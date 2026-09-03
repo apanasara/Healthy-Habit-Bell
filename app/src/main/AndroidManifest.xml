@@ -34,6 +34,37 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+
+            <!-- Google Assistant Voice Action: "OK Google, set timer on Habit Bell" -->
+            <intent-filter>
+                <action android:name="android.intent.action.SET_TIMER" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+
+            <!-- Google Assistant Voice Action: "OK Google, stop timer on Habit Bell" -->
+            <intent-filter>
+                <action android:name="android.intent.action.DISMISS_TIMER" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+
+            <!-- Google Assistant Voice Action: "OK Google, show timers on Habit Bell" -->
+            <intent-filter>
+                <action android:name="android.intent.action.SHOW_TIMERS" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+
+            <!-- Custom Voice Assistant & App Action Deep Links (e.g. habitbell://start?profile=eating) -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="habitbell" />
+            </intent-filter>
+
+            <!-- Google Assistant App Actions & Launcher Shortcuts -->
+            <meta-data
+                android:name="android.app.shortcuts"
+                android:resource="@xml/shortcuts" />
         </activity>
 
         <service
@@ -48,14 +79,19 @@
         <meta-data
             android:name="androidx.car.app.minCarApiLevel"
             android:value="1" />
+        <meta-data
+            android:name="com.google.android.gms.car.notification.SmallIcon"
+            android:resource="@mipmap/ic_launcher" />
 
         <service
             android:name=".auto.HabitBellCarAppService"
             android:exported="true"
+            android:icon="@mipmap/ic_launcher"
             android:label="@string/car_app_name">
             <intent-filter>
                 <action android:name="androidx.car.app.CarAppService" />
                 <category android:name="androidx.car.app.category.IOT" />
+                <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </service>
     </application>

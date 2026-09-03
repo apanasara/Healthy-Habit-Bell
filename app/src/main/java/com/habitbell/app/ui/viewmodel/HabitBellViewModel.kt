@@ -147,6 +147,44 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
+    fun pauseTimer() {
+        engine.pause()
+    }
+
+    fun resumeTimer() {
+        engine.startOrResume()
+    }
+
+    fun stopTimer() {
+        engine.reset()
+        exitSessionToHome()
+    }
+
+    fun startVoiceTimer(durationSec: Int, message: String) {
+        val allProfiles = profiles.value
+        val lowerMessage = message.lowercase().trim()
+        val matched = allProfiles.find {
+            lowerMessage.isNotEmpty() && (
+                lowerMessage.contains(it.name.lowercase()) ||
+                it.name.lowercase().contains(lowerMessage) ||
+                (lowerMessage.contains("eat") && it.id == "eating") ||
+                (lowerMessage.contains("posture") && it.id == "posture") ||
+                (lowerMessage.contains("read") && it.id == "reading") ||
+                (lowerMessage.contains("walk") && it.id == "walking")
+            )
+        } ?: allProfiles.firstOrNull()
+
+        if (matched != null) {
+            val finalProfile = if (durationSec > 0) {
+                matched.copy(
+                    totalDurationSeconds = durationSec,
+                    intervalDurationSeconds = (durationSec / 5).coerceIn(30, 300)
+                )
+            } else matched
+            startProfileSession(finalProfile)
+        }
+    }
+
     fun resetSession() {
         engine.reset()
     }

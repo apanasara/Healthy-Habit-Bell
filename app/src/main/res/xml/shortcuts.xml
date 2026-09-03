@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Google Assistant Built-in Intent: START_TIMER -->
+    <!-- e.g. "Hey Google, start a timer on Habit Bell" -->
+    <capability android:name="actions.intent.START_TIMER">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="com.habitbell.app.debug"
+            android:targetClass="com.habitbell.app.MainActivity">
+            <parameter
+                android:name="timer.name"
+                android:key="timerName"/>
+            <parameter
+                android:name="timer.duration"
+                android:key="timerDuration"/>
+        </intent>
+    </capability>
+
+    <!-- Google Assistant Built-in Intent: STOP_TIMER -->
+    <!-- e.g. "Hey Google, stop timer on Habit Bell" -->
+    <capability android:name="actions.intent.STOP_TIMER">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="habitbell://action/stop"
+            android:targetPackage="com.habitbell.app.debug"
+            android:targetClass="com.habitbell.app.MainActivity" />
+    </capability>
+
+    <!-- Google Assistant Built-in Intent: PAUSE_TIMER -->
+    <!-- e.g. "Hey Google, pause timer on Habit Bell" -->
+    <capability android:name="actions.intent.PAUSE_TIMER">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="habitbell://action/pause"
+            android:targetPackage="com.habitbell.app.debug"
+            android:targetClass="com.habitbell.app.MainActivity" />
+    </capability>
+
+    <!-- Google Assistant Built-in Intent: RESUME_TIMER -->
+    <!-- e.g. "Hey Google, resume timer on Habit Bell" -->
+    <capability android:name="actions.intent.RESUME_TIMER">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="habitbell://action/resume"
+            android:targetPackage="com.habitbell.app.debug"
+            android:targetClass="com.habitbell.app.MainActivity" />
+    </capability>
+
+    <!-- Static App Launcher Shortcut: Mindful Eating -->
+    <shortcut
+        android:shortcutId="shortcut_mindful_eating"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/profile_eating"
+        android:shortcutLongLabel="@string/profile_eating">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="habitbell://start?profile=eating"
+            android:targetPackage="com.habitbell.app.debug"
+            android:targetClass="com.habitbell.app.MainActivity" />
+    </shortcut>
+
+    <!-- Static App Launcher Shortcut: Posture & Alignment -->
+    <shortcut
+        android:shortcutId="shortcut_posture"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/profile_posture"
+        android:shortcutLongLabel="@string/profile_posture">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="habitbell://start?profile=posture"
+            android:targetPackage="com.habitbell.app.debug"
+            android:targetClass="com.habitbell.app.MainActivity" />
+    </shortcut>
+</shortcuts>

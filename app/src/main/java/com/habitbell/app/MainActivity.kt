@@ -1,5 +1,6 @@
 package com.habitbell.app
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -194,6 +195,59 @@ class MainActivity : ComponentActivity() {
                         }
                     }
                 }
+            }
+        }
+
+        // Handle Google Assistant & Voice Action on launch
+        handleVoiceIntent(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleVoiceIntent(intent)
+    }
+
+    private fun handleVoiceIntent(intent: Intent?) {
+        if (intent == null) return
+        val action = intent.action ?: ""
+        val dataUri = intent.data
+
+        when {
+            // Google Assistant / System Voice: "OK Google, set timer on Habit Bell"
+            action == android.provider.AlarmClock.ACTION_SET_TIMER -> {
+                val lengthSec = intent.getIntExtra(android.provider.AlarmClock.EXTRA_LENGTH, 0)
+                val message = intent.getStringExtra(android.provider.AlarmClock.EXTRA_MESSAGE) ?: ""
+                viewModel.startVoiceTimer(lengthSec, message)
+            }
+
+            // Google Assistant / System Voice: "OK Google, stop timer on Habit Bell"
+            action == android.provider.AlarmClock.ACTION_DISMISS_TIMER ||
+            (dataUri != null && dataUri.scheme == "habitbell" && dataUri.host == "action" && dataUri.path == "/stop") -> {
+                viewModel.stopTimer()
+            }
+
+            // App Action / Voice: Pause
+            (dataUri != null && dataUri.scheme == "habitbell" && dataUri.host == "action" && dataUri.path == "/pause") -> {
+                viewModel.pauseTimer()
+            }
+
+            // App Action / Voice: Resume
+            (dataUri != null && dataUri.scheme == "habitbell" && dataUri.host == "action" && dataUri.path == "/resume") -> {
+                viewModel.resumeTimer()
+            }
+
+            // Deep link: habitbell://start?profile=...
+            (dataUri != null && dataUri.scheme == "habitbell" && dataUri.host == "start") -> {
+                val profileKey = dataUri.getQueryParameter("profile") ?: ""
+                viewModel.startVoiceTimer(0, profileKey)
+            }
+
+            // App Actions / Voice search with timerName parameter
+            intent.hasExtra("timerName") -> {
+                val timerName = intent.getStringExtra("timerName") ?: ""
+                val duration = intent.getStringExtra("timerDuration")?.toIntOrNull() ?: 0
+                viewModel.startVoiceTimer(duration, timerName)
             }
         }
     }
