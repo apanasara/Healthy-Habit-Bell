@@ -103,16 +103,18 @@ class MainActivity : ComponentActivity() {
                             TVDashboardScreen(
                                 sessionState = sessionState,
                                 onTogglePlayPause = { viewModel.togglePlayPause() },
-                                onExitTVMode = { viewModel.navigateTo(AppScreen.SESSION) }
+                                onReset = { viewModel.resetSession() },
+                                onExit = { viewModel.exitSessionToHome() },
+                                onOpenSettings = { viewModel.openSettingsDrawer(true) }
                             )
                         }
 
                         AppScreen.CREATE_TIMER -> {
                             CreateTimerScreen(
-                                onSave = { profile ->
-                                    viewModel.createCustomProfile(profile)
-                                },
-                                onCancel = { viewModel.navigateTo(AppScreen.HOME) }
+                                onDismiss = { viewModel.navigateTo(AppScreen.HOME) },
+                                onSaveProfile = { customProfile ->
+                                    viewModel.createCustomProfile(customProfile)
+                                }
                             )
                         }
                     }
@@ -141,7 +143,8 @@ class MainActivity : ComponentActivity() {
                             onOpenTVMode = {
                                 viewModel.openSettingsDrawer(false)
                                 viewModel.navigateTo(AppScreen.TV_DASHBOARD)
-                            }
+                            },
+                            tvCastUrl = viewModel.getTvCastUrl()
                         )
                     }
 
@@ -153,8 +156,24 @@ class MainActivity : ComponentActivity() {
                             }
                         )
                     }
+
+                    // System Back button handling
+                    androidx.activity.compose.BackHandler(enabled = uiState.currentScreen != AppScreen.HOME || uiState.isSettingsDrawerOpen) {
+                        if (uiState.isSettingsDrawerOpen) {
+                            viewModel.openSettingsDrawer(false)
+                        } else {
+                            viewModel.exitSessionToHome()
+                        }
+                    }
                 }
             }
+        }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        if (isFinishing) {
+            viewModel.cancelHaptics()
         }
     }
 }

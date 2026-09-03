@@ -17,26 +17,29 @@ class HapticManager(private val context: Context) {
     }
 
     /**
-     * 1 Vibration - Interval Bell Cue (matching PRD: "1 Vibration Interval")
+     * Firm Dual-Pulse Vibration for Interval Cue (Tactile, punchy, easily felt through pocket fabric)
      */
     fun triggerIntervalHaptic() {
         if (vibrator?.hasVibrator() != true) return
+        val timings = longArrayOf(0, 250, 150, 300)
+        val amplitudes = intArrayOf(0, 255, 0, 255)
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             vibrator.vibrate(
-                VibrationEffect.createOneShot(120, VibrationEffect.DEFAULT_AMPLITUDE)
+                VibrationEffect.createWaveform(timings, amplitudes, -1)
             )
         } else {
             @Suppress("DEPRECATION")
-            vibrator.vibrate(120)
+            vibrator.vibrate(timings, -1)
         }
     }
 
     /**
-     * 3 Vibrations - Session Completed (matching PRD: "3 Vibrations Session Completed")
+     * 3 Vibrations - Session Completed (Strong, noticeable triple pulse)
      */
     fun triggerCompletionHaptic() {
         if (vibrator?.hasVibrator() != true) return
-        val timings = longArrayOf(0, 250, 150, 250, 150, 500)
+        val timings = longArrayOf(0, 350, 150, 350, 150, 600)
         val amplitudes = intArrayOf(0, 255, 0, 255, 0, 255)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -50,17 +53,26 @@ class HapticManager(private val context: Context) {
     }
 
     /**
-     * Subtle breath cue pulse for Pranayama inhale/hold/exhale phase transitions
+     * Breath cue pulse for Pranayama inhale/hold/exhale phase transitions
      */
     fun triggerBreathPhaseHaptic() {
         if (vibrator?.hasVibrator() != true) return
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             vibrator.vibrate(
-                VibrationEffect.createOneShot(45, (VibrationEffect.DEFAULT_AMPLITUDE * 0.7).toInt().coerceIn(1, 255))
+                VibrationEffect.createOneShot(120, 220)
             )
         } else {
             @Suppress("DEPRECATION")
-            vibrator.vibrate(45)
+            vibrator.vibrate(120)
         }
+    }
+
+    /**
+     * Immediately cancels all ongoing and queued vibrations
+     */
+    fun cancel() {
+        try {
+            vibrator?.cancel()
+        } catch (_: Exception) {}
     }
 }
