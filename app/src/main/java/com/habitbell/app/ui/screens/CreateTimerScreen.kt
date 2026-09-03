@@ -20,6 +20,14 @@ import com.habitbell.app.data.model.TimerProfile
 import com.habitbell.app.data.model.TimerType
 import java.util.UUID
 
+/**
+ * Screen enabling users to configure and persist custom timer profiles with personalized
+ * durations, interval chime periods, theme selections, and power modes.
+ *
+ * @param onSave Callback receiving the newly created [TimerProfile] to save and launch.
+ * @param onCancel Callback to dismiss the creation screen and return to Home.
+ * @param modifier Composable layout modifier.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CreateTimerScreen(

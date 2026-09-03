@@ -20,6 +20,39 @@ import androidx.compose.ui.platform.LocalContext
 import com.habitbell.app.data.model.ThemeMode
 import com.habitbell.app.data.model.TimerProfile
 
+/**
+ * Modal bottom sheet configuration drawer providing fine-grained controls for timer parameters,
+ * visual themes, power-saving modes, audio volumes, TV casting URLs, and ambient soundscapes.
+ *
+ * @param profile Active [TimerProfile] currently targeted for adjustments.
+ * @param currentTheme Currently applied visual theme mode ([ThemeMode]).
+ * @param isZenMode Whether minimalist Zen mode is enabled.
+ * @param isPocketMode Whether proximity-based Pocket Mode blanking is toggled.
+ * @param isDisplayMode Whether display is kept awake during active timer.
+ * @param isAutoDim Whether display automatically dims during rest.
+ * @param bellVolume Current gain level for Tibetan bell audio cues (0.0f..1.0f).
+ * @param onDismiss Callback invoked when the sheet is swiped down or dismissed.
+ * @param onThemeSelected Callback when the user selects a theme variant.
+ * @param onZenModeToggle Callback to toggle Zen mode.
+ * @param onPocketModeToggle Callback to toggle pocket mode.
+ * @param onDisplayModeToggle Callback to toggle screen awake mode.
+ * @param onAutoDimToggle Callback to toggle auto dimming.
+ * @param onVolumeChange Callback when bell volume slider is adjusted.
+ * @param onTestBell Callback to play a test chime and haptic pulse.
+ * @param onUpdateTime Callback when total duration or interval sliders are modified.
+ * @param onOpenTVMode Callback to launch TV Dashboard mode.
+ * @param tvCastUrl Network URL of the embedded TV cast web server.
+ * @param isBgMusicEnabled Master toggle for ambient soundscapes.
+ * @param bgMusicType Selected ambient sound strategy ([com.habitbell.app.engine.BackgroundSoundType]).
+ * @param bgMusicCustomName Human-readable filename of selected local audio track.
+ * @param bgMusicYouTubeUrl YouTube link for ambient background audio streaming.
+ * @param bgMusicVolume Ambient background music gain level (0.0f..1.0f).
+ * @param onBgMusicToggle Callback to toggle ambient music.
+ * @param onBgMusicTypeSelected Callback to select sound strategy.
+ * @param onPickCustomAudio Callback to launch system file picker for audio files.
+ * @param onBgMusicYouTubeUrlChange Callback when YouTube URL input changes.
+ * @param onBgMusicVolumeChange Callback when ambient music volume slider is adjusted.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsDrawer(

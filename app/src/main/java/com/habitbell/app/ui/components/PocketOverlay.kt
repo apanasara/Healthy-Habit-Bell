@@ -17,6 +17,18 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
+/**
+ * Pure `#000000` AMOLED power-saving curtain for Hardware Pocket Mode.
+ *
+ * When the user places the phone in their pocket or face down on a table during mindful eating
+ * or walking meditation, this overlay renders a 100% black screen. On OLED and AMOLED displays,
+ * black pixels are completely powered down, eliminating battery drain and screen glare.
+ *
+ * Touching anywhere on the screen invokes [onDismiss] to unlock and reveal the session UI.
+ *
+ * @param onDismiss Callback invoked when the user taps anywhere to dismiss the pocket curtain.
+ * @param modifier Composable layout modifier.
+ */
 @Composable
 fun PocketOverlay(
     onDismiss: () -> Unit,
@@ -25,10 +37,11 @@ fun PocketOverlay(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(Color.Black) // 100% pure black, OLED displays turn off pixels completely
+            // 100% pure black: OLED displays turn off individual emissive pixels completely
+            .background(Color.Black)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
-                indication = null
+                indication = null // Suppress ripple animation to maintain complete darkness
             ) {
                 onDismiss()
             },
@@ -40,8 +53,8 @@ fun PocketOverlay(
         ) {
             Icon(
                 imageVector = Icons.Outlined.Lock,
-                contentDescription = "Pocket Mode",
-                tint = Color(0xFF333333), // Subdued low luminance to conserve battery
+                contentDescription = "Pocket Mode Active",
+                tint = Color(0xFF333333), // Subdued low luminance to preserve battery
                 modifier = Modifier.size(36.dp)
             )
             Spacer(modifier = Modifier.height(12.dp))

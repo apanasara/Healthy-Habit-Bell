@@ -5,6 +5,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import com.habitbell.app.data.model.ThemeMode
 
+/** Pure `#000000` AMOLED color scheme for OLED displays. */
 private val AmoledColorScheme = darkColorScheme(
     primary = BellGold,
     secondary = EyeComfortAmber,
@@ -17,6 +18,7 @@ private val AmoledColorScheme = darkColorScheme(
     onSurfaceVariant = AmoledMuted
 )
 
+/** Circadian warm amber color scheme for evening wind-down. */
 private val EyeComfortColorScheme = darkColorScheme(
     primary = EyeComfortAmber,
     secondary = EyeComfortWarmGold,
@@ -29,6 +31,7 @@ private val EyeComfortColorScheme = darkColorScheme(
     onSurfaceVariant = EyeComfortMuted
 )
 
+/** Standard neutral dark theme. */
 private val StandardDarkColorScheme = darkColorScheme(
     primary = BellGold,
     secondary = ZenGreen,
@@ -41,6 +44,7 @@ private val StandardDarkColorScheme = darkColorScheme(
     onSurfaceVariant = DarkMuted
 )
 
+/** Standard crisp daytime light theme. */
 private val StandardLightColorScheme = lightColorScheme(
     primary = EyeComfortAmber,
     secondary = ZenGreen,
@@ -53,6 +57,14 @@ private val StandardLightColorScheme = lightColorScheme(
     onSurfaceVariant = LightMuted
 )
 
+/**
+ * Top-level Material3 Theme wrapper for Habit Bell.
+ *
+ * Dynamically resolves color schemes according to the selected [ThemeMode].
+ *
+ * @param themeMode The active theme configuration ([ThemeMode.AMOLED], [ThemeMode.EYE_COMFORT], etc.).
+ * @param content The composable subtree wrapped with this styling theme.
+ */
 @Composable
 fun HabitBellTheme(
     themeMode: ThemeMode = ThemeMode.AMOLED,

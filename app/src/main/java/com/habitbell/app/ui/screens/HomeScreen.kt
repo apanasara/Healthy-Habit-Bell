@@ -24,6 +24,25 @@ import com.habitbell.app.data.model.*
 import com.habitbell.app.ui.theme.BellGold
 import com.habitbell.app.ui.theme.EyeComfortAmber
 
+/**
+ * Primary home landing screen displaying the catalog of wellness timer profiles,
+ * quick-start favorites, recent sessions, and daily routine reminders.
+ *
+ * @param profiles Complete list of available timer profiles (both presets and custom).
+ * @param favorites Sub-list of profiles flagged as favorites by the user.
+ * @param recentProfiles Chronologically ordered list of recently launched profiles.
+ * @param reminders Scheduled daily routine reminders (e.g. hydration, mindful lunch).
+ * @param currentTheme Currently applied visual theme mode ([ThemeMode]).
+ * @param isZenMode Whether Zen mode is enabled to suppress non-critical dashboard clutter.
+ * @param onSelectProfile Callback invoked when a profile card or row is tapped to start a session.
+ * @param onConfigureProfile Callback invoked to open the profile customization bottom sheet.
+ * @param onToggleFavorite Callback invoked when the star favorite toggle button is clicked.
+ * @param onToggleZenMode Callback to toggle the distraction-free Zen mode.
+ * @param onCycleTheme Callback to cycle between AMOLED, Eye Comfort, Dark, and Light themes.
+ * @param onCreateNewClick Callback invoked when the FAB is tapped to create a custom profile.
+ * @param onOpenTVMode Callback invoked to launch a profile directly in TV Dashboard mode.
+ * @param modifier Composable layout modifier.
+ */
 @Composable
 fun HomeScreen(
     profiles: List<TimerProfile>,
@@ -162,6 +181,14 @@ fun HomeScreen(
     }
 }
 
+/**
+ * Top app bar displaying app branding, active Zen mode indicator, and theme cycle button.
+ *
+ * @param currentTheme Currently applied visual theme mode ([ThemeMode]).
+ * @param isZenMode Whether Zen mode is currently active.
+ * @param onToggleZenMode Callback to toggle Zen mode state.
+ * @param onCycleTheme Callback to advance to the next theme variant.
+ */
 @Composable
 private fun HomeTopBar(
     currentTheme: ThemeMode,
@@ -230,6 +257,13 @@ private fun HomeTopBar(
     }
 }
 
+/**
+ * Card section displaying scheduled routine reminders across morning, afternoon, and night.
+ *
+ * @param reminders List of [RoutineReminder] schedules.
+ * @param profiles Complete list of profiles used to resolve profile names and launchers.
+ * @param onStartProfile Callback to launch the profile associated with a clicked reminder.
+ */
 @Composable
 private fun RoutineReminderSection(
     reminders: List<RoutineReminder>,
@@ -296,6 +330,14 @@ private fun RoutineReminderSection(
     }
 }
 
+/**
+ * Compact square card rendered inside the horizontal Favorites carousel.
+ *
+ * @param profile [TimerProfile] data entity.
+ * @param onClick Callback to launch session for this profile.
+ * @param onTVClick Callback to launch TV leanback mode.
+ * @param onSettingsClick Callback to open profile customization drawer.
+ */
 @Composable
 private fun FavoriteCard(
     profile: TimerProfile,
@@ -372,6 +414,12 @@ private fun FavoriteCard(
     }
 }
 
+/**
+ * Quick-start pill chip rendered in the Recents row for rapid session resumption.
+ *
+ * @param profile [TimerProfile] recently completed or run.
+ * @param onClick Callback to launch this profile.
+ */
 @Composable
 private fun RecentChip(
     profile: TimerProfile,
@@ -402,6 +450,16 @@ private fun RecentChip(
     }
 }
 
+/**
+ * Full-width profile list card displaying category emoji, duration stats, cast icon,
+ * configuration icon, and star favorite toggle.
+ *
+ * @param profile [TimerProfile] metadata entity.
+ * @param onClick Callback to start session.
+ * @param onToggleFav Callback to toggle favorite star.
+ * @param onTVClick Callback to launch TV mode.
+ * @param onSettingsClick Callback to open settings drawer.
+ */
 @Composable
 private fun TimerProfileListItem(
     profile: TimerProfile,

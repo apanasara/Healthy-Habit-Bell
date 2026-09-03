@@ -26,6 +26,22 @@ import com.habitbell.app.ui.components.BreathIndicator
 import com.habitbell.app.ui.components.CircularProgressRing
 import com.habitbell.app.ui.components.CompoundPoseCard
 
+/**
+ * Active timer execution screen rendering real-time countdown progress, breathing visualizers,
+ * compound posture guidance, and playback controls.
+ *
+ * Dynamically switches between [LandscapeSessionLayout] and [PortraitSessionLayout] depending
+ * on device configuration, ensuring zero cutoffs on horizontal displays and tablets.
+ *
+ * @param sessionState Reactive snapshot of the active timer engine ([TimerSessionState]).
+ * @param onTogglePlayPause Callback to alternate between running and paused timer execution.
+ * @param onReset Callback to reset countdown back to initial profile duration.
+ * @param onOpenSettings Callback to open the settings configuration drawer.
+ * @param onExit Callback to exit session and return to the Home dashboard.
+ * @param onTriggerPocketMode Callback to engage manual Pocket Mode AMOLED screen blanking.
+ * @param onOpenTVMode Callback to open leanback TV Dashboard mode.
+ * @param modifier Composable layout modifier.
+ */
 @Composable
 fun SessionScreen(
     sessionState: TimerSessionState,
@@ -70,8 +86,16 @@ fun SessionScreen(
 }
 
 /**
- * Responsive Landscape Layout: 2-column balanced presentation so all buttons and the timer
- * are fully accessible and clearly visible without scrolling or cutoffs on horizontal phones.
+ * Responsive 2-column landscape layout ensuring timer rings and action controls
+ * remain fully visible simultaneously on horizontal devices without vertical scrolling.
+ *
+ * @param sessionState Reactive timer state snapshot ([TimerSessionState]).
+ * @param onTogglePlayPause Toggle play/pause callback.
+ * @param onReset Reset timer callback.
+ * @param onOpenSettings Open settings callback.
+ * @param onExit Exit to home callback.
+ * @param onTriggerPocketMode Manual pocket mode trigger callback.
+ * @param onOpenTVMode TV leanback mode trigger callback.
  */
 @Composable
 private fun LandscapeSessionLayout(
@@ -288,7 +312,16 @@ private fun LandscapeSessionLayout(
 }
 
 /**
- * Clean Portrait Layout
+ * Standard vertical portrait layout arranging header navigation, central circular timer /
+ * breath indicator, and bottom transport control buttons.
+ *
+ * @param sessionState Reactive timer state snapshot ([TimerSessionState]).
+ * @param onTogglePlayPause Toggle play/pause callback.
+ * @param onReset Reset timer callback.
+ * @param onOpenSettings Open settings callback.
+ * @param onExit Exit to home callback.
+ * @param onTriggerPocketMode Manual pocket mode trigger callback.
+ * @param onOpenTVMode TV leanback mode trigger callback.
  */
 @Composable
 private fun PortraitSessionLayout(

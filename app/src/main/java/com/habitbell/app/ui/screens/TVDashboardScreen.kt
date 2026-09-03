@@ -20,6 +20,17 @@ import androidx.compose.ui.unit.sp
 import com.habitbell.app.engine.SessionStatus
 import com.habitbell.app.engine.TimerSessionState
 
+/**
+ * Big-screen leanback dashboard designed for Android TV, living room tablets, and landscape monitors.
+ *
+ * Renders high-visibility typography (110sp countdown digits legible from 15+ feet away),
+ * wide progress bars, next interval bell countdowns, and large D-pad friendly transport controls.
+ *
+ * @param sessionState Reactive timer state snapshot ([TimerSessionState]).
+ * @param onTogglePlayPause Callback to alternate between running and paused timer execution.
+ * @param onExitTVMode Callback to exit leanback mode and return to standard mobile view.
+ * @param modifier Composable layout modifier.
+ */
 @Composable
 fun TVDashboardScreen(
     sessionState: TimerSessionState,

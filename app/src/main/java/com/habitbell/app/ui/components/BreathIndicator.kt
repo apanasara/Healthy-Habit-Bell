@@ -15,6 +15,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.habitbell.app.data.model.PranayamaPhase
 
+/**
+ * Animated breathing circle visualizer for multi-phase Pranayama breathwork.
+ *
+ * Smoothly scales an inner core ring and luminous breathing aura to guide inhalation,
+ * breath retention, and exhalation cycles in harmony with configured phase durations.
+ *
+ * @param phase Active breathwork phase ([PranayamaPhase.INHALE], [PranayamaPhase.HOLD_IN], [PranayamaPhase.EXHALE], [PranayamaPhase.HOLD_OUT]).
+ * @param remainingSeconds Seconds remaining in the current active breath phase.
+ * @param phaseDuration Total configured duration of the active breath phase in seconds.
+ * @param modifier Composable layout modifier.
+ * @param size Outer dimension bounding box of the visualizer (defaults to `260.dp`).
+ */
 @Composable
 fun BreathIndicator(
     phase: PranayamaPhase,
@@ -23,13 +35,15 @@ fun BreathIndicator(
     modifier: Modifier = Modifier,
     size: Dp = 260.dp
 ) {
+    // Determine target expansion scale factor based on biological breath mechanics
     val targetScale = when (phase) {
-        PranayamaPhase.INHALE -> 1.0f
-        PranayamaPhase.HOLD_IN -> 0.96f
-        PranayamaPhase.EXHALE -> 0.45f
-        PranayamaPhase.HOLD_OUT -> 0.45f
+        PranayamaPhase.INHALE -> 1.0f    // Full lung expansion
+        PranayamaPhase.HOLD_IN -> 0.96f  // Steady full retention with subtle pulse
+        PranayamaPhase.EXHALE -> 0.45f   // Deflation to resting residual capacity
+        PranayamaPhase.HOLD_OUT -> 0.45f // Sustained calm resting empty state
     }
 
+    // Dynamic animation duration synchronized to the exact phase length
     val animDurationMs = (phaseDuration * 1000).coerceAtLeast(1000)
     val animatedScale by animateFloatAsState(
         targetValue = targetScale,
@@ -48,20 +62,20 @@ fun BreathIndicator(
             val maxRadius = this.size.minDimension / 2f
             val currentRadius = maxRadius * animatedScale
 
-            // Outer guideline
+            // 1. Static outer boundary guideline
             drawCircle(
                 color = trackColor,
                 radius = maxRadius - 10f,
                 style = Stroke(width = 2.dp.toPx())
             )
 
-            // Animated breathing aura
+            // 2. Dynamic breathing aura fill
             drawCircle(
                 color = primaryColor.copy(alpha = 0.22f),
                 radius = currentRadius
             )
 
-            // Inner core ring
+            // 3. Crisp inner core contour ring
             drawCircle(
                 color = primaryColor,
                 radius = currentRadius,
@@ -69,6 +83,7 @@ fun BreathIndicator(
             )
         }
 
+        // Centered textual cue and countdown
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 text = phase.displayName.uppercase(),

@@ -2,16 +2,24 @@ package com.habitbell.app.data.default
 
 import com.habitbell.app.data.model.*
 
+/**
+ * Pre-configured wellness timer profiles based on scientifically validated health habits,
+ * yogic traditions, and mindfulness practices.
+ */
 object DefaultProfiles {
 
+    /**
+     * Mindful Eating: 20-minute total meal duration with a 30-second interval chime.
+     * Encourages thorough chewing, paced eating, and improved digestive satiety signaling.
+     */
     val EATING = TimerProfile(
         id = "eating-mindful-20",
         name = "Eating",
         type = TimerType.LINEAR,
         category = "Mindful Eating",
         iconName = "restaurant",
-        totalDurationSeconds = 1200,      // 20 minutes
-        intervalDurationSeconds = 30,     // 30-second bite reminder
+        totalDurationSeconds = 1200,      // 20 minutes total mealtime
+        intervalDurationSeconds = 30,     // 30-second bite pacing bell
         bellPattern = BellPattern.THREE_BELL,
         theme = ThemeMode.EYE_COMFORT,
         displayMode = true,
@@ -19,6 +27,10 @@ object DefaultProfiles {
         isFavorite = true
     )
 
+    /**
+     * Reiki Energy Healing: 45-minute total session with a 3-minute transition bell.
+     * Accompanying practitioners through 12 to 15 standard hand placement positions.
+     */
     val REIKI = TimerProfile(
         id = "reiki-session-45",
         name = "Reiki",
@@ -34,6 +46,11 @@ object DefaultProfiles {
         isFavorite = true
     )
 
+    /**
+     * Box Breathing (Sama Vritti): Equalized 4-4-4-4 ratio across 20 cycles.
+     * Inhale 4s, Hold In 4s, Exhale 4s, Rest Empty 4s.
+     * Clinically proven to regulate the autonomic nervous system and lower cortisol.
+     */
     val PRANAYAMA_BOX = TimerProfile(
         id = "pranayama-box-breath",
         name = "Pranayama (Box Breath)",
@@ -55,6 +72,11 @@ object DefaultProfiles {
         )
     )
 
+    /**
+     * 4-7-8 Relaxing Breath: Dr. Andrew Weil technique across 15 cycles.
+     * Inhale 4s, Hold In 7s, Exhale 8s, Rest 2s.
+     * Activates the parasympathetic vagal response for deep tranquility and sleep preparation.
+     */
     val PRANAYAMA_478 = TimerProfile(
         id = "pranayama-478-relax",
         name = "Pranayama (4-7-8 Deep Relax)",
@@ -76,6 +98,10 @@ object DefaultProfiles {
         )
     )
 
+    /**
+     * Surya Namaskar (Sun Salutation): 12-asana compound sequence across 5 full rounds.
+     * 5 seconds per posture with synchronized breath cues.
+     */
     val SURYA_NAMASKAR = TimerProfile(
         id = "surya-namaskar-compound",
         name = "Surya Namaskar",
@@ -105,6 +131,10 @@ object DefaultProfiles {
         )
     )
 
+    /**
+     * Mindful Walking: 15-minute walking meditation with 5-minute interval check-ins.
+     * Pocket mode enabled by default for hands-free outdoor movement.
+     */
     val MINDFUL_WALKING = TimerProfile(
         id = "mindful-walking-15",
         name = "Mindful Walking",
@@ -120,6 +150,9 @@ object DefaultProfiles {
         isFavorite = false
     )
 
+    /**
+     * Mindful Reading: 30-minute focused study/reading sprint with 10-minute eye relief chimes.
+     */
     val MINDFUL_READING = TimerProfile(
         id = "mindful-reading-30",
         name = "Mindful Reading",
@@ -135,6 +168,9 @@ object DefaultProfiles {
         isFavorite = false
     )
 
+    /**
+     * Hydration Habit: 60-minute recurring reminder chime encouraging regular water intake.
+     */
     val HYDRATION = TimerProfile(
         id = "hydration-reminder-60",
         name = "Hydration Habit",
@@ -150,6 +186,9 @@ object DefaultProfiles {
         isFavorite = false
     )
 
+    /**
+     * Complete list of all default preset wellness profiles.
+     */
     val ALL_PRESETS = listOf(
         EATING,
         REIKI,

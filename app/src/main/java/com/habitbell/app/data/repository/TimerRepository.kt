@@ -13,29 +13,66 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
+/**
+ * Top-level DataStore extension property for local persistent preferences.
+ */
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "habit_bell_prefs")
 
+/**
+ * Repository orchestrating access, modification, and persistence of wellness timer profiles,
+ * favorite lists, recent session history, and scheduled habit reminders.
+ *
+ * Exposes immutable reactive [StateFlow] pipelines to provide single-source-of-truth state
+ * updates across ViewModels, car automotive interfaces, and cast services.
+ *
+ * @param context Android context for DataStore initialization and disk operations.
+ */
 class TimerRepository(private val context: Context) {
 
+    /** Coroutine scope on [Dispatchers.IO] dedicated to background data persistence. */
     private val scope = CoroutineScope(Dispatchers.IO)
 
+    /** Mutable backing stream holding the complete catalog of preset and user-created profiles. */
     private val _profiles = MutableStateFlow<List<TimerProfile>>(DefaultProfiles.ALL_PRESETS)
+
+    /** Public read-only stream emitting the live list of available timer profiles. */
     val profiles: StateFlow<List<TimerProfile>> = _profiles.asStateFlow()
 
+    /** Mutable backing stream tracking recently executed profile IDs (ordered most recent first). */
     private val _recentProfileIds = MutableStateFlow<List<String>>(listOf("eating-mindful-20", "pranayama-box-breath", "reiki-session-45"))
+
+    /** Public read-only stream emitting list of recently used profile IDs. */
     val recentProfileIds: StateFlow<List<String>> = _recentProfileIds.asStateFlow()
 
+    /** Mutable backing stream for active daily habit reminders. */
     private val _reminders = MutableStateFlow<List<RoutineReminder>>(DefaultReminders.ALL_REMINDERS)
+
+    /** Public read-only stream emitting list of scheduled routine reminders. */
     val reminders: StateFlow<List<RoutineReminder>> = _reminders.asStateFlow()
 
+    /**
+     * Derived stream filtering profiles marked as favorite by the user.
+     * Starts eagerly to ensure instantaneous UI population.
+     */
     val favorites: StateFlow<List<TimerProfile>> = _profiles.map { list ->
         list.filter { it.isFavorite }
     }.stateIn(scope, SharingStarted.Eagerly, DefaultProfiles.ALL_PRESETS.filter { it.isFavorite })
 
+    /**
+     * Queries a profile by its unique ID.
+     *
+     * @param id The unique profile string identifier.
+     * @return Matching [TimerProfile] if found, or null otherwise.
+     */
     fun getProfileById(id: String): TimerProfile? {
         return _profiles.value.find { it.id == id }
     }
 
+    /**
+     * Toggles the favorite status for a given profile ID.
+     *
+     * @param profileId Unique ID of the profile whose favorite status will be inverted.
+     */
     fun toggleFavorite(profileId: String) {
         _profiles.update { currentList ->
             currentList.map { profile ->
@@ -48,6 +85,12 @@ class TimerRepository(private val context: Context) {
         }
     }
 
+    /**
+     * Records the completion or execution of a session, moving its ID to the front of
+     * the recent history list (capped at 5 recent profiles).
+     *
+     * @param profileId Unique ID of the completed profile.
+     */
     fun recordSessionCompleted(profileId: String) {
         _recentProfileIds.update { list ->
             val updated = list.filter { it != profileId }.toMutableList()
@@ -56,6 +99,12 @@ class TimerRepository(private val context: Context) {
         }
     }
 
+    /**
+     * Saves a newly created or edited custom timer profile into the repository.
+     * If a profile with the same ID already exists, it is replaced; otherwise appended.
+     *
+     * @param profile The [TimerProfile] instance to insert or update.
+     */
     fun saveCustomProfile(profile: TimerProfile) {
         _profiles.update { current ->
             val existingIndex = current.indexOfFirst { it.id == profile.id }
@@ -67,6 +116,15 @@ class TimerRepository(private val context: Context) {
         }
     }
 
+    /**
+     * Updates specific runtime settings of an existing profile without mutating its core identity.
+     *
+     * @param profileId Target profile identifier.
+     * @param totalDuration Optional new total duration in seconds.
+     * @param intervalDuration Optional new interval duration in seconds.
+     * @param displayMode Optional toggle for keep-screen-on display mode.
+     * @param pocketMode Optional toggle for proximity-sensor pocket mode.
+     */
     fun updateProfileSettings(
         profileId: String,
         totalDuration: Int? = null,

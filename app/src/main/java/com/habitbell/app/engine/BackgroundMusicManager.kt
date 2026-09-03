@@ -11,24 +11,62 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import java.util.regex.Pattern
 
+/**
+ * Supported sound sources for background ambient soundscapes during meditation.
+ */
 enum class BackgroundSoundType {
+    /** Continuous acoustic Aum / Om resonant drone synthesized or looped from assets. */
     DEFAULT_AUM,
+
+    /** User-selected local audio file via Android Storage Access Framework URI. */
     CUSTOM_FILE,
+
+    /** Online ambient stream streamed via YouTube IFrame player. */
     YOUTUBE_LINK,
+
+    /** Complete background silence (only bell chimes will play). */
     NONE
 }
 
+/**
+ * Coordinates ambient background soundscapes during active timer sessions.
+ *
+ * Supports multi-source audio delivery:
+ * 1. Looping local audio via Android [MediaPlayer].
+ * 2. Background audio streaming from YouTube URLs utilizing a sandboxed, ad-free
+ *    headless [WebView] communicating via the YouTube IFrame Player API.
+ *
+ * @param context Android context for media playback and resource resolution.
+ */
 class BackgroundMusicManager(private val context: Context) {
 
     private val TAG = "BackgroundMusicManager"
+
+    /** Main thread handler for dispatching UI-bound WebView calls. */
     private val mainHandler = Handler(Looper.getMainLooper())
+
+    /** Native media player for local raw resources and SAF storage audio files. */
     private var mediaPlayer: MediaPlayer? = null
+
+    /** Sandboxed headless WebView for hosting YouTube IFrame embed. */
     private var youtubeWebView: WebView? = null
 
+    /** Master toggle enabling or disabling background music playback. */
     var isEnabled: Boolean = true
+
+    /** Currently selected sound source strategy. */
     var soundType: BackgroundSoundType = BackgroundSoundType.DEFAULT_AUM
+
+    /** String URI of user-selected custom audio file. */
     var customAudioUri: String? = null
+
+    /** YouTube video URL or ID for streaming ambient music. */
     var youtubeUrl: String = "https://www.youtube.com/watch?v=x6UITRjhijI"
+
+    /**
+     * Normalized audio volume gain (0.0f to 1.0f).
+     * Synchronously propagates volume changes to both [MediaPlayer] and the YouTube IFrame player.
+     */
     var volume: Float = 0.35f
         set(value) {
             field = value.coerceIn(0f, 1f)
@@ -38,6 +76,9 @@ class BackgroundMusicManager(private val context: Context) {
             setYouTubeVolume(field)
         }
 
+    /**
+     * Starts background soundscape according to the active [soundType].
+     */
     fun start() {
         if (!isEnabled || soundType == BackgroundSoundType.NONE) {
             stop()
@@ -63,6 +104,9 @@ class BackgroundMusicManager(private val context: Context) {
         }
     }
 
+    /**
+     * Pauses active media playback (both native MediaPlayer and YouTube IFrame).
+     */
     fun pause() {
         try {
             if (mediaPlayer?.isPlaying == true) {
@@ -73,6 +117,9 @@ class BackgroundMusicManager(private val context: Context) {
         sendYouTubeCommand("pauseVideo")
     }
 
+    /**
+     * Resumes background playback if enabled.
+     */
     fun resume() {
         if (!isEnabled || soundType == BackgroundSoundType.NONE) return
         when (soundType) {
@@ -94,11 +141,17 @@ class BackgroundMusicManager(private val context: Context) {
         }
     }
 
+    /**
+     * Stops both MediaPlayer and YouTube streams and releases volatile webview contexts.
+     */
     fun stop() {
         stopMediaPlayer()
         stopYouTube()
     }
 
+    /**
+     * Safely halts and releases the native [MediaPlayer] instance.
+     */
     private fun stopMediaPlayer() {
         try {
             mediaPlayer?.let {
@@ -111,6 +164,9 @@ class BackgroundMusicManager(private val context: Context) {
         mediaPlayer = null
     }
 
+    /**
+     * Destroys the headless [WebView] hosting the YouTube embed on the main thread.
+     */
     private fun stopYouTube() {
         mainHandler.post {
             try {
@@ -122,6 +178,9 @@ class BackgroundMusicManager(private val context: Context) {
         }
     }
 
+    /**
+     * Instantiates and begins looping playback of a local audio track or bundled Aum chant drone.
+     */
     private fun playMediaPlayer() {
         stopMediaPlayer()
 
@@ -130,6 +189,7 @@ class BackgroundMusicManager(private val context: Context) {
             .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
             .build()
 
+        // Handle user custom audio file
         if (soundType == BackgroundSoundType.CUSTOM_FILE && !customAudioUri.isNullOrBlank()) {
             try {
                 val uri = Uri.parse(customAudioUri)
@@ -147,7 +207,7 @@ class BackgroundMusicManager(private val context: Context) {
             }
         }
 
-        // Default Aum Chanting Drone
+        // Default Aum Chanting Drone from raw assets
         val resId = context.resources.getIdentifier("aum_chant_drone", "raw", context.packageName)
         if (resId != 0) {
             mediaPlayer = MediaPlayer.create(context, resId, audioAttributes, 0)?.apply {
@@ -158,6 +218,9 @@ class BackgroundMusicManager(private val context: Context) {
         }
     }
 
+    /**
+     * Initializes a headless sandboxed WebView to play YouTube audio without visual distraction or banner ads.
+     */
     private fun playYouTubeAudio() {
         val videoId = extractVideoId(youtubeUrl) ?: "x6UITRjhijI"
 
@@ -179,6 +242,7 @@ class BackgroundMusicManager(private val context: Context) {
                     }
                 }
 
+                // Clean minimal HTML hosting YouTube IFrame API
                 val embedHtml = """
                     <!DOCTYPE html>
                     <html>
@@ -207,6 +271,11 @@ class BackgroundMusicManager(private val context: Context) {
         }
     }
 
+    /**
+     * Injects custom CSS and periodic DOM mutation checks to hide banner overlays and auto-skip advertisements.
+     *
+     * @param view Target [WebView] instance.
+     */
     private fun injectAdBlocker(view: WebView?) {
         val js = """
             (function() {
@@ -230,6 +299,12 @@ class BackgroundMusicManager(private val context: Context) {
         view?.evaluateJavascript(js, null)
     }
 
+    /**
+     * Dispatches an IFrame API JSON message into the YouTube player iframe.
+     *
+     * @param command JavaScript function name (e.g. "playVideo", "pauseVideo", "stopVideo").
+     * @param args Optional JSON array string formatted arguments.
+     */
     private fun sendYouTubeCommand(command: String, args: String = "") {
         mainHandler.post {
             val json = if (args.isEmpty()) {
@@ -242,11 +317,22 @@ class BackgroundMusicManager(private val context: Context) {
         }
     }
 
+    /**
+     * Updates YouTube player volume.
+     *
+     * @param vol Normalized floating-point volume between `0.0f` and `1.0f`.
+     */
     private fun setYouTubeVolume(vol: Float) {
         val intVol = (vol * 100).toInt().coerceIn(0, 100)
         sendYouTubeCommand("setVolume", "[$intVol]")
     }
 
+    /**
+     * Extracts an 11-character YouTube video ID from various URL structures (watch, shorts, embed, youtu.be).
+     *
+     * @param url Raw input URL string.
+     * @return 11-character alphanumeric video ID, or null if no valid ID pattern was found.
+     */
     fun extractVideoId(url: String): String? {
         val cleanUrl = url.trim()
         val patterns = listOf(
@@ -262,6 +348,9 @@ class BackgroundMusicManager(private val context: Context) {
         return null
     }
 
+    /**
+     * Releases active media players and destroys WebView instances.
+     */
     fun release() {
         stop()
     }

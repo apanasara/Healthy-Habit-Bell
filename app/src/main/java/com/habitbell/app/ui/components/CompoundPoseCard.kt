@@ -13,6 +13,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.habitbell.app.data.model.CompoundPose
 
+/**
+ * Visual card displaying the current posture, round index, and breathing cue
+ * for compound sequential timers (such as Surya Namaskar or Reiki hand positions).
+ *
+ * @param pose Active posture metadata ([CompoundPose]) including names, duration, and breath cue.
+ * @param currentRound Current 1-based repetition round number.
+ * @param totalRounds Total target rounds configured for the sequence.
+ * @param remainingSeconds Seconds remaining in the active pose.
+ * @param modifier Composable layout modifier.
+ */
 @Composable
 fun CompoundPoseCard(
     pose: CompoundPose,
@@ -27,7 +37,7 @@ fun CompoundPoseCard(
             .padding(horizontal = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Round Indicator
+        // Round and Pose Index Header
         Text(
             text = "ROUND $currentRound OF $totalRounds • POSE ${pose.index} / 12",
             style = MaterialTheme.typography.labelSmall,
@@ -37,7 +47,7 @@ fun CompoundPoseCard(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Pose Sanskrit Name
+        // Primary Posture Name (e.g., "Pranamasana", "Bhujangasana")
         Text(
             text = pose.name,
             style = MaterialTheme.typography.headlineMedium,
@@ -45,7 +55,7 @@ fun CompoundPoseCard(
             color = MaterialTheme.colorScheme.onBackground
         )
 
-        // Sanskrit Meaning / English Name
+        // Translation / Meaning (e.g., "Prayer Pose", "Cobra Pose")
         Text(
             text = pose.sanskritName,
             style = MaterialTheme.typography.bodyMedium,
@@ -54,7 +64,7 @@ fun CompoundPoseCard(
 
         Spacer(modifier = Modifier.height(20.dp))
 
-        // Breath Guidance Box
+        // Synchronized Breath Cue Badge
         Box(
             modifier = Modifier
                 .background(
