@@ -1,5 +1,6 @@
 package com.habitbell.app.engine
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.media.AudioAttributes
 import android.media.MediaPlayer
@@ -7,6 +8,8 @@ import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import android.webkit.WebChromeClient
+import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import java.util.regex.Pattern
@@ -51,6 +54,12 @@ class BackgroundMusicManager(private val context: Context) {
     /** Sandboxed headless WebView for hosting YouTube IFrame embed. */
     private var youtubeWebView: WebView? = null
 
+    /** Currently active video ID loaded in WebView. */
+    private var activeVideoId: String? = null
+
+    /** State flag to prevent redundant restart loops. */
+    private var isPlaying: Boolean = false
+
     /** Master toggle enabling or disabling background music playback. */
     var isEnabled: Boolean = true
 
@@ -77,6 +86,32 @@ class BackgroundMusicManager(private val context: Context) {
         }
 
     /**
+     * Returns or instantiates the WebView. Attaching it to the Activity view hierarchy
+     * ensures Chromium does not throttle or suspend background audio execution.
+     */
+    @SuppressLint("SetJavaScriptEnabled")
+    fun getOrCreateWebView(ctx: Context): WebView {
+        if (youtubeWebView == null) {
+            youtubeWebView = WebView(ctx.applicationContext).apply {
+                settings.javaScriptEnabled = true
+                settings.mediaPlaybackRequiresUserGesture = false
+                settings.domStorageEnabled = true
+                settings.databaseEnabled = true
+                settings.cacheMode = WebSettings.LOAD_DEFAULT
+                settings.userAgentString = "Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+                webChromeClient = WebChromeClient()
+                webViewClient = object : WebViewClient() {
+                    override fun onPageFinished(view: WebView?, url: String?) {
+                        super.onPageFinished(view, url)
+                        Log.d(TAG, "YouTube player page finished loading.")
+                    }
+                }
+            }
+        }
+        return youtubeWebView!!
+    }
+
+    /**
      * Starts background soundscape according to the active [soundType].
      */
     fun start() {
@@ -90,11 +125,7 @@ class BackgroundMusicManager(private val context: Context) {
                 stopMediaPlayer()
                 playYouTubeAudio()
             }
-            BackgroundSoundType.CUSTOM_FILE -> {
-                stopYouTube()
-                playMediaPlayer()
-            }
-            BackgroundSoundType.DEFAULT_AUM -> {
+            BackgroundSoundType.CUSTOM_FILE, BackgroundSoundType.DEFAULT_AUM -> {
                 stopYouTube()
                 playMediaPlayer()
             }
@@ -102,12 +133,14 @@ class BackgroundMusicManager(private val context: Context) {
                 stop()
             }
         }
+        isPlaying = true
     }
 
     /**
      * Pauses active media playback (both native MediaPlayer and YouTube IFrame).
      */
     fun pause() {
+        isPlaying = false
         try {
             if (mediaPlayer?.isPlaying == true) {
                 mediaPlayer?.pause()
@@ -122,6 +155,7 @@ class BackgroundMusicManager(private val context: Context) {
      */
     fun resume() {
         if (!isEnabled || soundType == BackgroundSoundType.NONE) return
+        isPlaying = true
         when (soundType) {
             BackgroundSoundType.YOUTUBE_LINK -> {
                 sendYouTubeCommand("playVideo")
@@ -142,9 +176,10 @@ class BackgroundMusicManager(private val context: Context) {
     }
 
     /**
-     * Stops both MediaPlayer and YouTube streams and releases volatile webview contexts.
+     * Stops both MediaPlayer and YouTube streams.
      */
     fun stop() {
+        isPlaying = false
         stopMediaPlayer()
         stopYouTube()
     }
@@ -165,17 +200,11 @@ class BackgroundMusicManager(private val context: Context) {
     }
 
     /**
-     * Destroys the headless [WebView] hosting the YouTube embed on the main thread.
+     * Pauses and stops YouTube playback without destroying the persistent WebView.
      */
     private fun stopYouTube() {
-        mainHandler.post {
-            try {
-                sendYouTubeCommand("stopVideo")
-                youtubeWebView?.loadUrl("about:blank")
-                youtubeWebView?.destroy()
-            } catch (_: Exception) {}
-            youtubeWebView = null
-        }
+        sendYouTubeCommand("stopVideo")
+        activeVideoId = null
     }
 
     /**
@@ -219,52 +248,92 @@ class BackgroundMusicManager(private val context: Context) {
     }
 
     /**
-     * Initializes a headless sandboxed WebView to play YouTube audio without visual distraction or banner ads.
+     * Initializes or commands the sandboxed WebView to play YouTube audio ad-free.
      */
     private fun playYouTubeAudio() {
         val videoId = extractVideoId(youtubeUrl) ?: "x6UITRjhijI"
 
         mainHandler.post {
             try {
-                if (youtubeWebView == null) {
-                    youtubeWebView = WebView(context).apply {
-                        settings.javaScriptEnabled = true
-                        settings.mediaPlaybackRequiresUserGesture = false
-                        settings.domStorageEnabled = true
-                        settings.userAgentString = "Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
-                        webViewClient = object : WebViewClient() {
-                            override fun onPageFinished(view: WebView?, url: String?) {
-                                super.onPageFinished(view, url)
-                                injectAdBlocker(view)
-                                setYouTubeVolume(volume)
-                            }
-                        }
-                    }
+                val webView = getOrCreateWebView(context)
+
+                // If already playing this exact video, simply resume it
+                if (activeVideoId == videoId) {
+                    sendYouTubeCommand("playVideo")
+                    return@post
                 }
 
-                // Clean minimal HTML hosting YouTube IFrame API
+                activeVideoId = videoId
+                val targetVol = (volume * 100).toInt().coerceIn(10, 100)
+
+                // Robust HTML using official YouTube IFrame Player API with auto ad-skipping
                 val embedHtml = """
                     <!DOCTYPE html>
                     <html>
                     <head>
                         <meta name="viewport" content="width=device-width, initial-scale=1.0">
                         <style>
-                            body { margin: 0; background: #000000; overflow: hidden; }
-                            iframe { width: 100vw; height: 100vh; border: none; }
-                            .video-ads, .ytp-ad-module, .ytp-ad-player-overlay, .ytp-ad-overlay-container, #player-ads { display: none !important; }
+                            * { margin: 0; padding: 0; box-sizing: border-box; }
+                            body { background: #000; overflow: hidden; width: 100vw; height: 100vh; }
+                            #player { width: 100%; height: 100%; }
+                            .video-ads, .ytp-ad-module, .ytp-ad-player-overlay { display: none !important; }
                         </style>
                     </head>
                     <body>
-                        <iframe id="ytPlayer"
-                            src="https://www.youtube-nocookie.com/embed/$videoId?enablejsapi=1&autoplay=1&controls=0&modestbranding=1&rel=0&iv_load_policy=3&loop=1&playlist=$videoId&playsinline=1"
-                            allow="autoplay; encrypted-media">
-                        </iframe>
+                        <div id="player"></div>
+                        <script>
+                            var tag = document.createElement('script');
+                            tag.src = "https://www.youtube.com/iframe_api";
+                            var firstScriptTag = document.getElementsByTagName('script')[0];
+                            firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+
+                            var player;
+                            function onYouTubeIframeAPIReady() {
+                                player = new YT.Player('player', {
+                                    videoId: '$videoId',
+                                    playerVars: {
+                                        'autoplay': 1,
+                                        'controls': 0,
+                                        'playsinline': 1,
+                                        'loop': 1,
+                                        'playlist': '$videoId',
+                                        'modestbranding': 1,
+                                        'rel': 0,
+                                        'fs': 0,
+                                        'disablekb': 1
+                                    },
+                                    events: {
+                                        'onReady': function(e) {
+                                            e.target.setVolume($targetVol);
+                                            e.target.playVideo();
+                                        },
+                                        'onStateChange': function(e) {
+                                            if (e.data === 0) {
+                                                e.target.playVideo();
+                                            }
+                                        }
+                                    }
+                                });
+                            }
+
+                            // Auto-click ad skip buttons continuously
+                            setInterval(function() {
+                                var btn = document.querySelector('.ytp-ad-skip-button, .ytp-ad-skip-button-modern, .ytp-ad-overlay-close-button');
+                                if (btn) {
+                                    btn.click();
+                                }
+                                var vid = document.querySelector('video');
+                                if (document.querySelector('.ad-showing') && vid) {
+                                    vid.currentTime = vid.duration || 9999;
+                                }
+                            }, 300);
+                        </script>
                     </body>
                     </html>
                 """.trimIndent()
 
-                youtubeWebView?.loadDataWithBaseURL("https://www.youtube-nocookie.com", embedHtml, "text/html", "UTF-8", null)
-                Log.d(TAG, "Started ad-free YouTube background player for video: $videoId")
+                webView.loadDataWithBaseURL("https://www.youtube.com", embedHtml, "text/html", "UTF-8", null)
+                Log.d(TAG, "Started ad-free YouTube player for video: $videoId")
             } catch (e: Exception) {
                 Log.e(TAG, "Failed starting YouTube audio player", e)
             }
@@ -272,48 +341,20 @@ class BackgroundMusicManager(private val context: Context) {
     }
 
     /**
-     * Injects custom CSS and periodic DOM mutation checks to hide banner overlays and auto-skip advertisements.
-     *
-     * @param view Target [WebView] instance.
-     */
-    private fun injectAdBlocker(view: WebView?) {
-        val js = """
-            (function() {
-                var css = '.video-ads, .ytp-ad-module, .ytp-ad-player-overlay, .ytp-ad-overlay-container, #player-ads { display: none !important; }';
-                var style = document.createElement('style');
-                style.textContent = css;
-                document.head.appendChild(style);
-
-                setInterval(function() {
-                    var skipBtn = document.querySelector('.ytp-ad-skip-button, .ytp-ad-skip-button-modern, .ytp-ad-overlay-close-button');
-                    if (skipBtn) {
-                        skipBtn.click();
-                    }
-                    var video = document.querySelector('video');
-                    if (document.querySelector('.ad-showing') && video) {
-                        video.currentTime = video.duration || 9999;
-                    }
-                }, 250);
-            })();
-        """.trimIndent()
-        view?.evaluateJavascript(js, null)
-    }
-
-    /**
-     * Dispatches an IFrame API JSON message into the YouTube player iframe.
-     *
-     * @param command JavaScript function name (e.g. "playVideo", "pauseVideo", "stopVideo").
-     * @param args Optional JSON array string formatted arguments.
+     * Dispatches a direct JavaScript command to the YouTube player instance.
      */
     private fun sendYouTubeCommand(command: String, args: String = "") {
         mainHandler.post {
-            val json = if (args.isEmpty()) {
-                "{\"event\":\"command\",\"func\":\"$command\",\"args\":\"\"}"
-            } else {
-                "{\"event\":\"command\",\"func\":\"$command\",\"args\":$args}"
+            val script = when (command) {
+                "playVideo" -> "if (typeof player !== 'undefined' && player.playVideo) player.playVideo();"
+                "pauseVideo" -> "if (typeof player !== 'undefined' && player.pauseVideo) player.pauseVideo();"
+                "stopVideo" -> "if (typeof player !== 'undefined' && player.stopVideo) player.stopVideo();"
+                "setVolume" -> "if (typeof player !== 'undefined' && player.setVolume) player.setVolume($args);"
+                else -> ""
             }
-            val js = "document.querySelector('iframe')?.contentWindow?.postMessage('$json', '*');"
-            youtubeWebView?.evaluateJavascript(js, null)
+            if (script.isNotEmpty()) {
+                youtubeWebView?.evaluateJavascript(script, null)
+            }
         }
     }
 
@@ -324,7 +365,7 @@ class BackgroundMusicManager(private val context: Context) {
      */
     private fun setYouTubeVolume(vol: Float) {
         val intVol = (vol * 100).toInt().coerceIn(0, 100)
-        sendYouTubeCommand("setVolume", "[$intVol]")
+        sendYouTubeCommand("setVolume", "$intVol")
     }
 
     /**
@@ -353,5 +394,12 @@ class BackgroundMusicManager(private val context: Context) {
      */
     fun release() {
         stop()
+        mainHandler.post {
+            try {
+                youtubeWebView?.loadUrl("about:blank")
+                youtubeWebView?.destroy()
+            } catch (_: Exception) {}
+            youtubeWebView = null
+        }
     }
 }

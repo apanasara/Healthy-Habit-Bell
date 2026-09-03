@@ -156,41 +156,53 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
 
         // Observe session status transitions to orchestrate foreground services and battery optimization
         viewModelScope.launch {
+            var lastStatus: SessionStatus? = null
             sessionState.collect { state ->
-                when (state.status) {
-                    SessionStatus.RUNNING -> {
-                        TimerService.startService(
-                            getApplication(),
-                            state.profile.name,
-                            state.formattedRemainingTime
-                        )
-                        batteryOptimizer.acquireWakeLock()
-                        if (_uiState.value.isDisplayMode) {
-                            batteryOptimizer.startProximityMonitoring()
+                val statusChanged = state.status != lastStatus
+                if (statusChanged) {
+                    lastStatus = state.status
+                    when (state.status) {
+                        SessionStatus.RUNNING -> {
+                            TimerService.startService(
+                                getApplication(),
+                                state.profile.name,
+                                state.formattedRemainingTime
+                            )
+                            batteryOptimizer.acquireWakeLock()
+                            if (_uiState.value.isDisplayMode) {
+                                batteryOptimizer.startProximityMonitoring()
+                            }
+                            bgMusicManager.start()
                         }
-                        bgMusicManager.start()
+                        SessionStatus.PAUSED -> {
+                            TimerService.startService(
+                                getApplication(),
+                                state.profile.name,
+                                "${state.formattedRemainingTime} (Paused)"
+                            )
+                            bgMusicManager.pause()
+                        }
+                        SessionStatus.COMPLETED -> {
+                            TimerService.stopService(getApplication())
+                            batteryOptimizer.releaseWakeLock()
+                            batteryOptimizer.stopProximityMonitoring()
+                            bgMusicManager.stop()
+                            repository.recordSessionCompleted(state.profile.id)
+                        }
+                        SessionStatus.IDLE -> {
+                            TimerService.stopService(getApplication())
+                            batteryOptimizer.releaseWakeLock()
+                            batteryOptimizer.stopProximityMonitoring()
+                            bgMusicManager.stop()
+                        }
                     }
-                    SessionStatus.PAUSED -> {
-                        TimerService.startService(
-                            getApplication(),
-                            state.profile.name,
-                            "${state.formattedRemainingTime} (Paused)"
-                        )
-                        bgMusicManager.pause()
-                    }
-                    SessionStatus.COMPLETED -> {
-                        TimerService.stopService(getApplication())
-                        batteryOptimizer.releaseWakeLock()
-                        batteryOptimizer.stopProximityMonitoring()
-                        bgMusicManager.stop()
-                        repository.recordSessionCompleted(state.profile.id)
-                    }
-                    SessionStatus.IDLE -> {
-                        TimerService.stopService(getApplication())
-                        batteryOptimizer.releaseWakeLock()
-                        batteryOptimizer.stopProximityMonitoring()
-                        bgMusicManager.stop()
-                    }
+                } else if (state.status == SessionStatus.RUNNING) {
+                    // Ongoing 1-second ticks: only update notification, DO NOT restart music
+                    TimerService.startService(
+                        getApplication(),
+                        state.profile.name,
+                        state.formattedRemainingTime
+                    )
                 }
             }
         }

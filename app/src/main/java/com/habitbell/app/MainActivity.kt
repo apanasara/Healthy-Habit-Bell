@@ -8,8 +8,12 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.habitbell.app.data.model.ThemeMode
 import com.habitbell.app.engine.SessionStatus
@@ -78,6 +82,12 @@ class MainActivity : ComponentActivity() {
 
             HabitBellTheme(themeMode = uiState.selectedTheme) {
                 Box(modifier = Modifier.fillMaxSize()) {
+                    // Headless YouTube player attached to Window hierarchy to ensure continuous audio playback
+                    AndroidView(
+                        factory = { ctx -> viewModel.bgMusicManager.getOrCreateWebView(ctx) },
+                        modifier = Modifier.size(1.dp).alpha(0.01f)
+                    )
+
                     // Navigation routing based on active AppScreen
                     when (uiState.currentScreen) {
                         AppScreen.HOME -> {
@@ -265,6 +275,10 @@ class MainActivity : ComponentActivity() {
             // Deep link: habitbell://start?profile=...
             (dataUri != null && dataUri.scheme == "habitbell" && dataUri.host == "start") -> {
                 val profileKey = dataUri.getQueryParameter("profile") ?: ""
+                val bg = dataUri.getQueryParameter("bg")
+                if (bg == "youtube" || bg == "yt") {
+                    viewModel.setBgMusicType(com.habitbell.app.engine.BackgroundSoundType.YOUTUBE_LINK)
+                }
                 viewModel.startVoiceTimer(0, profileKey)
             }
 
