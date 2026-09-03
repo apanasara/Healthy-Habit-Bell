@@ -15,6 +15,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import android.content.Intent
+import androidx.compose.ui.platform.LocalContext
 import com.habitbell.app.data.model.ThemeMode
 import com.habitbell.app.data.model.TimerProfile
 
@@ -74,8 +76,17 @@ fun SettingsDrawer(
 
             // 1. Timer Adjustments (Total Time & Interval Time)
             item {
-                SettingsSectionHeader(title = "Timer")
+                var totalMinutes by remember(profile.id, profile.totalDurationSeconds) {
+                    mutableStateOf((profile.totalDurationSeconds / 60).coerceAtLeast(1))
+                }
+                var intervalSec by remember(profile.id, profile.intervalDurationSeconds) {
+                    mutableStateOf(profile.intervalDurationSeconds)
+                }
+
+                SettingsSectionHeader(title = "Timer Duration")
                 Spacer(modifier = Modifier.height(8.dp))
+
+                // Total Duration Header & Fine-tuning
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -83,59 +94,141 @@ fun SettingsDrawer(
                 ) {
                     Column {
                         Text(
-                            text = "Total Duration",
+                            text = "Total Session Duration",
                             style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
                             color = MaterialTheme.colorScheme.onBackground
                         )
                         Text(
-                            text = "${profile.totalDurationSeconds / 60} minutes",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            text = "$totalMinutes minutes",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
                         )
                     }
 
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        SmallAdjustButton(text = "-5m") {
-                            val newTotal = (profile.totalDurationSeconds - 300).coerceAtLeast(60)
-                            onUpdateTime(newTotal, profile.intervalDurationSeconds)
+                        SmallAdjustButton(text = "-1m") {
+                            totalMinutes = (totalMinutes - 1).coerceAtLeast(1)
+                            onUpdateTime(totalMinutes * 60, intervalSec)
+                        }
+                        SmallAdjustButton(text = "+1m") {
+                            totalMinutes = (totalMinutes + 1).coerceAtMost(120)
+                            onUpdateTime(totalMinutes * 60, intervalSec)
                         }
                         SmallAdjustButton(text = "+5m") {
-                            val newTotal = profile.totalDurationSeconds + 300
-                            onUpdateTime(newTotal, profile.intervalDurationSeconds)
+                            totalMinutes = (totalMinutes + 5).coerceAtMost(120)
+                            onUpdateTime(totalMinutes * 60, intervalSec)
                         }
                     }
                 }
 
-                if (profile.intervalDurationSeconds > 0) {
-                    Spacer(modifier = Modifier.height(14.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Interactive Slider
+                Slider(
+                    value = totalMinutes.toFloat(),
+                    onValueChange = {
+                        totalMinutes = it.toInt().coerceIn(1, 120)
+                        onUpdateTime(totalMinutes * 60, intervalSec)
+                    },
+                    valueRange = 1f..60f,
+                    steps = 58,
+                    colors = SliderDefaults.colors(
+                        thumbColor = MaterialTheme.colorScheme.primary,
+                        activeTrackColor = MaterialTheme.colorScheme.primary
+                    )
+                )
+
+                // Quick Preset Chips
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    listOf(10, 15, 20, 25, 30, 45).forEach { m ->
+                        val isSelected = totalMinutes == m
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable {
+                                    totalMinutes = m
+                                    onUpdateTime(m * 60, intervalSec)
+                                }
+                        ) {
                             Text(
-                                text = "Interval Bell",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onBackground
-                            )
-                            Text(
-                                text = "${profile.intervalDurationSeconds} seconds",
+                                text = "${m}m",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onBackground,
+                                modifier = Modifier
+                                    .padding(vertical = 8.dp)
+                                    .wrapContentWidth(Alignment.CenterHorizontally)
                             )
                         }
+                    }
+                }
 
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            SmallAdjustButton(text = "30s") {
-                                onUpdateTime(profile.totalDurationSeconds, 30)
-                            }
-                            SmallAdjustButton(text = "60s") {
-                                onUpdateTime(profile.totalDurationSeconds, 60)
-                            }
-                            SmallAdjustButton(text = "3m") {
-                                onUpdateTime(profile.totalDurationSeconds, 180)
-                            }
+                // Interval Bell Configuration
+                Spacer(modifier = Modifier.height(18.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = "Interval Bell Cue",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                        Text(
+                            text = if (intervalSec > 0) {
+                                if (intervalSec >= 60) "${intervalSec / 60}m (${intervalSec}s)" else "${intervalSec} seconds"
+                            } else "None (Bell only at end)",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Interval Preset Chips
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    listOf(
+                        "None" to 0,
+                        "15s" to 15,
+                        "30s" to 30,
+                        "1m" to 60,
+                        "2m" to 120,
+                        "3m" to 180
+                    ).forEach { (label, sec) ->
+                        val isSelected = intervalSec == sec
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable {
+                                    intervalSec = sec
+                                    onUpdateTime(totalMinutes * 60, sec)
+                                }
+                        ) {
+                            Text(
+                                text = label,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onBackground,
+                                modifier = Modifier
+                                    .padding(vertical = 8.dp)
+                                    .wrapContentWidth(Alignment.CenterHorizontally)
+                            )
                         }
                     }
                 }
@@ -261,6 +354,56 @@ fun SettingsDrawer(
                             )
                             Text(
                                 text = "Big screen oversized display readable across room",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Icon(
+                            Icons.Outlined.ChevronRight,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                val context = LocalContext.current
+                Spacer(modifier = Modifier.height(10.dp))
+                Card(
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                    ),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            try {
+                                context.startActivity(Intent(android.provider.Settings.ACTION_CAST_SETTINGS))
+                            } catch (e: Exception) {
+                                try {
+                                    context.startActivity(Intent(android.provider.Settings.ACTION_WIRELESS_SETTINGS))
+                                } catch (_: Exception) {}
+                            }
+                        }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Icon(
+                            Icons.Outlined.Cast,
+                            contentDescription = "Google Cast",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Google Cast / Chromecast",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onBackground
+                            )
+                            Text(
+                                text = "Connect wirelessly to Chromecast, Android TV, or Smart TV",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )

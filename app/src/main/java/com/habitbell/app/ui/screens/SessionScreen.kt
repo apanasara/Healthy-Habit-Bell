@@ -1,6 +1,7 @@
 package com.habitbell.app.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -69,13 +70,13 @@ fun SessionScreen(
                     color = MaterialTheme.colorScheme.onBackground
                 )
 
-                Row {
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = onOpenTVMode) {
                         Icon(
-                            Icons.Outlined.Tv,
-                            contentDescription = "TV Mode",
+                            Icons.Outlined.Cast,
+                            contentDescription = "Cast / TV Mode",
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(22.dp)
+                            modifier = Modifier.size(24.dp)
                         )
                     }
                     IconButton(onClick = onTriggerPocketMode) {
@@ -84,6 +85,14 @@ fun SessionScreen(
                             contentDescription = "Pocket Mode",
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(22.dp)
+                        )
+                    }
+                    IconButton(onClick = onOpenSettings) {
+                        Icon(
+                            Icons.Outlined.Settings,
+                            contentDescription = "Settings",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(24.dp)
                         )
                     }
                 }
@@ -103,7 +112,10 @@ fun SessionScreen(
                             size = 290.dp,
                             strokeWidth = 6.dp
                         ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier.clickable { onOpenSettings() }
+                            ) {
                                 Text(
                                     text = sessionState.formattedRemainingTime,
                                     fontSize = 68.sp,
@@ -120,6 +132,12 @@ fun SessionScreen(
                                         style = MaterialTheme.typography.labelSmall,
                                         letterSpacing = 1.sp,
                                         color = MaterialTheme.colorScheme.primary
+                                    )
+                                } else {
+                                    Text(
+                                        text = "Tap to adjust duration",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                                     )
                                 }
                             }

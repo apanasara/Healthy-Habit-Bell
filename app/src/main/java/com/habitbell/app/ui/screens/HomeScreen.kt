@@ -33,6 +33,7 @@ fun HomeScreen(
     currentTheme: ThemeMode,
     isZenMode: Boolean,
     onSelectProfile: (TimerProfile) -> Unit,
+    onConfigureProfile: (TimerProfile) -> Unit,
     onToggleFavorite: (String) -> Unit,
     onToggleZenMode: () -> Unit,
     onCycleTheme: () -> Unit,
@@ -94,7 +95,8 @@ fun HomeScreen(
                             FavoriteCard(
                                 profile = fav,
                                 onClick = { onSelectProfile(fav) },
-                                onTVClick = { onOpenTVMode(fav) }
+                                onTVClick = { onOpenTVMode(fav) },
+                                onSettingsClick = { onConfigureProfile(fav) }
                             )
                         }
                     }
@@ -148,7 +150,8 @@ fun HomeScreen(
                     profile = profile,
                     onClick = { onSelectProfile(profile) },
                     onToggleFav = { onToggleFavorite(profile.id) },
-                    onTVClick = { onOpenTVMode(profile) }
+                    onTVClick = { onOpenTVMode(profile) },
+                    onSettingsClick = { onConfigureProfile(profile) }
                 )
             }
 
@@ -297,14 +300,15 @@ private fun RoutineReminderSection(
 private fun FavoriteCard(
     profile: TimerProfile,
     onClick: () -> Unit,
-    onTVClick: () -> Unit
+    onTVClick: () -> Unit,
+    onSettingsClick: () -> Unit
 ) {
     Card(
         shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         modifier = Modifier
-            .width(160.dp)
-            .height(135.dp)
+            .width(168.dp)
+            .height(138.dp)
             .clickable { onClick() }
     ) {
         Column(
@@ -326,13 +330,23 @@ private fun FavoriteCard(
                     else -> "🔔"
                 }
                 Text(text = icon, fontSize = 24.sp)
-                IconButton(onClick = onTVClick, modifier = Modifier.size(28.dp)) {
-                    Icon(
-                        Icons.Outlined.Tv,
-                        contentDescription = "Cast to TV",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(18.dp)
-                    )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onTVClick, modifier = Modifier.size(28.dp)) {
+                        Icon(
+                            Icons.Outlined.Cast,
+                            contentDescription = "Cast to TV",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                    IconButton(onClick = onSettingsClick, modifier = Modifier.size(28.dp)) {
+                        Icon(
+                            Icons.Outlined.Settings,
+                            contentDescription = "Settings",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(17.dp)
+                        )
+                    }
                 }
             }
 
@@ -393,7 +407,8 @@ private fun TimerProfileListItem(
     profile: TimerProfile,
     onClick: () -> Unit,
     onToggleFav: () -> Unit,
-    onTVClick: () -> Unit
+    onTVClick: () -> Unit,
+    onSettingsClick: () -> Unit
 ) {
     Card(
         shape = RoundedCornerShape(16.dp),
@@ -458,9 +473,17 @@ private fun TimerProfileListItem(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onTVClick) {
                     Icon(
-                        Icons.Outlined.Tv,
-                        contentDescription = "TV Dashboard",
+                        Icons.Outlined.Cast,
+                        contentDescription = "Cast / TV Dashboard",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                IconButton(onClick = onSettingsClick) {
+                    Icon(
+                        Icons.Outlined.Settings,
+                        contentDescription = "Configure Timer",
+                        tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(20.dp)
                     )
                 }
