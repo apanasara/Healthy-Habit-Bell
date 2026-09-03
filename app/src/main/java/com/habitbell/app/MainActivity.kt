@@ -103,16 +103,14 @@ class MainActivity : ComponentActivity() {
                             TVDashboardScreen(
                                 sessionState = sessionState,
                                 onTogglePlayPause = { viewModel.togglePlayPause() },
-                                onReset = { viewModel.resetSession() },
-                                onExit = { viewModel.exitSessionToHome() },
-                                onOpenSettings = { viewModel.openSettingsDrawer(true) }
+                                onExitTVMode = { viewModel.exitSessionToHome() }
                             )
                         }
 
                         AppScreen.CREATE_TIMER -> {
                             CreateTimerScreen(
-                                onDismiss = { viewModel.navigateTo(AppScreen.HOME) },
-                                onSaveProfile = { customProfile ->
+                                onCancel = { viewModel.navigateTo(AppScreen.HOME) },
+                                onSave = { customProfile ->
                                     viewModel.createCustomProfile(customProfile)
                                 }
                             )

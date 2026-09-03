@@ -18,18 +18,18 @@ enum class SessionStatus {
 
 data class TimerSessionState(
     val status: SessionStatus = SessionStatus.IDLE,
-    val profile: TimerProfile = DefaultProfiles.eatingTimer,
-    val remainingSeconds: Int = DefaultProfiles.eatingTimer.totalDurationSeconds,
-    val totalSeconds: Int = DefaultProfiles.eatingTimer.totalDurationSeconds,
-    val nextBellSeconds: Int = DefaultProfiles.eatingTimer.intervalDurationSeconds,
+    val profile: TimerProfile = DefaultProfiles.EATING,
+    val remainingSeconds: Int = DefaultProfiles.EATING.totalDurationSeconds,
+    val totalSeconds: Int = DefaultProfiles.EATING.totalDurationSeconds,
+    val nextBellSeconds: Int = DefaultProfiles.EATING.intervalDurationSeconds,
     // Multi-interval Pranayama tracking
     val currentRound: Int = 1,
     val totalRounds: Int = 1,
-    val currentPranayamaPhase: BreathPhase? = null,
+    val currentPranayamaPhase: PranayamaPhase? = null,
     val phaseRemainingSeconds: Int = 0,
     val phaseDurationSeconds: Int = 0,
     // Compound Sequencer tracking
-    val currentPose: YogaPoseStep? = null,
+    val currentPose: CompoundPose? = null,
     val poseRemainingSeconds: Int = 0
 ) {
     val progressFraction: Float

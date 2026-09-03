@@ -192,7 +192,7 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
     fun updateActiveProfileTimes(totalDuration: Int, intervalDuration: Int) {
         val currentProfile = sessionState.value.profile
         repository.updateProfileSettings(
-            id = currentProfile.id,
+            profileId = currentProfile.id,
             totalDuration = totalDuration,
             intervalDuration = intervalDuration
         )
