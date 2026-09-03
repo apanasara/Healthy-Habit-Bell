@@ -55,6 +55,10 @@ class MainActivity : ComponentActivity() {
                                 onSelectProfile = { profile ->
                                     viewModel.startProfileSession(profile)
                                 },
+                                onConfigureProfile = { profile ->
+                                    viewModel.startProfileSession(profile)
+                                    viewModel.openSettingsDrawer(true)
+                                },
                                 onToggleFavorite = { id ->
                                     viewModel.toggleFavorite(id)
                                 },
