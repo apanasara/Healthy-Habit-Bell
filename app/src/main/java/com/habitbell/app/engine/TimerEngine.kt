@@ -18,23 +18,23 @@ enum class SessionStatus {
 
 data class TimerSessionState(
     val status: SessionStatus = SessionStatus.IDLE,
-    val profile: TimerProfile = DefaultProfiles.EATING,
-    val remainingSeconds: Int = 1200,
-    val totalSeconds: Int = 1200,
-    val nextBellSeconds: Int = 30,
+    val profile: TimerProfile = DefaultProfiles.eatingTimer,
+    val remainingSeconds: Int = DefaultProfiles.eatingTimer.totalDurationSeconds,
+    val totalSeconds: Int = DefaultProfiles.eatingTimer.totalDurationSeconds,
+    val nextBellSeconds: Int = DefaultProfiles.eatingTimer.intervalDurationSeconds,
+    // Multi-interval Pranayama tracking
     val currentRound: Int = 1,
     val totalRounds: Int = 1,
-    // Pranayama specific
-    val currentPranayamaPhase: PranayamaPhase? = null,
+    val currentPranayamaPhase: BreathPhase? = null,
     val phaseRemainingSeconds: Int = 0,
     val phaseDurationSeconds: Int = 0,
-    // Compound / Surya Namaskar specific
-    val currentPose: CompoundPose? = null,
+    // Compound Sequencer tracking
+    val currentPose: YogaPoseStep? = null,
     val poseRemainingSeconds: Int = 0
 ) {
     val progressFraction: Float
         get() = if (totalSeconds > 0) {
-            1.0f - (remainingSeconds.toFloat() / totalSeconds.toFloat()).coerceIn(0f, 1f)
+            1f - (remainingSeconds.toFloat() / totalSeconds.toFloat())
         } else 0f
 
     val formattedRemainingTime: String
@@ -56,6 +56,12 @@ class TimerEngine(
     private val audioManager: AudioBellManager,
     private val hapticManager: HapticManager
 ) {
+    /**
+     * Predicate checking if Pocket Mode is active.
+     * User Requirement: ONLY pocket mode should have vibration!
+     */
+    var isPocketModeActive: () -> Boolean = { false }
+
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     private var timerJob: Job? = null
 
@@ -149,8 +155,24 @@ class TimerEngine(
     fun pause() {
         if (_state.value.status == SessionStatus.RUNNING) {
             timerJob?.cancel()
+            timerJob = null
+            hapticManager.cancel()
             _state.update { it.copy(status = SessionStatus.PAUSED) }
         }
+    }
+
+    fun stop() {
+        timerJob?.cancel()
+        timerJob = null
+        hapticManager.cancel()
+        _state.update { it.copy(status = SessionStatus.IDLE) }
+    }
+
+    fun destroy() {
+        timerJob?.cancel()
+        timerJob = null
+        hapticManager.cancel()
+        scope.cancel()
     }
 
     fun reset() {
@@ -177,9 +199,12 @@ class TimerEngine(
         var nextBell = currentIntervalRemaining - 1
 
         if (nextBell <= 0) {
-            // Trigger interval bell & haptic!
+            // Trigger interval bell
             audioManager.playIntervalBell()
-            hapticManager.triggerIntervalHaptic()
+            // User Requirement 2: ONLY pocket mode should have vibration!
+            if (isPocketModeActive()) {
+                hapticManager.triggerIntervalHaptic()
+            }
             val interval = _state.value.profile.intervalDurationSeconds
             nextBell = if (interval > 0) interval else newRemaining
             currentIntervalRemaining = nextBell
@@ -215,7 +240,9 @@ class TimerEngine(
             }
 
             val nextStep = config.steps[pranayamaStepIndex]
-            hapticManager.triggerBreathPhaseHaptic()
+            if (isPocketModeActive()) {
+                hapticManager.triggerBreathPhaseHaptic()
+            }
 
             _state.update {
                 it.copy(
@@ -249,9 +276,13 @@ class TimerEngine(
                 compoundRound++
                 // Interval bell on round completion
                 audioManager.playIntervalBell()
-                hapticManager.triggerIntervalHaptic()
+                if (isPocketModeActive()) {
+                    hapticManager.triggerIntervalHaptic()
+                }
             } else {
-                hapticManager.triggerBreathPhaseHaptic()
+                if (isPocketModeActive()) {
+                    hapticManager.triggerBreathPhaseHaptic()
+                }
             }
 
             if (compoundRound > config.targetRounds) {
@@ -289,8 +320,10 @@ class TimerEngine(
                 poseRemainingSeconds = 0
             )
         }
-        // Three bells at completion + 3 vibrations (matching PRD!)
+        // Three bells at completion
         audioManager.playCompletionBell()
-        hapticManager.triggerCompletionHaptic()
+        if (isPocketModeActive()) {
+            hapticManager.triggerCompletionHaptic()
+        }
     }
 }

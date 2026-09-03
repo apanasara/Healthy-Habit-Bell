@@ -1,12 +1,17 @@
 package com.habitbell.app.ui.viewmodel
 
-import android.app.Activity
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.habitbell.app.data.model.*
 import com.habitbell.app.data.repository.TimerRepository
-import com.habitbell.app.engine.*
+import com.habitbell.app.engine.AudioBellManager
+import com.habitbell.app.engine.BatteryOptimizer
+import com.habitbell.app.engine.HapticManager
+import com.habitbell.app.engine.SessionStatus
+import com.habitbell.app.engine.TimerEngine
+import com.habitbell.app.engine.TimerService
+import com.habitbell.app.engine.TimerSessionState
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
@@ -35,6 +40,7 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
     private val hapticManager = HapticManager(application)
     val batteryOptimizer = BatteryOptimizer(application)
     private val engine = TimerEngine(audioManager, hapticManager)
+    val castServer = com.habitbell.app.cast.LocalCastWebServer(application)
 
     private val _uiState = MutableStateFlow(AppUiState())
     val uiState: StateFlow<AppUiState> = _uiState.asStateFlow()
@@ -60,6 +66,11 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
     }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     init {
+        // Link pocket mode state to TimerEngine so vibration ONLY triggers in pocket mode
+        engine.isPocketModeActive = { _uiState.value.isPocketModeManual || isPocketBlankingActive.value }
+        // Start local TV web receiver server for decoupled TV casting
+        castServer.start()
+
         // Monitor session status to manage foreground notification and battery optimizer
         viewModelScope.launch {
             sessionState.collect { state ->
@@ -162,6 +173,14 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
         hapticManager.triggerIntervalHaptic()
     }
 
+    fun cancelHaptics() {
+        hapticManager.cancel()
+    }
+
+    fun getTvCastUrl(): String {
+        return castServer.getTvUrl()
+    }
+
     fun openSettingsDrawer(open: Boolean) {
         _uiState.update { it.copy(isSettingsDrawerOpen = open) }
     }
@@ -173,7 +192,7 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
     fun updateActiveProfileTimes(totalDuration: Int, intervalDuration: Int) {
         val currentProfile = sessionState.value.profile
         repository.updateProfileSettings(
-            currentProfile.id,
+            id = currentProfile.id,
             totalDuration = totalDuration,
             intervalDuration = intervalDuration
         )
@@ -192,6 +211,10 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
 
     override fun onCleared() {
         super.onCleared()
+        engine.destroy()
+        hapticManager.cancel()
+        castServer.stop()
+        TimerService.stopService(getApplication())
         audioManager.release()
         batteryOptimizer.releaseWakeLock()
         batteryOptimizer.stopProximityMonitoring()

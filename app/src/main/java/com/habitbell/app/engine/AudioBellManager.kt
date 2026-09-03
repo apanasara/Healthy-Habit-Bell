@@ -75,9 +75,9 @@ class AudioBellManager(private val context: Context) {
         if (isLoaded && intervalSoundId != 0) {
             soundPool?.play(intervalSoundId, bellVolume, bellVolume, 1, 0, 1.0f)
         } else {
-            // Procedural Tibetan Singing Bowl fallback with 528Hz fundamental
+            // Soothing warm 432Hz chime
             scope.launch {
-                playSynthesizedChime(f0 = 528.0, durationSeconds = 3.5)
+                playSynthesizedChime(f0 = 432.0, durationSeconds = 3.2, volumeScale = 0.85f)
             }
         }
     }
@@ -87,13 +87,13 @@ class AudioBellManager(private val context: Context) {
         if (isLoaded && completionSoundId != 0) {
             soundPool?.play(completionSoundId, bellVolume, bellVolume, 1, 0, 1.0f)
         } else {
-            // Procedural 3-bell sequence fallback
+            // User Requirement 5: Bell 3-2-1 (3 strikes, ascending volume, descending frequency)
             scope.launch {
-                playSynthesizedChime(f0 = 432.0, durationSeconds = 2.0)
+                playSynthesizedChime(f0 = 528.0, durationSeconds = 2.5, volumeScale = 0.40f)
                 kotlinx.coroutines.delay(1200)
-                playSynthesizedChime(f0 = 480.0, durationSeconds = 2.0)
-                kotlinx.coroutines.delay(1200)
-                playSynthesizedChime(f0 = 528.0, durationSeconds = 3.5)
+                playSynthesizedChime(f0 = 432.0, durationSeconds = 2.5, volumeScale = 0.70f)
+                kotlinx.coroutines.delay(1300)
+                playSynthesizedChime(f0 = 360.0, durationSeconds = 4.0, volumeScale = 1.00f)
             }
         }
     }
@@ -121,24 +121,30 @@ class AudioBellManager(private val context: Context) {
     }
 
     /**
-     * Procedural harmonic Tibetan singing bowl synthesis for zero-dependency acoustic purity.
+     * Procedural harmonic soothing bell synthesis with soft wool mallet attack and pure overtones.
      */
-    private fun playSynthesizedChime(f0: Double, durationSeconds: Double) {
+    private fun playSynthesizedChime(f0: Double, durationSeconds: Double, volumeScale: Float = 1.0f) {
         try {
             val sampleRate = 44100
             val numSamples = (sampleRate * durationSeconds).toInt()
             val buffer = ShortArray(numSamples)
+            val attackSamples = (sampleRate * 0.045).toInt()
 
             for (i in 0 until numSamples) {
                 val t = i.toDouble() / sampleRate
-                val attack = (t / 0.005).coerceAtMost(1.0)
+                val attack = if (i < attackSamples) {
+                    0.5 * (1.0 - Math.cos(Math.PI * i / attackSamples))
+                } else {
+                    Math.exp(-t * 0.75)
+                }
 
-                // Partials: fundamental 1.0x, second partial 2.76x, third partial 5.40x
-                val p0 = sin(2 * Math.PI * f0 * t) * exp(-t / 2.5) * (1.0 + 0.12 * sin(2 * Math.PI * 1.5 * t))
-                val p1 = 0.40 * sin(2 * Math.PI * (f0 * 2.76) * t) * exp(-t / 1.5)
-                val p2 = 0.18 * sin(2 * Math.PI * (f0 * 5.40) * t) * exp(-t / 0.8)
+                val beating = 1.0 + 0.08 * sin(2 * Math.PI * 1.2 * t)
+                val sFund = sin(2 * Math.PI * f0 * t)
+                val sSub = 0.20 * sin(2 * Math.PI * (f0 * 0.5) * t) * Math.exp(-t * 0.6)
+                val sOct = 0.28 * sin(2 * Math.PI * (f0 * 2.0) * t) * Math.exp(-t * 1.2)
+                val sFifth = 0.08 * sin(2 * Math.PI * (f0 * 3.0) * t) * Math.exp(-t * 1.8)
 
-                val sample = attack * bellVolume * (p0 + p1 + p2)
+                val sample = (sFund + sSub + sOct + sFifth) * attack * beating * bellVolume * volumeScale
                 val saturated = tanh(sample * 0.85) * 0.95
                 buffer[i] = (saturated * 32767).toInt().coerceIn(-32768, 32767).toShort()
             }
