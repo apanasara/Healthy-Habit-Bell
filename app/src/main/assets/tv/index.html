@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Habit Bell • TV Dashboard</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+        }
+        body {
+            background-color: #060709;
+            color: #FFFFFF;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            height: 100vh;
+            width: 100vw;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+            padding: 40px 60px;
+            overflow: hidden;
+        }
+        .header {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .badge {
+            background: rgba(229, 169, 60, 0.15);
+            color: #E5A93C;
+            border: 1px solid rgba(229, 169, 60, 0.3);
+            border-radius: 30px;
+            padding: 10px 24px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+        }
+        .title {
+            font-size: 2.2rem;
+            font-weight: 300;
+            letter-spacing: 2px;
+            color: #E0E0E0;
+        }
+        .tv-status {
+            font-size: 1.1rem;
+            color: #8892B0;
+        }
+        .center-stage {
+            position: relative;
+            width: 480px;
+            height: 480px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .progress-svg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            transform: rotate(-90deg);
+        }
+        .progress-bg {
+            fill: none;
+            stroke: rgba(255, 255, 255, 0.08);
+            stroke-width: 10;
+        }
+        .progress-bar {
+            fill: none;
+            stroke: #E5A93C;
+            stroke-width: 10;
+            stroke-linecap: round;
+            stroke-dasharray: 1382;
+            stroke-dashoffset: 0;
+            transition: stroke-dashoffset 1s linear;
+        }
+        .clock-container {
+            text-align: center;
+            z-index: 10;
+        }
+        .clock-time {
+            font-size: 7.5rem;
+            font-weight: 200;
+            letter-spacing: -2px;
+            color: #FFFFFF;
+            line-height: 1;
+        }
+        .next-bell {
+            margin-top: 20px;
+            font-size: 1.3rem;
+            font-weight: 500;
+            color: #E5A93C;
+            letter-spacing: 1.5px;
+        }
+        .controls {
+            display: flex;
+            gap: 24px;
+            align-items: center;
+        }
+        .btn {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            color: #FFFFFF;
+            border-radius: 40px;
+            padding: 16px 36px;
+            font-size: 1.2rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            outline: none;
+        }
+        .btn:focus, .btn:hover {
+            background: #E5A93C;
+            color: #060709;
+            border-color: #E5A93C;
+            transform: scale(1.05);
+        }
+        .btn-primary {
+            background: #E5A93C;
+            color: #060709;
+            border: none;
+            padding: 20px 48px;
+            font-size: 1.4rem;
+        }
+        .hint {
+            color: #6C7A9C;
+            font-size: 1rem;
+            letter-spacing: 1px;
+            text-align: center;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="badge">Living Room TV Dashboard</div>
+        <div class="title" id="sessionTitle">🍽 Mindful Eating</div>
+        <div class="tv-status">TV Autonomous Mode • Zero Mobile Battery</div>
+    </div>
+
+    <div class="center-stage">
+        <svg class="progress-svg" viewBox="0 0 480 480">
+            <circle class="progress-bg" cx="240" cy="240" r="220" />
+            <circle class="progress-bar" id="progressBar" cx="240" cy="240" r="220" />
+        </svg>
+        <div class="clock-container">
+            <div class="clock-time" id="clockText">20:00</div>
+            <div class="next-bell" id="bellText">Next Bell in 00:30</div>
+        </div>
+    </div>
+
+    <div>
+        <div class="controls">
+            <button class="btn" id="btnReset" onclick="resetTimer()">Reset (R)</button>
+            <button class="btn btn-primary" id="btnPlayPause" onclick="togglePlayPause()">Pause (Space)</button>
+            <button class="btn" onclick="adjustTime(-5)">-5 Min</button>
+            <button class="btn" onclick="adjustTime(5)">+5 Min</button>
+        </div>
+        <div class="hint">Use TV Remote [OK / Enter] to Play/Pause • Mobile phone can now be locked or turned off</div>
+    </div>
+
+    <script>
+        let totalSeconds = 1200;
+        let remainingSeconds = 1200;
+        let intervalSeconds = 30;
+        let nextBell = 30;
+        let isRunning = true;
+        let timer = null;
+
+        const CIRCUMFERENCE = 2 * Math.PI * 220; // ~1382.3
+
+        // Soothing Web Audio Synthesizer
+        let audioCtx = null;
+
+        function getAudioContext() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            return audioCtx;
+        }
+
+        function playHarmonicChime(freq, volume, duration) {
+            try {
+                const ctx = getAudioContext();
+                const now = ctx.currentTime;
+
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(freq, now);
+
+                // Soft felt mallet attack envelope (40ms rise)
+                gain.gain.setValueAtTime(0.001, now);
+                gain.gain.exponentialRampToValueAtTime(volume, now + 0.045);
+                gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+
+                osc.start(now);
+                osc.stop(now + duration);
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        // User Requirement 5: Soothing 3-2-1 Bell (3 strikes, ascending volume, descending frequency)
+        function play321SoothingSequence() {
+            // Strike 1: 528 Hz @ 0.35 volume
+            playHarmonicChime(528, 0.35, 2.5);
+            // Strike 2: 432 Hz @ 0.65 volume
+            setTimeout(() => playHarmonicChime(432, 0.65, 2.8), 1200);
+            // Strike 3: 360 Hz (deep base) @ 1.00 volume
+            setTimeout(() => playHarmonicChime(360, 0.95, 4.5), 2500);
+        }
+
+        function playIntervalChime() {
+            playHarmonicChime(432, 0.75, 3.0);
+        }
+
+        function formatTime(sec) {
+            const m = Math.floor(sec / 60).toString().padStart(2, '0');
+            const s = (sec % 60).toString().padStart(2, '0');
+            return `${m}:${s}`;
+        }
+
+        function updateUI() {
+            document.getElementById('clockText').innerText = formatTime(remainingSeconds);
+            document.getElementById('bellText').innerText = `Next Bell in ${formatTime(nextBell)}`;
+
+            const progress = (totalSeconds - remainingSeconds) / totalSeconds;
+            const offset = CIRCUMFERENCE * progress;
+            document.getElementById('progressBar').style.strokeDashoffset = offset;
+
+            document.getElementById('btnPlayPause').innerText = isRunning ? "Pause (Space)" : "Start (Space)";
+        }
+
+        function tick() {
+            if (!isRunning) return;
+            if (remainingSeconds <= 1) {
+                remainingSeconds = 0;
+                isRunning = false;
+                clearInterval(timer);
+                play321SoothingSequence();
+                document.getElementById('bellText').innerText = "Session Completed 🙏";
+                updateUI();
+                return;
+            }
+
+            remainingSeconds--;
+            nextBell--;
+
+            if (nextBell <= 0) {
+                playIntervalChime();
+                nextBell = intervalSeconds;
+            }
+
+            updateUI();
+        }
+
+        function togglePlayPause() {
+            getAudioContext();
+            isRunning = !isRunning;
+            document.getElementById('btnPlayPause').innerText = isRunning ? "Pause (Space)" : "Start (Space)";
+        }
+
+        function resetTimer() {
+            remainingSeconds = totalSeconds;
+            nextBell = intervalSeconds;
+            updateUI();
+        }
+
+        function adjustTime(minutes) {
+            totalSeconds = Math.max(60, totalSeconds + minutes * 60);
+            remainingSeconds = Math.min(totalSeconds, remainingSeconds + minutes * 60);
+            updateUI();
+        }
+
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' || e.code === 'Enter') {
+                e.preventDefault();
+                togglePlayPause();
+            } else if (e.code === 'KeyR') {
+                resetTimer();
+            }
+        });
+
+        timer = setInterval(tick, 1000);
+        updateUI();
+    </script>
+</body>
+</html>

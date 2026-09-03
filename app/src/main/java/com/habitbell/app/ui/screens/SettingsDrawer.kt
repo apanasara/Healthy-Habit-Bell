@@ -39,7 +39,8 @@ fun SettingsDrawer(
     onVolumeChange: (Float) -> Unit,
     onTestBell: () -> Unit,
     onUpdateTime: (totalSec: Int, intervalSec: Int) -> Unit,
-    onOpenTVMode: () -> Unit
+    onOpenTVMode: () -> Unit,
+    tvCastUrl: String = ""
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -324,8 +325,94 @@ fun SettingsDrawer(
 
             // 5. Casting & Devices (TV Dashboard)
             item {
+                val context = LocalContext.current
                 SettingsSectionHeader(title = "Casting & Living Room")
                 Spacer(modifier = Modifier.height(8.dp))
+
+                // Autonomous TV Cast (Zero Phone Battery)
+                Card(
+                    shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Icon(
+                                Icons.Outlined.CastConnected,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(26.dp)
+                            )
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "TV Web Cast • Zero Mobile Battery",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onBackground
+                                )
+                                Text(
+                                    text = "Runs 100% on your TV hardware (like YouTube Cast). You can lock your phone or turn it off with zero battery drain!",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        if (tvCastUrl.isNotBlank()) {
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = MaterialTheme.colorScheme.surface,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = tvCastUrl,
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                        TextButton(
+                                            onClick = {
+                                                val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                                                clipboard.setPrimaryClip(android.content.ClipData.newPlainText("TV URL", tvCastUrl))
+                                            },
+                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                                        ) {
+                                            Text("Copy Link", style = MaterialTheme.typography.labelSmall)
+                                        }
+                                        TextButton(
+                                            onClick = {
+                                                try {
+                                                    context.startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(tvCastUrl)))
+                                                } catch (_: Exception) {}
+                                            },
+                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                                        ) {
+                                            Text("Open", style = MaterialTheme.typography.labelSmall)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // TV Dashboard on Phone
                 Card(
                     shape = RoundedCornerShape(12.dp),
                     colors = CardDefaults.cardColors(
@@ -347,13 +434,13 @@ fun SettingsDrawer(
                         )
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "TV Dashboard Mode",
+                                text = "TV Dashboard Mode (On Phone)",
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.Medium,
                                 color = MaterialTheme.colorScheme.onBackground
                             )
                             Text(
-                                text = "Big screen oversized display readable across room",
+                                text = "Oversized 110pt display readable across living room",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -366,8 +453,9 @@ fun SettingsDrawer(
                     }
                 }
 
-                val context = LocalContext.current
                 Spacer(modifier = Modifier.height(10.dp))
+
+                // Standard Google Cast Screen Mirror
                 Card(
                     shape = RoundedCornerShape(12.dp),
                     colors = CardDefaults.cardColors(
@@ -397,13 +485,13 @@ fun SettingsDrawer(
                         )
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "Google Cast / Chromecast",
+                                text = "Google Cast / Chromecast (System Mirror)",
                                 style = MaterialTheme.typography.bodyMedium,
                                 fontWeight = FontWeight.Medium,
                                 color = MaterialTheme.colorScheme.onBackground
                             )
                             Text(
-                                text = "Connect wirelessly to Chromecast, Android TV, or Smart TV",
+                                text = "Connect wirelessly to Chromecast or Android TV device",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
