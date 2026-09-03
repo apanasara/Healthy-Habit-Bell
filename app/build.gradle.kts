@@ -84,8 +84,9 @@ dependencies {
 
     implementation("androidx.datastore:datastore-preferences:1.1.1")
 
-    // Android Auto Car App Library (User Requirement 4)
+    // Android Auto Car App Library & Media Browser Service (User Requirement 4)
     implementation("androidx.car.app:app:1.4.0")
+    implementation("androidx.media:media:1.7.0")
 
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
