@@ -6,6 +6,8 @@ import androidx.lifecycle.viewModelScope
 import com.habitbell.app.data.model.*
 import com.habitbell.app.data.repository.TimerRepository
 import com.habitbell.app.engine.AudioBellManager
+import com.habitbell.app.engine.BackgroundMusicManager
+import com.habitbell.app.engine.BackgroundSoundType
 import com.habitbell.app.engine.BatteryOptimizer
 import com.habitbell.app.engine.HapticManager
 import com.habitbell.app.engine.SessionStatus
@@ -30,7 +32,13 @@ data class AppUiState(
     val isDisplayMode: Boolean = true,
     val isAutoDim: Boolean = true,
     val bellVolume: Float = 0.9f,
-    val isSettingsDrawerOpen: Boolean = false
+    val isSettingsDrawerOpen: Boolean = false,
+    val isBgMusicEnabled: Boolean = true,
+    val bgMusicType: BackgroundSoundType = BackgroundSoundType.DEFAULT_AUM,
+    val bgMusicCustomUri: String? = null,
+    val bgMusicCustomName: String? = null,
+    val bgMusicYouTubeUrl: String = "https://www.youtube.com/watch?v=x6UITRjhijI",
+    val bgMusicVolume: Float = 0.35f
 )
 
 class HabitBellViewModel(application: Application) : AndroidViewModel(application) {
@@ -39,6 +47,7 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
     private val audioManager = AudioBellManager(application)
     private val hapticManager = HapticManager(application)
     val batteryOptimizer = BatteryOptimizer(application)
+    val bgMusicManager = BackgroundMusicManager(application)
     private val engine = TimerEngine(audioManager, hapticManager)
     val castServer = com.habitbell.app.cast.LocalCastWebServer(application)
 
@@ -71,6 +80,10 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
         // Start local TV web receiver server for decoupled TV casting
         castServer.start()
 
+        bgMusicManager.isEnabled = _uiState.value.isBgMusicEnabled
+        bgMusicManager.soundType = _uiState.value.bgMusicType
+        bgMusicManager.volume = _uiState.value.bgMusicVolume
+
         // Monitor session status to manage foreground notification and battery optimizer
         viewModelScope.launch {
             sessionState.collect { state ->
@@ -85,6 +98,7 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
                         if (_uiState.value.isDisplayMode) {
                             batteryOptimizer.startProximityMonitoring()
                         }
+                        bgMusicManager.start()
                     }
                     SessionStatus.PAUSED -> {
                         TimerService.startService(
@@ -92,17 +106,20 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
                             state.profile.name,
                             "${state.formattedRemainingTime} (Paused)"
                         )
+                        bgMusicManager.pause()
                     }
                     SessionStatus.COMPLETED -> {
                         TimerService.stopService(getApplication())
                         batteryOptimizer.releaseWakeLock()
                         batteryOptimizer.stopProximityMonitoring()
+                        bgMusicManager.stop()
                         repository.recordSessionCompleted(state.profile.id)
                     }
                     SessionStatus.IDLE -> {
                         TimerService.stopService(getApplication())
                         batteryOptimizer.releaseWakeLock()
                         batteryOptimizer.stopProximityMonitoring()
+                        bgMusicManager.stop()
                     }
                 }
             }
@@ -209,10 +226,58 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
         startProfileSession(profile)
     }
 
+    fun setBgMusicEnabled(enabled: Boolean) {
+        _uiState.update { it.copy(isBgMusicEnabled = enabled) }
+        bgMusicManager.isEnabled = enabled
+        if (!enabled) {
+            bgMusicManager.stop()
+        } else if (sessionState.value.status == SessionStatus.RUNNING) {
+            bgMusicManager.start()
+        }
+    }
+
+    fun setBgMusicType(type: BackgroundSoundType) {
+        _uiState.update { it.copy(bgMusicType = type) }
+        bgMusicManager.soundType = type
+        if (sessionState.value.status == SessionStatus.RUNNING) {
+            bgMusicManager.start()
+        }
+    }
+
+    fun setBgMusicCustomUri(uriStr: String?, fileName: String?) {
+        _uiState.update {
+            it.copy(
+                bgMusicCustomUri = uriStr,
+                bgMusicCustomName = fileName,
+                bgMusicType = BackgroundSoundType.CUSTOM_FILE
+            )
+        }
+        bgMusicManager.customAudioUri = uriStr
+        bgMusicManager.soundType = BackgroundSoundType.CUSTOM_FILE
+        if (sessionState.value.status == SessionStatus.RUNNING) {
+            bgMusicManager.start()
+        }
+    }
+
+    fun setBgMusicVolume(volume: Float) {
+        _uiState.update { it.copy(bgMusicVolume = volume) }
+        bgMusicManager.volume = volume
+    }
+
+    fun setBgMusicYouTubeUrl(url: String) {
+        _uiState.update { it.copy(bgMusicYouTubeUrl = url, bgMusicType = BackgroundSoundType.YOUTUBE_LINK) }
+        bgMusicManager.youtubeUrl = url
+        bgMusicManager.soundType = BackgroundSoundType.YOUTUBE_LINK
+        if (sessionState.value.status == SessionStatus.RUNNING) {
+            bgMusicManager.start()
+        }
+    }
+
     override fun onCleared() {
         super.onCleared()
         engine.destroy()
         hapticManager.cancel()
+        bgMusicManager.release()
         castServer.stop()
         TimerService.stopService(getApplication())
         audioManager.release()

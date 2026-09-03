@@ -35,6 +35,26 @@ class MainActivity : ComponentActivity() {
             val reminders by viewModel.reminders.collectAsStateWithLifecycle()
             val isPocketBlanking by viewModel.isPocketBlankingActive.collectAsStateWithLifecycle()
 
+            val audioPickerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+                contract = androidx.activity.result.contract.ActivityResultContracts.GetContent()
+            ) { uri: android.net.Uri? ->
+                if (uri != null) {
+                    try {
+                        contentResolver.takePersistableUriPermission(
+                            uri,
+                            android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                        )
+                    } catch (_: Exception) {}
+                    val fileName = try {
+                        contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                            val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                            if (cursor.moveToFirst() && nameIndex >= 0) cursor.getString(nameIndex) else null
+                        }
+                    } catch (_: Exception) { null } ?: uri.lastPathSegment ?: "Custom Audio"
+                    viewModel.setBgMusicCustomUri(uri.toString(), fileName)
+                }
+            }
+
             // Hardware Display Mode: keep screen awake if session is active and display mode is on
             LaunchedEffect(sessionState.status, uiState.isDisplayMode) {
                 val shouldKeepAwake = uiState.isDisplayMode && sessionState.status == SessionStatus.RUNNING
@@ -142,7 +162,17 @@ class MainActivity : ComponentActivity() {
                                 viewModel.openSettingsDrawer(false)
                                 viewModel.navigateTo(AppScreen.TV_DASHBOARD)
                             },
-                            tvCastUrl = viewModel.getTvCastUrl()
+                            tvCastUrl = viewModel.getTvCastUrl(),
+                            isBgMusicEnabled = uiState.isBgMusicEnabled,
+                            bgMusicType = uiState.bgMusicType,
+                            bgMusicCustomName = uiState.bgMusicCustomName,
+                            bgMusicYouTubeUrl = uiState.bgMusicYouTubeUrl,
+                            bgMusicVolume = uiState.bgMusicVolume,
+                            onBgMusicToggle = { viewModel.setBgMusicEnabled(it) },
+                            onBgMusicTypeSelected = { viewModel.setBgMusicType(it) },
+                            onPickCustomAudio = { audioPickerLauncher.launch("audio/*") },
+                            onBgMusicYouTubeUrlChange = { viewModel.setBgMusicYouTubeUrl(it) },
+                            onBgMusicVolumeChange = { viewModel.setBgMusicVolume(it) }
                         )
                     }
 

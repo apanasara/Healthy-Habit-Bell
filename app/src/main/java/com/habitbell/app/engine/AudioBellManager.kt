@@ -75,9 +75,9 @@ class AudioBellManager(private val context: Context) {
         if (isLoaded && intervalSoundId != 0) {
             soundPool?.play(intervalSoundId, bellVolume, bellVolume, 1, 0, 1.0f)
         } else {
-            // Soothing warm 432Hz chime
+            // Soothing warm 432Hz chime with 8.5s duration and smooth boundary-free finish
             scope.launch {
-                playSynthesizedChime(f0 = 432.0, durationSeconds = 3.2, volumeScale = 0.85f)
+                playSynthesizedChime(f0 = 432.0, durationSeconds = 8.5, volumeScale = 0.88f)
             }
         }
     }
@@ -87,13 +87,13 @@ class AudioBellManager(private val context: Context) {
         if (isLoaded && completionSoundId != 0) {
             soundPool?.play(completionSoundId, bellVolume, bellVolume, 1, 0, 1.0f)
         } else {
-            // User Requirement 5: Bell 3-2-1 (3 strikes, ascending volume, descending frequency)
+            // User Requirement 5: Bell 3-2-1 with smooth seamless decay and zero boundary
             scope.launch {
-                playSynthesizedChime(f0 = 528.0, durationSeconds = 2.5, volumeScale = 0.40f)
-                kotlinx.coroutines.delay(1200)
-                playSynthesizedChime(f0 = 432.0, durationSeconds = 2.5, volumeScale = 0.70f)
-                kotlinx.coroutines.delay(1300)
-                playSynthesizedChime(f0 = 360.0, durationSeconds = 4.0, volumeScale = 1.00f)
+                playSynthesizedChime(f0 = 528.0, durationSeconds = 6.0, volumeScale = 0.42f)
+                kotlinx.coroutines.delay(2200)
+                playSynthesizedChime(f0 = 432.0, durationSeconds = 7.5, volumeScale = 0.72f)
+                kotlinx.coroutines.delay(2600)
+                playSynthesizedChime(f0 = 360.0, durationSeconds = 8.0, volumeScale = 1.00f)
             }
         }
     }
@@ -122,29 +122,36 @@ class AudioBellManager(private val context: Context) {
 
     /**
      * Procedural harmonic soothing bell synthesis with soft wool mallet attack and pure overtones.
+     * Ultra-smooth S-curve cosine fadeout eliminates any audible boundary cutoff.
      */
     private fun playSynthesizedChime(f0: Double, durationSeconds: Double, volumeScale: Float = 1.0f) {
         try {
             val sampleRate = 44100
             val numSamples = (sampleRate * durationSeconds).toInt()
             val buffer = ShortArray(numSamples)
-            val attackSamples = (sampleRate * 0.045).toInt()
+            val attackSamples = (sampleRate * 0.050).toInt()
+            val fadeOutStartSec = durationSeconds - 2.0
 
             for (i in 0 until numSamples) {
                 val t = i.toDouble() / sampleRate
                 val attack = if (i < attackSamples) {
                     0.5 * (1.0 - Math.cos(Math.PI * i / attackSamples))
                 } else {
-                    Math.exp(-t * 0.75)
+                    Math.exp(-(t - 0.050) * 0.52)
                 }
 
-                val beating = 1.0 + 0.08 * sin(2 * Math.PI * 1.2 * t)
-                val sFund = sin(2 * Math.PI * f0 * t)
-                val sSub = 0.20 * sin(2 * Math.PI * (f0 * 0.5) * t) * Math.exp(-t * 0.6)
-                val sOct = 0.28 * sin(2 * Math.PI * (f0 * 2.0) * t) * Math.exp(-t * 1.2)
-                val sFifth = 0.08 * sin(2 * Math.PI * (f0 * 3.0) * t) * Math.exp(-t * 1.8)
+                val tailFade = if (t >= fadeOutStartSec) {
+                    0.5 * (1.0 + Math.cos(Math.PI * (t - fadeOutStartSec) / 2.0))
+                } else 1.0
 
-                val sample = (sFund + sSub + sOct + sFifth) * attack * beating * bellVolume * volumeScale
+                val beating = 1.0 + 0.07 * sin(2 * Math.PI * 1.08 * t)
+                val sFund = sin(2 * Math.PI * f0 * t)
+                val sSub = 0.25 * sin(2 * Math.PI * (f0 * 0.5) * t) * Math.exp(-t * 0.35)
+                val sThird = 0.18 * sin(2 * Math.PI * (f0 * 1.5) * t) * Math.exp(-t * 0.75)
+                val sOct = 0.20 * sin(2 * Math.PI * (f0 * 2.0) * t) * Math.exp(-t * 1.0)
+                val sFifth = 0.06 * sin(2 * Math.PI * (f0 * 3.0) * t) * Math.exp(-t * 1.5)
+
+                val sample = (sFund + sSub + sThird + sOct + sFifth) * attack * tailFade * beating * bellVolume * volumeScale
                 val saturated = tanh(sample * 0.85) * 0.95
                 buffer[i] = (saturated * 32767).toInt().coerceIn(-32768, 32767).toShort()
             }

@@ -40,7 +40,17 @@ fun SettingsDrawer(
     onTestBell: () -> Unit,
     onUpdateTime: (totalSec: Int, intervalSec: Int) -> Unit,
     onOpenTVMode: () -> Unit,
-    tvCastUrl: String = ""
+    tvCastUrl: String = "",
+    isBgMusicEnabled: Boolean = true,
+    bgMusicType: com.habitbell.app.engine.BackgroundSoundType = com.habitbell.app.engine.BackgroundSoundType.DEFAULT_AUM,
+    bgMusicCustomName: String? = null,
+    bgMusicYouTubeUrl: String = "https://www.youtube.com/watch?v=x6UITRjhijI",
+    bgMusicVolume: Float = 0.35f,
+    onBgMusicToggle: (Boolean) -> Unit = {},
+    onBgMusicTypeSelected: (com.habitbell.app.engine.BackgroundSoundType) -> Unit = {},
+    onPickCustomAudio: () -> Unit = {},
+    onBgMusicYouTubeUrlChange: (String) -> Unit = {},
+    onBgMusicVolumeChange: (Float) -> Unit = {}
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -235,9 +245,9 @@ fun SettingsDrawer(
                 }
             }
 
-            // 2. Sound (Bell Volume & Test)
+            // 2. Sound & Background Music
             item {
-                SettingsSectionHeader(title = "Sound")
+                SettingsSectionHeader(title = "Sound & Background Chants")
                 Spacer(modifier = Modifier.height(8.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -262,6 +272,165 @@ fun SettingsDrawer(
                         activeTrackColor = MaterialTheme.colorScheme.primary
                     )
                 )
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Global Background Music Setting (User Requirement)
+                Card(
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        SettingsToggleRow(
+                            title = "Background Music",
+                            subtitle = "Continuous soothing sound while any timer runs",
+                            checked = isBgMusicEnabled,
+                            onCheckedChange = onBgMusicToggle
+                        )
+
+                        if (isBgMusicEnabled) {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(
+                                text = "SOUND SOURCE",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            var ytInput by remember(bgMusicYouTubeUrl) { mutableStateOf(bgMusicYouTubeUrl) }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                val isAumSelected = bgMusicType == com.habitbell.app.engine.BackgroundSoundType.DEFAULT_AUM
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = if (isAumSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clickable { onBgMusicTypeSelected(com.habitbell.app.engine.BackgroundSoundType.DEFAULT_AUM) }
+                                ) {
+                                    Text(
+                                        text = "ॐ Aum",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = if (isAumSelected) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (isAumSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onBackground,
+                                        modifier = Modifier.padding(vertical = 10.dp).wrapContentWidth(Alignment.CenterHorizontally)
+                                    )
+                                }
+
+                                val isYtSelected = bgMusicType == com.habitbell.app.engine.BackgroundSoundType.YOUTUBE_LINK
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = if (isYtSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+                                    modifier = Modifier
+                                        .weight(1.2f)
+                                        .clickable { onBgMusicTypeSelected(com.habitbell.app.engine.BackgroundSoundType.YOUTUBE_LINK) }
+                                ) {
+                                    Text(
+                                        text = "YouTube (Ad-Free)",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = if (isYtSelected) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (isYtSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onBackground,
+                                        modifier = Modifier.padding(vertical = 10.dp).wrapContentWidth(Alignment.CenterHorizontally)
+                                    )
+                                }
+
+                                val isCustomSelected = bgMusicType == com.habitbell.app.engine.BackgroundSoundType.CUSTOM_FILE
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = if (isCustomSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clickable { onBgMusicTypeSelected(com.habitbell.app.engine.BackgroundSoundType.CUSTOM_FILE) }
+                                ) {
+                                    Text(
+                                        text = "Custom File",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = if (isCustomSelected) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (isCustomSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onBackground,
+                                        modifier = Modifier.padding(vertical = 10.dp).wrapContentWidth(Alignment.CenterHorizontally)
+                                    )
+                                }
+                            }
+
+                            if (bgMusicType == com.habitbell.app.engine.BackgroundSoundType.YOUTUBE_LINK) {
+                                Spacer(modifier = Modifier.height(10.dp))
+                                OutlinedTextField(
+                                    value = ytInput,
+                                    onValueChange = {
+                                        ytInput = it
+                                        onBgMusicYouTubeUrlChange(it)
+                                    },
+                                    label = { Text("YouTube URL (Audio Stream)") },
+                                    singleLine = true,
+                                    textStyle = MaterialTheme.typography.bodySmall,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "✓ Clean ad-free audio plays in background while timer runs",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+
+                            if (bgMusicType == com.habitbell.app.engine.BackgroundSoundType.CUSTOM_FILE) {
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        text = bgMusicCustomName ?: "No custom file chosen",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    Button(
+                                        onClick = onPickCustomAudio,
+                                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                                    ) {
+                                        Text("Choose File", style = MaterialTheme.typography.labelSmall)
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Background Volume",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onBackground
+                                )
+                                Text(
+                                    text = "${(bgMusicVolume * 100).toInt()}%",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                            Slider(
+                                value = bgMusicVolume,
+                                onValueChange = onBgMusicVolumeChange,
+                                valueRange = 0f..1f,
+                                colors = SliderDefaults.colors(
+                                    thumbColor = MaterialTheme.colorScheme.primary,
+                                    activeTrackColor = MaterialTheme.colorScheme.primary
+                                )
+                            )
+                        }
+                    }
+                }
             }
 
             // 3. Display & Battery Optimizations

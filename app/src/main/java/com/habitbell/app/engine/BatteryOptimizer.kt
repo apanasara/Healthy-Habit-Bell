@@ -24,6 +24,9 @@ class BatteryOptimizer(private val context: Context) : SensorEventListener {
     private val proximitySensor: Sensor? = sensorManager?.getDefaultSensor(Sensor.TYPE_PROXIMITY)
     private val powerManager = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
 
+    private val wifiManager = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? android.net.wifi.WifiManager
+    private var wifiLock: android.net.wifi.WifiManager.WifiLock? = null
+
     private var wakeLock: PowerManager.WakeLock? = null
     private var isSensorRegistered = false
 
@@ -62,12 +65,41 @@ class BatteryOptimizer(private val context: Context) : SensorEventListener {
             }
         }
         wakeLock?.acquire(3 * 3600 * 1000L) // Max 3 hours failsafe
+        acquireWifiLock()
     }
 
     fun releaseWakeLock() {
         try {
             if (wakeLock?.isHeld == true) {
                 wakeLock?.release()
+            }
+        } catch (_: Exception) {}
+        releaseWifiLock()
+    }
+
+    fun acquireWifiLock() {
+        if (wifiLock == null) {
+            wifiLock = wifiManager?.createWifiLock(
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                    android.net.wifi.WifiManager.WIFI_MODE_FULL_LOW_LATENCY
+                } else {
+                    @Suppress("DEPRECATION")
+                    android.net.wifi.WifiManager.WIFI_MODE_FULL_HIGH_PERF
+                },
+                "HabitBell::CastWifiLock"
+            )?.apply {
+                setReferenceCounted(false)
+            }
+        }
+        try {
+            wifiLock?.acquire()
+        } catch (_: Exception) {}
+    }
+
+    fun releaseWifiLock() {
+        try {
+            if (wifiLock?.isHeld == true) {
+                wifiLock?.release()
             }
         } catch (_: Exception) {}
     }

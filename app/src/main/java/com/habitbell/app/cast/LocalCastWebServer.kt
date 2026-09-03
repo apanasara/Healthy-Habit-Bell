@@ -1,29 +1,28 @@
 package com.habitbell.app.cast
 
 import android.content.Context
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.launch
+import android.net.nsd.NsdManager
+import android.net.nsd.NsdServiceInfo
+import android.net.wifi.WifiManager
+import android.util.Log
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.io.OutputStream
 import java.net.Inet4Address
+import java.net.InetAddress
 import java.net.NetworkInterface
 import java.net.ServerSocket
 import java.net.Socket
+import kotlin.concurrent.thread
 
-/**
- * Lightweight embedded HTTP server that serves the standalone Habit Bell TV Web Receiver
- * directly to any Smart TV, Chromecast with Google TV, or Android TV on the local Wi-Fi network.
- *
- * Runs 100% independently on the TV hardware with ZERO ongoing battery draw on the mobile device.
- */
-class LocalCastWebServer(private val context: Context, val port: Int = 8888) {
+class LocalCastWebServer(private val context: Context, private val port: Int = 8888) {
 
+    private val TAG = "LocalCastWebServer"
     private var serverSocket: ServerSocket? = null
-    private var serverJob: Job? = null
-    private val scope = CoroutineScope(Dispatchers.IO)
+    private var serverThread: Thread? = null
+    private var multicastLock: WifiManager.MulticastLock? = null
+    private var nsdManager: NsdManager? = null
+    private var registrationListener: NsdManager.RegistrationListener? = null
 
     @Volatile
     var isRunning: Boolean = false
@@ -32,69 +31,136 @@ class LocalCastWebServer(private val context: Context, val port: Int = 8888) {
     fun start() {
         if (isRunning) return
         try {
-            serverSocket = ServerSocket(port)
+            acquireLocks()
+
+            System.setProperty("java.net.preferIPv4Stack", "true")
+            val ipv4Any = InetAddress.getByAddress(byteArrayOf(0, 0, 0, 0))
+            serverSocket = ServerSocket(port, 50, ipv4Any).apply {
+                reuseAddress = true
+            }
             isRunning = true
-            serverJob = scope.launch {
+
+            registerNsd()
+
+            Log.i(TAG, "TV Webcast Server listening on http://0.0.0.0:$port (LAN: ${getTvUrl()})")
+
+            serverThread = thread(isDaemon = true, name = "HabitBell-TVServer") {
                 while (isRunning) {
                     try {
                         val client = serverSocket?.accept() ?: break
-                        handleClient(client)
-                    } catch (_: Exception) {
-                        break
+                        handleClientAsync(client)
+                    } catch (e: Exception) {
+                        if (isRunning) {
+                            Log.w(TAG, "Server accept error: ${e.message}")
+                        }
                     }
                 }
             }
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to start TV Webcast Server on port $port", e)
+        }
     }
 
-    fun stop() {
-        isRunning = false
-        try {
-            serverSocket?.close()
-        } catch (_: Exception) {}
-        serverJob?.cancel()
-        serverSocket = null
-        serverJob = null
-    }
-
-    private fun handleClient(socket: Socket) {
-        scope.launch {
+    private fun handleClientAsync(socket: Socket) {
+        thread(isDaemon = true, name = "HabitBell-TVClient") {
             try {
+                socket.soTimeout = 8000
                 val reader = BufferedReader(InputStreamReader(socket.getInputStream()))
-                val line = reader.readLine() ?: return@launch
-                val parts = line.split(" ")
+                val requestLine = reader.readLine() ?: return@thread
+                val parts = requestLine.split(" ")
                 val path = if (parts.size > 1) parts[1] else "/"
+
+                Log.i(TAG, "TV Request from ${socket.remoteSocketAddress}: $path")
 
                 val html = try {
                     context.assets.open("tv/index.html").bufferedReader().use { it.readText() }
                 } catch (e: Exception) {
-                    "<html><body><h1>Habit Bell TV Ready</h1></body></html>"
+                    Log.e(TAG, "Could not open tv/index.html asset", e)
+                    "<!DOCTYPE html><html><head><title>Habit Bell TV</title></head><body style='background:#000;color:#fff;text-align:center;padding:50px;font-family:sans-serif;'><h1>Habit Bell TV Dashboard</h1><p>Ready for mindfulness sessions.</p></body></html>"
                 }
 
-                val bytes = html.toByteArray(Charsets.UTF_8)
+                val bodyBytes = html.toByteArray(Charsets.UTF_8)
                 val out: OutputStream = socket.getOutputStream()
-                out.write("HTTP/1.1 200 OK\r\n".toByteArray())
-                out.write("Content-Type: text/html; charset=UTF-8\r\n".toByteArray())
-                out.write("Content-Length: ${bytes.size}\r\n".toByteArray())
-                out.write("Connection: close\r\n\r\n".toByteArray())
-                out.write(bytes)
+                val response = StringBuilder()
+                    .append("HTTP/1.1 200 OK\r\n")
+                    .append("Content-Type: text/html; charset=UTF-8\r\n")
+                    .append("Content-Length: ${bodyBytes.size}\r\n")
+                    .append("Access-Control-Allow-Origin: *\r\n")
+                    .append("Connection: close\r\n\r\n")
+                    .toString()
+
+                out.write(response.toByteArray(Charsets.UTF_8))
+                out.write(bodyBytes)
                 out.flush()
                 socket.close()
-            } catch (_: Exception) {
+                Log.i(TAG, "Successfully served TV Webcast dashboard (${bodyBytes.size} bytes)")
+            } catch (e: Exception) {
+                Log.w(TAG, "Error handling client socket: ${e.message}")
                 try { socket.close() } catch (_: Exception) {}
             }
         }
     }
 
+    private fun acquireLocks() {
+        try {
+            val wifi = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
+            multicastLock = wifi?.createMulticastLock("HabitBellTVMulticast")?.apply {
+                setReferenceCounted(true)
+                acquire()
+            }
+        } catch (_: Exception) {}
+    }
+
+    private fun registerNsd() {
+        try {
+            nsdManager = context.getSystemService(Context.NSD_SERVICE) as? NsdManager
+            val serviceInfo = NsdServiceInfo().apply {
+                serviceName = "HabitBellTV"
+                serviceType = "_http._tcp."
+                setPort(port)
+            }
+            registrationListener = object : NsdManager.RegistrationListener {
+                override fun onServiceRegistered(info: NsdServiceInfo?) {
+                    Log.i(TAG, "NSD registered: ${info?.serviceName}")
+                }
+                override fun onRegistrationFailed(info: NsdServiceInfo?, err: Int) {
+                    Log.w(TAG, "NSD registration failed: $err")
+                }
+                override fun onServiceUnregistered(info: NsdServiceInfo?) {}
+                override fun onUnregistrationFailed(info: NsdServiceInfo?, err: Int) {}
+            }
+            nsdManager?.registerService(serviceInfo, NsdManager.PROTOCOL_DNS_SD, registrationListener)
+        } catch (e: Exception) {
+            Log.w(TAG, "NSD setup notice: ${e.message}")
+        }
+    }
+
+    fun stop() {
+        isRunning = false
+        try { serverSocket?.close() } catch (_: Exception) {}
+        try { registrationListener?.let { nsdManager?.unregisterService(it) } } catch (_: Exception) {}
+        try { if (multicastLock?.isHeld == true) multicastLock?.release() } catch (_: Exception) {}
+        serverSocket = null
+        serverThread = null
+        multicastLock = null
+    }
+
     fun getLocalIpAddress(): String? {
         try {
-            val interfaces = NetworkInterface.getNetworkInterfaces()
-            while (interfaces.hasMoreElements()) {
-                val networkInterface = interfaces.nextElement()
-                if (networkInterface.isLoopback || !networkInterface.isUp) continue
-                val addresses = networkInterface.inetAddresses
-                while (addresses.hasMoreElements()) {
-                    val addr = addresses.nextElement()
+            val interfaces = NetworkInterface.getNetworkInterfaces().toList()
+            for (intf in interfaces) {
+                if (intf.isLoopback || !intf.isUp) continue
+                if (intf.name.lowercase().contains("wlan") || intf.name.lowercase().contains("eth")) {
+                    for (addr in intf.inetAddresses) {
+                        if (addr is Inet4Address && !addr.isLoopbackAddress) {
+                            return addr.hostAddress
+                        }
+                    }
+                }
+            }
+            for (intf in interfaces) {
+                if (intf.isLoopback || !intf.isUp) continue
+                for (addr in intf.inetAddresses) {
                     if (addr is Inet4Address && !addr.isLoopbackAddress) {
                         return addr.hostAddress
                     }
@@ -105,7 +171,7 @@ class LocalCastWebServer(private val context: Context, val port: Int = 8888) {
     }
 
     fun getTvUrl(): String {
-        val ip = getLocalIpAddress() ?: "localhost"
+        val ip = getLocalIpAddress() ?: "192.168.1.2"
         return "http://$ip:$port"
     }
 }
