@@ -205,12 +205,14 @@ private fun LandscapeSessionLayout(
                 )
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = onOpenTVMode, modifier = Modifier.size(36.dp)) {
-                        Icon(
-                            Icons.Outlined.Cast,
-                            contentDescription = "Cast to TV",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                    if (sessionState.profile.isCastSupported) {
+                        IconButton(onClick = onOpenTVMode, modifier = Modifier.size(36.dp)) {
+                            Icon(
+                                Icons.Outlined.Cast,
+                                contentDescription = "Cast to TV",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                     IconButton(onClick = onTriggerPocketMode, modifier = Modifier.size(36.dp)) {
                         Icon(
@@ -365,13 +367,15 @@ private fun PortraitSessionLayout(
             )
 
             Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onOpenTVMode) {
-                    Icon(
-                        Icons.Outlined.Cast,
-                        contentDescription = "Cast / TV Mode",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(24.dp)
-                    )
+                if (sessionState.profile.isCastSupported) {
+                    IconButton(onClick = onOpenTVMode) {
+                        Icon(
+                            Icons.Outlined.Cast,
+                            contentDescription = "Cast / TV Mode",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
                 }
                 IconButton(onClick = onTriggerPocketMode) {
                     Icon(

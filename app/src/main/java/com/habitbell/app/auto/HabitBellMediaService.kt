@@ -7,8 +7,13 @@ import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
 import androidx.media.MediaBrowserServiceCompat
 
+/**
+ * MediaBrowserServiceCompat providing standard media playback integration for Android Auto,
+ * Bluetooth audio metadata, Wear OS, and lock screen media controls.
+ */
 class HabitBellMediaService : MediaBrowserServiceCompat() {
 
+    /** Dedicated media session managing playback state, audio buttons, and track metadata. */
     private lateinit var mediaSession: MediaSessionCompat
 
     override fun onCreate() {
@@ -37,6 +42,11 @@ class HabitBellMediaService : MediaBrowserServiceCompat() {
         updatePlaybackState(PlaybackStateCompat.STATE_PAUSED)
     }
 
+    /**
+     * Broadcasts updated transport state (playing, paused, stopped) to automotive and system media receivers.
+     *
+     * @param state Playback state enum from [PlaybackStateCompat].
+     */
     private fun updatePlaybackState(state: Int) {
         val playbackState = PlaybackStateCompat.Builder()
             .setActions(
@@ -50,6 +60,14 @@ class HabitBellMediaService : MediaBrowserServiceCompat() {
         mediaSession.setPlaybackState(playbackState)
     }
 
+    /**
+     * Returns the root node for media tree browsing by external car head units or media clients.
+     *
+     * @param clientPackageName Connecting application package name.
+     * @param clientUid Connecting process UID.
+     * @param rootHints Optional bundle parameters.
+     * @return [BrowserRoot] node.
+     */
     override fun onGetRoot(
         clientPackageName: String,
         clientUid: Int,
@@ -58,6 +76,12 @@ class HabitBellMediaService : MediaBrowserServiceCompat() {
         return BrowserRoot("habit_bell_root", null)
     }
 
+    /**
+     * Loads the list of playable mindful audio routines for the car media browser.
+     *
+     * @param parentId Node identifier being browsed.
+     * @param result Asynchronous result sender delivering the media items.
+     */
     override fun onLoadChildren(
         parentId: String,
         result: Result<MutableList<MediaBrowserCompat.MediaItem>>

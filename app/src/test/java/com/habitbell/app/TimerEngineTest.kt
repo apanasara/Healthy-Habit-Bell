@@ -10,8 +10,16 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+/**
+ * Unit test suite verifying core timer state representations, default wellness profiles,
+ * breathwork configs, compound sequence counts, and time string formatters.
+ */
 class TimerEngineTest {
 
+    /**
+     * Verifies that the Mindful Eating profile initializes with a 20-minute total duration
+     * and 30-second interval bite chimes.
+     */
     @Test
     fun testEatingProfileDefaultValues() {
         val eating = DefaultProfiles.EATING
@@ -22,6 +30,10 @@ class TimerEngineTest {
         assertTrue(eating.isFavorite)
     }
 
+    /**
+     * Verifies that the Reiki Energy Healing profile has 45-minute total duration
+     * and 3-minute hand placement transitions.
+     */
     @Test
     fun testReikiProfileDefaultValues() {
         val reiki = DefaultProfiles.REIKI
@@ -30,6 +42,9 @@ class TimerEngineTest {
         assertEquals(180, reiki.intervalDurationSeconds) // 3-minute hand transitions
     }
 
+    /**
+     * Verifies the 4-phase Sama Vritti (Box Breathing) 4-4-4-4 second ratio configuration.
+     */
     @Test
     fun testPranayamaBoxBreathConfig() {
         val pranayama = DefaultProfiles.PRANAYAMA_BOX
@@ -41,6 +56,9 @@ class TimerEngineTest {
         assertEquals(20, config.targetRounds)
     }
 
+    /**
+     * Verifies the 12-asana Surya Namaskar yoga sequence boundaries and round repetitions.
+     */
     @Test
     fun testSuryaNamaskar12Poses() {
         val surya = DefaultProfiles.SURYA_NAMASKAR
@@ -52,6 +70,9 @@ class TimerEngineTest {
         assertEquals(5, config.targetRounds)
     }
 
+    /**
+     * Verifies that remaining seconds and interval countdowns format properly into `MM:SS` strings.
+     */
     @Test
     fun testSessionStateTimeFormatting() {
         val state = TimerSessionState(
@@ -64,6 +85,9 @@ class TimerEngineTest {
         assertEquals("00:20", state.formattedNextBellTime)
     }
 
+    /**
+     * Verifies preset routine reminder counts and time strings.
+     */
     @Test
     fun testDefaultReminders() {
         val reminders = DefaultReminders.ALL_REMINDERS

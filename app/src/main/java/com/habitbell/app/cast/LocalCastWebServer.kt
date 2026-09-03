@@ -15,19 +15,46 @@ import java.net.ServerSocket
 import java.net.Socket
 import kotlin.concurrent.thread
 
+/**
+ * Embedded lightweight HTTP server and Network Service Discovery (NSD) broadcaster.
+ *
+ * Enables zero-cloud, privacy-first screen mirroring to any Smart TV or computer web browser
+ * on the same local area network (LAN):
+ * 1. Hosts an embedded daemon listening on port 8888 (e.g. `http://192.168.1.X:8888`).
+ * 2. Advertises an mDNS / Bonjour service (`_http._tcp.`) named `HabitBellTV` for zero-configuration discovery.
+ * 3. Serves the pre-compiled, responsive TV web dashboard from `assets/tv/index.html`.
+ *
+ * @param context Android context for asset resolution and Wi-Fi system service acquisition.
+ * @param port TCP port to bind the HTTP server socket (defaults to `8888`).
+ */
 class LocalCastWebServer(private val context: Context, private val port: Int = 8888) {
 
     private val TAG = "LocalCastWebServer"
+
+    /** Bound server socket listening for incoming HTTP connections. */
     private var serverSocket: ServerSocket? = null
+
+    /** Background daemon thread executing the socket accept loop. */
     private var serverThread: Thread? = null
+
+    /** Multicast lock allowing mDNS discovery packets to traverse Wi-Fi interfaces. */
     private var multicastLock: WifiManager.MulticastLock? = null
+
+    /** System Network Service Discovery manager for local mDNS service registration. */
     private var nsdManager: NsdManager? = null
+
+    /** Listener callback for NSD service registration events. */
     private var registrationListener: NsdManager.RegistrationListener? = null
 
+    /** Volatile execution flag indicating whether the HTTP server is currently listening. */
     @Volatile
     var isRunning: Boolean = false
         private set
 
+    /**
+     * Starts the local HTTP server daemon and advertises the NSD Bonjour service.
+     * Binds to `0.0.0.0` (all IPv4 network interfaces).
+     */
     fun start() {
         if (isRunning) return
         try {
@@ -61,10 +88,16 @@ class LocalCastWebServer(private val context: Context, private val port: Int = 8
         }
     }
 
+    /**
+     * Handles an incoming HTTP request on a dedicated background thread,
+     * returning the bundled `tv/index.html` dashboard asset with CORS headers.
+     *
+     * @param socket Client socket connection.
+     */
     private fun handleClientAsync(socket: Socket) {
         thread(isDaemon = true, name = "HabitBell-TVClient") {
             try {
-                socket.soTimeout = 8000
+                socket.soTimeout = 8000 // 8s read timeout to prevent stale client hangs
                 val reader = BufferedReader(InputStreamReader(socket.getInputStream()))
                 val requestLine = reader.readLine() ?: return@thread
                 val parts = requestLine.split(" ")
@@ -72,6 +105,7 @@ class LocalCastWebServer(private val context: Context, private val port: Int = 8
 
                 Log.i(TAG, "TV Request from ${socket.remoteSocketAddress}: $path")
 
+                // Read bundled TV dashboard HTML asset
                 val html = try {
                     context.assets.open("tv/index.html").bufferedReader().use { it.readText() }
                 } catch (e: Exception) {
@@ -101,6 +135,9 @@ class LocalCastWebServer(private val context: Context, private val port: Int = 8
         }
     }
 
+    /**
+     * Acquires a Wi-Fi MulticastLock allowing mDNS discovery packets to pass through the radio chip.
+     */
     private fun acquireLocks() {
         try {
             val wifi = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
@@ -111,6 +148,10 @@ class LocalCastWebServer(private val context: Context, private val port: Int = 8
         } catch (_: Exception) {}
     }
 
+    /**
+     * Registers the mDNS service (`_http._tcp.`) via [NsdManager] so nearby Smart TVs
+     * can automatically locate the web broadcast without manual IP typing.
+     */
     private fun registerNsd() {
         try {
             nsdManager = context.getSystemService(Context.NSD_SERVICE) as? NsdManager
@@ -135,6 +176,9 @@ class LocalCastWebServer(private val context: Context, private val port: Int = 8
         }
     }
 
+    /**
+     * Halts the HTTP server socket, releases multicast locks, and unregisters NSD services.
+     */
     fun stop() {
         isRunning = false
         try { serverSocket?.close() } catch (_: Exception) {}
@@ -145,9 +189,15 @@ class LocalCastWebServer(private val context: Context, private val port: Int = 8
         multicastLock = null
     }
 
+    /**
+     * Discovers the device's non-loopback IPv4 address on Wi-Fi (`wlan`) or Ethernet (`eth`) interfaces.
+     *
+     * @return IPv4 address string (e.g., "192.168.1.15"), or null if offline.
+     */
     fun getLocalIpAddress(): String? {
         try {
             val interfaces = NetworkInterface.getNetworkInterfaces().toList()
+            // Priority 1: Match active wireless or ethernet adapters
             for (intf in interfaces) {
                 if (intf.isLoopback || !intf.isUp) continue
                 if (intf.name.lowercase().contains("wlan") || intf.name.lowercase().contains("eth")) {
@@ -158,6 +208,7 @@ class LocalCastWebServer(private val context: Context, private val port: Int = 8
                     }
                 }
             }
+            // Priority 2: Fallback to any valid non-loopback IPv4 interface
             for (intf in interfaces) {
                 if (intf.isLoopback || !intf.isUp) continue
                 for (addr in intf.inetAddresses) {
@@ -170,6 +221,11 @@ class LocalCastWebServer(private val context: Context, private val port: Int = 8
         return null
     }
 
+    /**
+     * Resolves the full local URL for browser casting.
+     *
+     * @return HTTP URL string (e.g., `http://192.168.1.45:8888`).
+     */
     fun getTvUrl(): String {
         val ip = getLocalIpAddress() ?: "192.168.1.2"
         return "http://$ip:$port"

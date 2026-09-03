@@ -101,33 +101,40 @@
         }
         .controls {
             display: flex;
-            gap: 24px;
+            gap: 16px;
+            justify-content: center;
             align-items: center;
         }
         .btn {
             background: rgba(255, 255, 255, 0.08);
-            border: 1px solid rgba(255, 255, 255, 0.15);
             color: #FFFFFF;
-            border-radius: 40px;
-            padding: 16px 36px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 16px;
+            padding: 14px 32px;
             font-size: 1.2rem;
-            font-weight: 600;
             cursor: pointer;
             transition: all 0.2s ease;
             outline: none;
         }
-        .btn:focus, .btn:hover {
-            background: #E5A93C;
-            color: #060709;
+        .btn:hover, .btn:focus {
+            background: rgba(229, 169, 60, 0.25);
             border-color: #E5A93C;
             transform: scale(1.05);
         }
         .btn-primary {
             background: #E5A93C;
             color: #060709;
-            border: none;
-            padding: 20px 48px;
-            font-size: 1.4rem;
+            font-weight: 600;
+            border-color: #E5A93C;
+        }
+        .btn-primary:hover, .btn-primary:focus {
+            background: #f3b64c;
+            color: #060709;
+        }
+        .btn-active {
+            background: rgba(229, 169, 60, 0.3);
+            border-color: #E5A93C;
+            color: #E5A93C;
         }
         .hint {
             color: #6C7A9C;
@@ -136,13 +143,20 @@
             text-align: center;
             margin-top: 10px;
         }
+        #ytFrame {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            opacity: 0.01;
+            pointer-events: none;
+        }
     </style>
 </head>
 <body>
     <div class="header">
         <div class="badge">Living Room TV Dashboard</div>
         <div class="title" id="sessionTitle">🍽 Mindful Eating</div>
-        <div class="tv-status">TV Autonomous Mode • Zero Mobile Battery</div>
+        <div class="tv-status" id="bgStatus">Background: ॐ Aum Drone</div>
     </div>
 
     <div class="center-stage">
@@ -160,13 +174,20 @@
         <div class="controls">
             <button class="btn" id="btnReset" onclick="resetTimer()">Reset (R)</button>
             <button class="btn btn-primary" id="btnPlayPause" onclick="togglePlayPause()">Pause (Space)</button>
+            <button class="btn btn-active" id="btnBgMusic" onclick="toggleBgSound()">ॐ Music: ON (M)</button>
             <button class="btn" onclick="adjustTime(-5)">-5 Min</button>
             <button class="btn" onclick="adjustTime(5)">+5 Min</button>
         </div>
         <div class="hint">Use TV Remote [OK / Enter] to Play/Pause • Mobile phone can now be locked or turned off</div>
     </div>
 
+    <iframe id="ytFrame" allow="autoplay; encrypted-media"></iframe>
+
     <script>
+        const urlParams = new URLSearchParams(window.location.search);
+        const ytParam = urlParams.get('yt');
+        const bgParam = urlParams.get('bg') || (ytParam ? 'yt' : 'aum');
+
         let totalSeconds = 1200;
         let remainingSeconds = 1200;
         let intervalSeconds = 30;
@@ -174,10 +195,14 @@
         let isRunning = true;
         let timer = null;
 
+        let isBgSoundEnabled = (bgParam !== 'none');
+        let bgSoundSource = ytParam ? 'yt' : 'aum';
+
         const CIRCUMFERENCE = 2 * Math.PI * 220; // ~1382.3
 
-        // Soothing Web Audio Synthesizer
         let audioCtx = null;
+        let aumSource = null;
+        let aumGain = null;
 
         function getAudioContext() {
             if (!audioCtx) {
@@ -193,40 +218,120 @@
             try {
                 const ctx = getAudioContext();
                 const now = ctx.currentTime;
-
                 const osc = ctx.createOscillator();
                 const gain = ctx.createGain();
 
                 osc.type = 'sine';
                 osc.frequency.setValueAtTime(freq, now);
 
-                // Soft felt mallet attack envelope (40ms rise)
+                // Soft felt mallet attack envelope (50ms rise)
                 gain.gain.setValueAtTime(0.001, now);
-                gain.gain.exponentialRampToValueAtTime(volume, now + 0.045);
-                gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+                gain.gain.exponentialRampToValueAtTime(volume, now + 0.050);
+                gain.gain.exponentialRampToValueAtTime(volume * 0.15, now + duration - 2.0);
+                // Asymptotic smooth cosine fadeout to zero boundary
+                gain.gain.linearRampToValueAtTime(0.00001, now + duration);
 
                 osc.connect(gain);
                 gain.connect(ctx.destination);
 
                 osc.start(now);
-                osc.stop(now + duration);
+                osc.stop(now + duration + 0.05);
             } catch (e) {
                 console.error(e);
             }
         }
 
-        // User Requirement 5: Soothing 3-2-1 Bell (3 strikes, ascending volume, descending frequency)
         function play321SoothingSequence() {
-            // Strike 1: 528 Hz @ 0.35 volume
-            playHarmonicChime(528, 0.35, 2.5);
-            // Strike 2: 432 Hz @ 0.65 volume
-            setTimeout(() => playHarmonicChime(432, 0.65, 2.8), 1200);
-            // Strike 3: 360 Hz (deep base) @ 1.00 volume
-            setTimeout(() => playHarmonicChime(360, 0.95, 4.5), 2500);
+            playHarmonicChime(528, 0.38, 5.0);
+            setTimeout(() => playHarmonicChime(432, 0.70, 6.5), 2200);
+            setTimeout(() => playHarmonicChime(360, 1.00, 7.5), 4800);
         }
 
         function playIntervalChime() {
-            playHarmonicChime(432, 0.75, 3.0);
+            playHarmonicChime(432, 0.85, 8.0);
+        }
+
+        function startAumDrone() {
+            if (!isBgSoundEnabled || bgSoundSource !== 'aum') return;
+            try {
+                const ctx = getAudioContext();
+                if (aumSource) return;
+
+                const sampleRate = ctx.sampleRate;
+                const duration = 16.0;
+                const buffer = ctx.createBuffer(1, sampleRate * duration, sampleRate);
+                const data = buffer.getChannelData(0);
+                const f_om = 136.1;
+
+                for (let i = 0; i < data.length; i++) {
+                    const t = i / sampleRate;
+                    const om_fund = Math.sin(2.0 * Math.PI * f_om * t);
+                    const om_sub = 0.35 * Math.sin(2.0 * Math.PI * (f_om * 0.5) * t);
+                    const fifth = 0.22 * Math.sin(2.0 * Math.PI * (f_om * 1.5) * t);
+                    const octave = 0.18 * Math.sin(2.0 * Math.PI * (f_om * 2.0) * t);
+                    const breath = 0.70 + 0.30 * Math.sin(2.0 * Math.PI * 0.125 * t);
+                    const beating = 1.0 + 0.05 * Math.sin(2.0 * Math.PI * 4.5 * t);
+                    data[i] = Math.tanh((om_fund + om_sub + fifth + octave) * breath * beating * 0.6) * 0.35;
+                }
+
+                aumSource = ctx.createBufferSource();
+                aumSource.buffer = buffer;
+                aumSource.loop = true;
+
+                aumGain = ctx.createGain();
+                aumGain.gain.setValueAtTime(0.001, ctx.currentTime);
+                aumGain.gain.linearRampToValueAtTime(0.35, ctx.currentTime + 2.0);
+
+                aumSource.connect(aumGain);
+                aumGain.connect(ctx.destination);
+                aumSource.start();
+            } catch (e) {
+                console.error("Aum Drone error:", e);
+            }
+        }
+
+        function stopAumDrone() {
+            if (aumSource) {
+                try {
+                    aumSource.stop();
+                    aumSource.disconnect();
+                } catch (e) {}
+                aumSource = null;
+            }
+        }
+
+        function startYouTubeAudio() {
+            if (!isBgSoundEnabled || bgSoundSource !== 'yt') return;
+            const ytId = ytParam || 'x6UITRjhijI';
+            const frame = document.getElementById('ytFrame');
+            frame.src = `https://www.youtube-nocookie.com/embed/${ytId}?autoplay=1&enablejsapi=1&controls=0&loop=1&playlist=${ytId}&modestbranding=1`;
+        }
+
+        function stopYouTubeAudio() {
+            const frame = document.getElementById('ytFrame');
+            frame.src = '';
+        }
+
+        function toggleBgSound() {
+            getAudioContext();
+            isBgSoundEnabled = !isBgSoundEnabled;
+            const btn = document.getElementById('btnBgMusic');
+            const status = document.getElementById('bgStatus');
+
+            if (isBgSoundEnabled) {
+                btn.className = "btn btn-active";
+                btn.innerText = "ॐ Music: ON (M)";
+                status.innerText = bgSoundSource === 'yt' ? "Background: YouTube Stream" : "Background: ॐ Aum Drone";
+                if (isRunning) {
+                    if (bgSoundSource === 'yt') startYouTubeAudio(); else startAumDrone();
+                }
+            } else {
+                btn.className = "btn";
+                btn.innerText = "Music: OFF (M)";
+                status.innerText = "Background: Muted";
+                stopAumDrone();
+                stopYouTubeAudio();
+            }
         }
 
         function formatTime(sec) {
@@ -252,6 +357,8 @@
                 remainingSeconds = 0;
                 isRunning = false;
                 clearInterval(timer);
+                stopAumDrone();
+                stopYouTubeAudio();
                 play321SoothingSequence();
                 document.getElementById('bellText').innerText = "Session Completed 🙏";
                 updateUI();
@@ -273,6 +380,13 @@
             getAudioContext();
             isRunning = !isRunning;
             document.getElementById('btnPlayPause').innerText = isRunning ? "Pause (Space)" : "Start (Space)";
+
+            if (isRunning) {
+                if (bgSoundSource === 'yt') startYouTubeAudio(); else startAumDrone();
+            } else {
+                stopAumDrone();
+                stopYouTubeAudio();
+            }
         }
 
         function resetTimer() {
@@ -293,8 +407,18 @@
                 togglePlayPause();
             } else if (e.code === 'KeyR') {
                 resetTimer();
+            } else if (e.code === 'KeyM') {
+                toggleBgSound();
             }
         });
+
+        // Autostart on first user click or remote press
+        window.addEventListener('click', () => {
+            getAudioContext();
+            if (isRunning && isBgSoundEnabled && !aumSource) {
+                if (bgSoundSource === 'yt') startYouTubeAudio(); else startAumDrone();
+            }
+        }, { once: true });
 
         timer = setInterval(tick, 1000);
         updateUI();

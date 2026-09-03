@@ -36,4 +36,11 @@ data class TimerProfile(
     val isFavorite: Boolean = false,
     val pranayamaConfig: PranayamaConfig? = null,
     val compoundConfig: CompoundConfig? = null
-)
+) {
+    /** Whether this timer makes sense to cast to a stationary TV (false for walking/running/mobile activities). */
+    val isCastSupported: Boolean
+        get() {
+            val lower = (name + " " + category).lowercase()
+            return !(lower.contains("walk") || lower.contains("run") || lower.contains("jog") || lower.contains("outdoor"))
+        }
+}

@@ -379,7 +379,18 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
      * @return Formatted network URL string.
      */
     fun getTvCastUrl(): String {
-        return castServer.getTvUrl()
+        val base = castServer.getTvUrl()
+        val ui = _uiState.value
+        return if (ui.isBgMusicEnabled) {
+            if (ui.bgMusicType == BackgroundSoundType.YOUTUBE_LINK) {
+                val vid = bgMusicManager.extractVideoId(ui.bgMusicYouTubeUrl) ?: "x6UITRjhijI"
+                "$base/?yt=$vid"
+            } else {
+                "$base/?bg=aum"
+            }
+        } else {
+            "$base/?bg=none"
+        }
     }
 
     /**

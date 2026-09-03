@@ -6,6 +6,12 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
+/**
+ * Material3 Typography system for Habit Bell.
+ *
+ * Employs clean, high-legibility geometric sans-serif type scales with deliberate letter-spacing
+ * to foster a calm, uncluttered mindful reading experience.
+ */
 val Typography = Typography(
     displayLarge = TextStyle(
         fontFamily = FontFamily.SansSerif,

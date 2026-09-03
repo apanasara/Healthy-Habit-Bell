@@ -19,8 +19,20 @@ import com.habitbell.app.ui.theme.HabitBellTheme
 import com.habitbell.app.ui.viewmodel.AppScreen
 import com.habitbell.app.ui.viewmodel.HabitBellViewModel
 
+/**
+ * Main host activity for Habit Bell's Jetpack Compose presentation layer.
+ *
+ * Responsibilities:
+ * 1. **Window Insets**: Enables edge-to-edge immersive rendering.
+ * 2. **Compose Root**: Hosts screen navigation transitions between Home, Session, TV Dashboard, and Create Timer.
+ * 3. **Hardware Display Coordination**: Dynamically binds `FLAG_KEEP_SCREEN_ON` via [HabitBellViewModel.batteryOptimizer].
+ * 4. **Hardware Pocket Blanking**: Renders the pure black [PocketOverlay] when proximity sensors detect pocketing.
+ * 5. **Voice & Assistant Intents**: Decodes Google Assistant voice commands (`ACTION_SET_TIMER`, deep links).
+ * 6. **SAF Audio Picking**: Launches system file picker for custom ambient audio tracks and requests persistent URI permissions.
+ */
 class MainActivity : ComponentActivity() {
 
+    /** Shared ViewModel instance scoped to this Activity. */
     private val viewModel: HabitBellViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -28,6 +40,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         setContent {
+            // Collect reactive state streams with lifecycle awareness to prevent unnecessary background recomposition
             val uiState by viewModel.uiState.collectAsStateWithLifecycle()
             val sessionState by viewModel.sessionState.collectAsStateWithLifecycle()
             val profiles by viewModel.profiles.collectAsStateWithLifecycle()
@@ -36,6 +49,7 @@ class MainActivity : ComponentActivity() {
             val reminders by viewModel.reminders.collectAsStateWithLifecycle()
             val isPocketBlanking by viewModel.isPocketBlankingActive.collectAsStateWithLifecycle()
 
+            // System file picker contract for selecting local audio files for ambient soundscapes
             val audioPickerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
                 contract = androidx.activity.result.contract.ActivityResultContracts.GetContent()
             ) { uri: android.net.Uri? ->
@@ -56,7 +70,7 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            // Hardware Display Mode: keep screen awake if session is active and display mode is on
+            // Keep screen awake dynamically while session is running and Display Mode is enabled
             LaunchedEffect(sessionState.status, uiState.isDisplayMode) {
                 val shouldKeepAwake = uiState.isDisplayMode && sessionState.status == SessionStatus.RUNNING
                 viewModel.batteryOptimizer.applyScreenAwake(this@MainActivity, shouldKeepAwake)
@@ -64,6 +78,7 @@ class MainActivity : ComponentActivity() {
 
             HabitBellTheme(themeMode = uiState.selectedTheme) {
                 Box(modifier = Modifier.fillMaxSize()) {
+                    // Navigation routing based on active AppScreen
                     when (uiState.currentScreen) {
                         AppScreen.HOME -> {
                             HomeScreen(
@@ -177,7 +192,7 @@ class MainActivity : ComponentActivity() {
                         )
                     }
 
-                    // Hardware & Manual Pocket Mode Blanking (Pure OLED Black)
+                    // Hardware & Manual Pocket Mode Blanking (Pure OLED Black #000000)
                     if (isPocketBlanking) {
                         PocketOverlay(
                             onDismiss = {
@@ -186,7 +201,7 @@ class MainActivity : ComponentActivity() {
                         )
                     }
 
-                    // System Back button handling
+                    // System Back button interceptor
                     androidx.activity.compose.BackHandler(enabled = uiState.currentScreen != AppScreen.HOME || uiState.isSettingsDrawerOpen) {
                         if (uiState.isSettingsDrawerOpen) {
                             viewModel.openSettingsDrawer(false)
@@ -198,16 +213,26 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // Handle Google Assistant & Voice Action on launch
+        // Handle Google Assistant & Voice Action on initial activity launch
         handleVoiceIntent(intent)
     }
 
+    /**
+     * Catches re-launched intents when the activity is already active in singleTop mode.
+     *
+     * @param intent Newly delivered intent.
+     */
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
         handleVoiceIntent(intent)
     }
 
+    /**
+     * Decodes Assistant actions, deep links, and voice intent parameters to start or control timers.
+     *
+     * @param intent Incoming intent.
+     */
     private fun handleVoiceIntent(intent: Intent?) {
         if (intent == null) return
         val action = intent.action ?: ""
@@ -252,6 +277,9 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    /**
+     * Cancels any pending hardware haptic pulses when the Activity is destroyed.
+     */
     override fun onDestroy() {
         super.onDestroy()
         if (isFinishing) {

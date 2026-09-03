@@ -373,13 +373,15 @@ private fun FavoriteCard(
                 }
                 Text(text = icon, fontSize = 24.sp)
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = onTVClick, modifier = Modifier.size(28.dp)) {
-                        Icon(
-                            Icons.Outlined.Cast,
-                            contentDescription = "Cast to TV",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(18.dp)
-                        )
+                    if (profile.isCastSupported) {
+                        IconButton(onClick = onTVClick, modifier = Modifier.size(28.dp)) {
+                            Icon(
+                                Icons.Outlined.Cast,
+                                contentDescription = "Cast to TV",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
                     }
                     IconButton(onClick = onSettingsClick, modifier = Modifier.size(28.dp)) {
                         Icon(
@@ -529,13 +531,15 @@ private fun TimerProfileListItem(
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onTVClick) {
-                    Icon(
-                        Icons.Outlined.Cast,
-                        contentDescription = "Cast / TV Dashboard",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(20.dp)
-                    )
+                if (profile.isCastSupported) {
+                    IconButton(onClick = onTVClick) {
+                        Icon(
+                            Icons.Outlined.Cast,
+                            contentDescription = "Cast / TV Dashboard",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                 }
                 IconButton(onClick = onSettingsClick) {
                     Icon(
