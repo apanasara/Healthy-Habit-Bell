@@ -218,8 +218,28 @@ class BackgroundMusicManager(private val context: Context) {
             .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
             .build()
 
-        // Handle user custom audio file
-        if (soundType == BackgroundSoundType.CUSTOM_FILE && !customAudioUri.isNullOrBlank()) {
+        // 1. Check if user has an imported custom Aum file (internal filesDir)
+        val internalAumFile = java.io.File(context.filesDir, "custom_aum.mp3")
+        if ((soundType == BackgroundSoundType.DEFAULT_AUM || soundType == BackgroundSoundType.CUSTOM_FILE) &&
+            internalAumFile.exists() && internalAumFile.length() > 0) {
+            try {
+                mediaPlayer = MediaPlayer().apply {
+                    setAudioAttributes(audioAttributes)
+                    setDataSource(internalAumFile.absolutePath)
+                    isLooping = true
+                    prepare()
+                    setVolume(this@BackgroundMusicManager.volume, this@BackgroundMusicManager.volume)
+                    start()
+                }
+                Log.d(TAG, "Playing internal custom Aum background track (default)")
+                return
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed playing internal custom_aum.mp3, trying URI/fallback", e)
+            }
+        }
+
+        // 2. Handle user custom audio file via URI
+        if (!customAudioUri.isNullOrBlank()) {
             try {
                 val uri = Uri.parse(customAudioUri)
                 mediaPlayer = MediaPlayer().apply {
@@ -232,11 +252,11 @@ class BackgroundMusicManager(private val context: Context) {
                 }
                 return
             } catch (e: Exception) {
-                Log.w(TAG, "Failed playing custom file, falling back to Aum", e)
+                Log.w(TAG, "Failed playing custom file, falling back to bundled Aum", e)
             }
         }
 
-        // Default Aum Chanting Drone from raw assets
+        // 3. Fallback to bundled Aum Chanting Drone from raw assets
         val resId = context.resources.getIdentifier("aum_chant_drone", "raw", context.packageName)
         if (resId != 0) {
             mediaPlayer = MediaPlayer.create(context, resId, audioAttributes, 0)?.apply {

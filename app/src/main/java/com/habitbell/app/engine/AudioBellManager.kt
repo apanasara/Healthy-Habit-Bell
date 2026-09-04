@@ -16,6 +16,13 @@ import kotlin.math.exp
 import kotlin.math.sin
 import kotlin.math.tanh
 
+enum class BellSoundStyle {
+    ZEN_TINGSHA,
+    TIBETAN_BOWL,
+    TEMPLE_GONG,
+    CRYSTAL_QUARTZ
+}
+
 /**
  * Dual-engine audio management service for meditative bell chimes and singing bowls.
  *
@@ -28,25 +35,17 @@ import kotlin.math.tanh
  */
 class AudioBellManager(private val context: Context) {
 
-    /** System AudioManager used for managing transient audio focus and stream ducking. */
     private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
 
-    /** Dedicated SoundPool instance for low-latency playback of short bell audio clips. */
     private var soundPool: SoundPool? = null
 
-    /** Resource identifier handle for the single interval chime sound sample in SoundPool. */
     private var intervalSoundId = 0
-
-    /** Resource identifier handle for the three-bell completion chime sound sample in SoundPool. */
     private var completionSoundId = 0
+    private var templeGongSoundId = 0
+    private var crystalQuartzSoundId = 0
 
-    /** Flag indicating whether raw audio assets have finished asynchronous decoding into memory. */
     private var isLoaded = false
-
-    /** Normalized volume gain scale factor (ranging from `0.0f` to `1.0f`). */
     private var bellVolume = 0.9f
-
-    /** Background coroutine scope for offloading procedural PCM buffer computation. */
     private val scope = CoroutineScope(Dispatchers.Default)
 
     /** Resource identifier handle for individual countdown strikes (Option C Tingsha cymbals). */
@@ -54,13 +53,13 @@ class AudioBellManager(private val context: Context) {
     private var strike2SoundId = 0
     private var strike1SoundId = 0
 
+    /** Active bell sound timbre style. Defaults to user-approved Zen Tingsha. */
+    var bellStyle: BellSoundStyle = BellSoundStyle.ZEN_TINGSHA
+
     init {
         initSoundPool()
     }
 
-    /**
-     * Initializes the [SoundPool] configured specifically for sonification and assistance cues.
-     */
     private fun initSoundPool() {
         val audioAttributes = AudioAttributes.Builder()
             .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
@@ -68,11 +67,10 @@ class AudioBellManager(private val context: Context) {
             .build()
 
         soundPool = SoundPool.Builder()
-            .setMaxStreams(6)
+            .setMaxStreams(8)
             .setAudioAttributes(audioAttributes)
             .build().apply {
                 setOnLoadCompleteListener { _, _, status ->
-                    // Status 0 indicates successful sample decoding
                     if (status == 0) isLoaded = true
                 }
             }
@@ -80,10 +78,6 @@ class AudioBellManager(private val context: Context) {
         loadSounds()
     }
 
-    /**
-     * Attempts to dynamically load raw Tibetan bell sound assets (`tibetan_bell_interval`, `tibetan_bell_complete`,
-     * and Option C countdown strikes `tingsha_strike_3s`, `tingsha_strike_2s`, `tingsha_strike_1s`).
-     */
     private fun loadSounds() {
         try {
             soundPool?.let { pool ->
@@ -92,51 +86,57 @@ class AudioBellManager(private val context: Context) {
                 val s3ResId = context.resources.getIdentifier("tingsha_strike_3s", "raw", context.packageName)
                 val s2ResId = context.resources.getIdentifier("tingsha_strike_2s", "raw", context.packageName)
                 val s1ResId = context.resources.getIdentifier("tingsha_strike_1s", "raw", context.packageName)
+                val gongResId = context.resources.getIdentifier("temple_gong", "raw", context.packageName)
+                val crystalResId = context.resources.getIdentifier("crystal_quartz", "raw", context.packageName)
 
-                if (intervalResId != 0) {
-                    intervalSoundId = pool.load(context, intervalResId, 1)
-                }
-                if (completeResId != 0) {
-                    completionSoundId = pool.load(context, completeResId, 1)
-                }
-                if (s3ResId != 0) {
-                    strike3SoundId = pool.load(context, s3ResId, 1)
-                }
-                if (s2ResId != 0) {
-                    strike2SoundId = pool.load(context, s2ResId, 1)
-                }
-                if (s1ResId != 0) {
-                    strike1SoundId = pool.load(context, s1ResId, 1)
-                }
+                if (intervalResId != 0) intervalSoundId = pool.load(context, intervalResId, 1)
+                if (completeResId != 0) completionSoundId = pool.load(context, completeResId, 1)
+                if (s3ResId != 0) strike3SoundId = pool.load(context, s3ResId, 1)
+                if (s2ResId != 0) strike2SoundId = pool.load(context, s2ResId, 1)
+                if (s1ResId != 0) strike1SoundId = pool.load(context, s1ResId, 1)
+                if (gongResId != 0) templeGongSoundId = pool.load(context, gongResId, 1)
+                if (crystalResId != 0) crystalQuartzSoundId = pool.load(context, crystalResId, 1)
             }
-        } catch (_: Exception) {
-            // Graceful fallback to procedural synthesis if resources are unavailable
-        }
+        } catch (_: Exception) {}
     }
 
-    /**
-     * Sets the playback volume for all bell notifications.
-     *
-     * @param volume Normalized floating-point volume value between `0.0f` (silent) and `1.0f` (full gain).
-     */
     fun setVolume(volume: Float) {
         bellVolume = volume.coerceIn(0f, 1f)
     }
 
     /**
-     * Triggers a single interval bell cue.
-     *
-     * If pre-rendered assets are loaded, plays the sampled Tibetan bell via [SoundPool].
-     * Otherwise, synthesizes a soothing, warm 432Hz harmonic chime with an 8.5s natural decay.
+     * Triggers the interval bell according to the configured [bellStyle].
      */
     fun playIntervalBell() {
         requestTransientAudioFocus()
-        if (isLoaded && intervalSoundId != 0) {
-            soundPool?.play(intervalSoundId, bellVolume, bellVolume, 1, 0, 1.0f)
-        } else {
-            // Procedural synthesis fallback: 432Hz healing frequency with soft woolen mallet attack
-            scope.launch {
-                playSynthesizedChime(f0 = 432.0, durationSeconds = 8.5, volumeScale = 0.88f)
+        when (bellStyle) {
+            BellSoundStyle.ZEN_TINGSHA -> {
+                if (isLoaded && strike1SoundId != 0) {
+                    soundPool?.play(strike1SoundId, bellVolume, bellVolume, 1, 0, 1.0f)
+                } else {
+                    scope.launch { playSynthesizedChime(f0 = 1024.0, durationSeconds = 7.5, volumeScale = 0.95f) }
+                }
+            }
+            BellSoundStyle.TEMPLE_GONG -> {
+                if (isLoaded && templeGongSoundId != 0) {
+                    soundPool?.play(templeGongSoundId, bellVolume, bellVolume, 1, 0, 1.0f)
+                } else {
+                    scope.launch { playSynthesizedChime(f0 = 324.0, durationSeconds = 8.5, volumeScale = 0.90f) }
+                }
+            }
+            BellSoundStyle.CRYSTAL_QUARTZ -> {
+                if (isLoaded && crystalQuartzSoundId != 0) {
+                    soundPool?.play(crystalQuartzSoundId, bellVolume, bellVolume, 1, 0, 1.0f)
+                } else {
+                    scope.launch { playSynthesizedChime(f0 = 528.0, durationSeconds = 8.0, volumeScale = 0.90f) }
+                }
+            }
+            BellSoundStyle.TIBETAN_BOWL -> {
+                if (isLoaded && intervalSoundId != 0) {
+                    soundPool?.play(intervalSoundId, bellVolume, bellVolume, 1, 0, 1.0f)
+                } else {
+                    scope.launch { playSynthesizedChime(f0 = 432.0, durationSeconds = 8.5, volumeScale = 0.88f) }
+                }
             }
         }
     }

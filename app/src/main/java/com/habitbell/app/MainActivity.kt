@@ -70,6 +70,17 @@ class MainActivity : ComponentActivity() {
                             if (cursor.moveToFirst() && nameIndex >= 0) cursor.getString(nameIndex) else null
                         }
                     } catch (_: Exception) { null } ?: uri.lastPathSegment ?: "Custom Audio"
+
+                    // Cache locally to app internal storage so it permanently becomes default Aum track
+                    try {
+                        val internalFile = java.io.File(filesDir, "custom_aum.mp3")
+                        contentResolver.openInputStream(uri)?.use { input ->
+                            internalFile.outputStream().use { output ->
+                                input.copyTo(output)
+                            }
+                        }
+                    } catch (_: Exception) {}
+
                     viewModel.setBgMusicCustomUri(uri.toString(), fileName)
                 }
             }

@@ -60,6 +60,7 @@ data class AppUiState(
     val isDisplayMode: Boolean = true,
     val isAutoDim: Boolean = true,
     val bellVolume: Float = 0.9f,
+    val bellStyle: com.habitbell.app.engine.BellSoundStyle = com.habitbell.app.engine.BellSoundStyle.ZEN_TINGSHA,
     val isSettingsDrawerOpen: Boolean = false,
     val isBgMusicEnabled: Boolean = true,
     val bgMusicType: BackgroundSoundType = BackgroundSoundType.DEFAULT_AUM,
@@ -150,9 +151,8 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
         // Start local TV web receiver server for decoupled TV casting
         castServer.start()
 
-        bgMusicManager.isEnabled = _uiState.value.isBgMusicEnabled
-        bgMusicManager.soundType = _uiState.value.bgMusicType
-        bgMusicManager.volume = _uiState.value.bgMusicVolume
+        // Restore persisted user background music and bell chime preferences
+        loadSettings()
 
         // Observe session status transitions to orchestrate foreground services and battery optimization
         viewModelScope.launch {
@@ -467,6 +467,7 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
         } else if (sessionState.value.status == SessionStatus.RUNNING) {
             bgMusicManager.start()
         }
+        saveSettings()
     }
 
     /**
@@ -480,6 +481,7 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
         if (sessionState.value.status == SessionStatus.RUNNING) {
             bgMusicManager.start()
         }
+        saveSettings()
     }
 
     /**
@@ -501,6 +503,7 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
         if (sessionState.value.status == SessionStatus.RUNNING) {
             bgMusicManager.start()
         }
+        saveSettings()
     }
 
     /**
@@ -511,6 +514,7 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
     fun setBgMusicVolume(volume: Float) {
         _uiState.update { it.copy(bgMusicVolume = volume) }
         bgMusicManager.volume = volume
+        saveSettings()
     }
 
     /**
@@ -525,6 +529,76 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
         if (sessionState.value.status == SessionStatus.RUNNING) {
             bgMusicManager.start()
         }
+        saveSettings()
+    }
+
+    /**
+     * Sets the active bell chime timbre style (Option C Zen Tingsha, Tibetan Bowl, Temple Gong, Crystal Quartz).
+     */
+    fun setBellStyle(style: com.habitbell.app.engine.BellSoundStyle) {
+        _uiState.update { it.copy(bellStyle = style) }
+        audioManager.bellStyle = style
+        saveSettings()
+    }
+
+    private val prefs = getApplication<Application>().getSharedPreferences("habit_bell_settings", android.content.Context.MODE_PRIVATE)
+
+    private fun loadSettings() {
+        val internalAumFile = java.io.File(getApplication<Application>().filesDir, "custom_aum.mp3")
+        val hasInternalAum = internalAumFile.exists() && internalAumFile.length() > 0
+
+        val savedTypeStr = prefs.getString("bg_music_type", null)
+        val savedType = when (savedTypeStr) {
+            "CUSTOM_FILE" -> BackgroundSoundType.CUSTOM_FILE
+            "YOUTUBE_LINK" -> BackgroundSoundType.YOUTUBE_LINK
+            "NONE" -> BackgroundSoundType.NONE
+            else -> BackgroundSoundType.DEFAULT_AUM
+        }
+
+        val savedUri = prefs.getString("bg_music_custom_uri", null)
+        val savedName = prefs.getString("bg_music_custom_name", if (hasInternalAum) "aum.mp3" else null)
+        val savedEnabled = prefs.getBoolean("bg_music_enabled", true)
+        val savedVol = prefs.getFloat("bg_music_volume", 0.35f)
+        val savedYt = prefs.getString("bg_music_yt_url", "https://www.youtube.com/watch?v=x6UITRjhijI") ?: "https://www.youtube.com/watch?v=x6UITRjhijI"
+
+        val savedStyleStr = prefs.getString("bell_style", com.habitbell.app.engine.BellSoundStyle.ZEN_TINGSHA.name)
+        val savedStyle = try {
+            com.habitbell.app.engine.BellSoundStyle.valueOf(savedStyleStr ?: com.habitbell.app.engine.BellSoundStyle.ZEN_TINGSHA.name)
+        } catch (_: Exception) {
+            com.habitbell.app.engine.BellSoundStyle.ZEN_TINGSHA
+        }
+
+        _uiState.update {
+            it.copy(
+                isBgMusicEnabled = savedEnabled,
+                bgMusicType = savedType,
+                bgMusicCustomUri = savedUri,
+                bgMusicCustomName = savedName,
+                bgMusicVolume = savedVol,
+                bgMusicYouTubeUrl = savedYt,
+                bellStyle = savedStyle
+            )
+        }
+
+        audioManager.bellStyle = savedStyle
+        bgMusicManager.isEnabled = savedEnabled
+        bgMusicManager.soundType = savedType
+        bgMusicManager.customAudioUri = savedUri
+        bgMusicManager.volume = savedVol
+        bgMusicManager.youtubeUrl = savedYt
+    }
+
+    private fun saveSettings() {
+        val state = _uiState.value
+        prefs.edit()
+            .putBoolean("bg_music_enabled", state.isBgMusicEnabled)
+            .putString("bg_music_type", state.bgMusicType.name)
+            .putString("bg_music_custom_uri", state.bgMusicCustomUri)
+            .putString("bg_music_custom_name", state.bgMusicCustomName)
+            .putFloat("bg_music_volume", state.bgMusicVolume)
+            .putString("bg_music_yt_url", state.bgMusicYouTubeUrl)
+            .putString("bell_style", state.bellStyle.name)
+            .apply()
     }
 
     /**

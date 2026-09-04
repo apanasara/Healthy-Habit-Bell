@@ -74,6 +74,8 @@ fun SettingsDrawer(
     onUpdateTime: (totalSec: Int, intervalSec: Int) -> Unit,
     onOpenTVMode: () -> Unit,
     tvCastUrl: String = "",
+    bellStyle: com.habitbell.app.engine.BellSoundStyle = com.habitbell.app.engine.BellSoundStyle.ZEN_TINGSHA,
+    onBellStyleSelected: (com.habitbell.app.engine.BellSoundStyle) -> Unit = {},
     isBgMusicEnabled: Boolean = true,
     bgMusicType: com.habitbell.app.engine.BackgroundSoundType = com.habitbell.app.engine.BackgroundSoundType.DEFAULT_AUM,
     bgMusicCustomName: String? = null,
