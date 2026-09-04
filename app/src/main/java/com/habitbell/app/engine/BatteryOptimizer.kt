@@ -163,16 +163,21 @@ class BatteryOptimizer(private val context: Context) : SensorEventListener {
     }
 
     /**
-     * Adjusts the window screen brightness level.
+     * Adjusts the window screen brightness level for battery-dominant Display Mode.
      *
      * @param activity Hosting Activity.
-     * @param dim If true, reduces brightness to minimal 5% (0.05f); if false, restores system default.
+     * @param dim If true, reduces brightness to minimal 3% (0.03f) for extreme battery savings;
+     *            if false, restores system auto-brightness ([WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE]).
      */
     fun setScreenBrightness(activity: Activity, dim: Boolean) {
-        val layout = activity.window.attributes
-        layout.screenBrightness = if (dim) 0.05f else WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
-        activity.window.attributes = layout
-        _isScreenDimmed.value = dim
+        try {
+            activity.runOnUiThread {
+                val layout = activity.window.attributes
+                layout.screenBrightness = if (dim) 0.03f else WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+                activity.window.attributes = layout
+                _isScreenDimmed.value = dim
+            }
+        } catch (_: Exception) {}
     }
 
     /**

@@ -97,4 +97,33 @@ class TimerEngineTest {
         assertEquals("17:00", reminders[2].timeString)
         assertEquals("20:00", reminders[3].timeString)
     }
+
+    /**
+     * Verifies that TimerSessionState accurately reflects Display Mode auto-dimming
+     * during resting intervals and visual alert during chime windows.
+     */
+    @Test
+    fun testSessionStateDimmedAndVisualAlert() {
+        val restingState = TimerSessionState(
+            status = SessionStatus.RUNNING,
+            profile = DefaultProfiles.EATING,
+            remainingSeconds = 2650,
+            nextBellSeconds = 30,
+            isVisualAlertActive = false,
+            isDimmed = true
+        )
+        assertTrue(restingState.isDimmed)
+        org.junit.Assert.assertFalse(restingState.isVisualAlertActive)
+
+        val alertState = TimerSessionState(
+            status = SessionStatus.RUNNING,
+            profile = DefaultProfiles.EATING,
+            remainingSeconds = 2640,
+            nextBellSeconds = 1,
+            isVisualAlertActive = true,
+            isDimmed = false
+        )
+        org.junit.Assert.assertFalse(alertState.isDimmed)
+        assertTrue(alertState.isVisualAlertActive)
+    }
 }

@@ -9,12 +9,18 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -40,6 +46,7 @@ import com.habitbell.app.ui.components.CompoundPoseCard
  * @param onExit Callback to exit session and return to the Home dashboard.
  * @param onTriggerPocketMode Callback to engage manual Pocket Mode AMOLED screen blanking.
  * @param onOpenTVMode Callback to open leanback TV Dashboard mode.
+ * @param onUserInteraction Callback triggered when the user interacts with the display to wake from dimming.
  * @param modifier Composable layout modifier.
  */
 @Composable
@@ -51,15 +58,32 @@ fun SessionScreen(
     onExit: () -> Unit,
     onTriggerPocketMode: () -> Unit,
     onOpenTVMode: () -> Unit,
+    onUserInteraction: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
+    // Smooth visual luminance transition between power-saving dimmed state and active alert state
+    val contentAlpha by animateFloatAsState(
+        targetValue = if (sessionState.isDimmed) 0.35f else 1.0f,
+        animationSpec = tween(durationMillis = 600),
+        label = "SessionContentAlpha"
+    )
+
     Box(
         modifier = modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
+            .pointerInput(Unit) {
+                awaitPointerEventScope {
+                    while (true) {
+                        awaitPointerEvent(PointerEventPass.Initial)
+                        onUserInteraction()
+                    }
+                }
+            }
+            .alpha(contentAlpha)
     ) {
         if (isLandscape) {
             LandscapeSessionLayout(

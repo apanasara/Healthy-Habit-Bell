@@ -35,20 +35,23 @@ class HapticManager(private val context: Context) {
     }
 
     /**
-     * Triggers a firm dual-pulse vibration pattern to signal an interval boundary.
+     * Triggers 3 heavy tactile vibration pulses to signal an interval boundary in Pocket Mode.
+     *
+     * Engineered specifically for mindful eating and public meditation so the user is clearly
+     * cued to take their next bite through trousers or pockets without emitting any audible sound.
      *
      * Timing Pattern:
      * - Delay: 0ms
-     * - Pulse 1: 250ms at maximum amplitude (255)
+     * - Pulse 1: 350ms at maximum amplitude (255)
      * - Rest: 150ms
-     * - Pulse 2: 300ms at maximum amplitude (255)
-     *
-     * Easily perceptible through trouser fabric or exercise attire.
+     * - Pulse 2: 350ms at maximum amplitude (255)
+     * - Rest: 150ms
+     * - Pulse 3: 350ms at maximum amplitude (255)
      */
     fun triggerIntervalHaptic() {
         if (vibrator?.hasVibrator() != true) return
-        val timings = longArrayOf(0, 250, 150, 300)
-        val amplitudes = intArrayOf(0, 255, 0, 255)
+        val timings = longArrayOf(0, 350, 150, 350, 150, 350)
+        val amplitudes = intArrayOf(0, 255, 0, 255, 0, 255)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             vibrator.vibrate(
@@ -61,19 +64,19 @@ class HapticManager(private val context: Context) {
     }
 
     /**
-     * Triggers an unmistakable triple-pulse vibration pattern signaling session completion.
+     * Triggers an unmistakable sustained vibration pattern signaling session completion in Pocket Mode.
      *
      * Timing Pattern:
      * - Delay: 0ms
-     * - Pulse 1: 350ms (full amplitude)
+     * - Pulse 1: 400ms (full amplitude 255)
      * - Rest: 150ms
-     * - Pulse 2: 350ms (full amplitude)
+     * - Pulse 2: 400ms (full amplitude 255)
      * - Rest: 150ms
-     * - Pulse 3: 600ms (sustained finale)
+     * - Pulse 3: 800ms (sustained finale)
      */
     fun triggerCompletionHaptic() {
         if (vibrator?.hasVibrator() != true) return
-        val timings = longArrayOf(0, 350, 150, 350, 150, 600)
+        val timings = longArrayOf(0, 400, 150, 400, 150, 800)
         val amplitudes = intArrayOf(0, 255, 0, 255, 0, 255)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {

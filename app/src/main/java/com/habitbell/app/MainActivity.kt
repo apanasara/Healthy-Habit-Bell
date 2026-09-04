@@ -52,6 +52,7 @@ class MainActivity : ComponentActivity() {
             val recentProfiles by viewModel.recentProfiles.collectAsStateWithLifecycle()
             val reminders by viewModel.reminders.collectAsStateWithLifecycle()
             val isPocketBlanking by viewModel.isPocketBlankingActive.collectAsStateWithLifecycle()
+            val isDisplayDimmed by viewModel.isDisplayDimmed.collectAsStateWithLifecycle()
 
             // System file picker contract for selecting local audio files for ambient soundscapes
             val audioPickerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
@@ -89,6 +90,11 @@ class MainActivity : ComponentActivity() {
             LaunchedEffect(sessionState.status, uiState.isDisplayMode) {
                 val shouldKeepAwake = uiState.isDisplayMode && sessionState.status == SessionStatus.RUNNING
                 viewModel.batteryOptimizer.applyScreenAwake(this@MainActivity, shouldKeepAwake)
+            }
+
+            // Dynamically modulate hardware screen brightness based on the Display Mode dimming lifecycle
+            LaunchedEffect(isDisplayDimmed) {
+                viewModel.batteryOptimizer.setScreenBrightness(this@MainActivity, isDisplayDimmed)
             }
 
             HabitBellTheme(themeMode = uiState.selectedTheme) {
@@ -157,6 +163,9 @@ class MainActivity : ComponentActivity() {
                                 },
                                 onOpenTVMode = {
                                     viewModel.navigateTo(AppScreen.TV_DASHBOARD)
+                                },
+                                onUserInteraction = {
+                                    viewModel.userInteractionWake()
                                 }
                             )
                         }
@@ -314,10 +323,19 @@ class MainActivity : ComponentActivity() {
     }
 
     /**
+     * Restores system screen brightness when the activity is stopped or backgrounded.
+     */
+    override fun onStop() {
+        super.onStop()
+        viewModel.batteryOptimizer.setScreenBrightness(this, false)
+    }
+
+    /**
      * Cancels any pending hardware haptic pulses when the Activity is destroyed.
      */
     override fun onDestroy() {
         super.onDestroy()
+        viewModel.batteryOptimizer.setScreenBrightness(this, false)
         if (isFinishing) {
             viewModel.cancelHaptics()
         }

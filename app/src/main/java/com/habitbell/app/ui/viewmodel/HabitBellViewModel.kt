@@ -147,6 +147,23 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
         isRunning && (manual || sensorCovered)
     }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
+    /**
+     * Authoritative reactive stream determining if screen brightness should currently be dimmed.
+     *
+     * Engages when:
+     * 1. Session is actively [SessionStatus.RUNNING].
+     * 2. [AppUiState.isDisplayMode] and [AppUiState.isAutoDim] are enabled.
+     * 3. Hardware Pocket Mode is NOT active (which uses the pure AMOLED black curtain instead).
+     * 4. [TimerSessionState.isDimmed] is true (resting interval countdown between bells).
+     */
+    val isDisplayDimmed: StateFlow<Boolean> = combine(
+        sessionState,
+        _uiState.map { it.isDisplayMode && it.isAutoDim },
+        isPocketBlankingActive
+    ) { session, autoDimEnabled, inPocket ->
+        session.status == SessionStatus.RUNNING && autoDimEnabled && !inPocket && session.isDimmed
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
     init {
         // Enforce project rule: Haptic vibration ONLY triggers when device is in pocket mode
         engine.isPocketModeActive = { _uiState.value.isPocketModeManual || isPocketBlankingActive.value }
@@ -161,6 +178,19 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
         val initialProfile = repository.getProfileById("eating-mindful-20") ?: repository.profiles.value.firstOrNull()
         if (initialProfile != null) {
             engine.loadProfile(initialProfile)
+        }
+
+        // Mute or resume ambient background music when entering or exiting Pocket Mode in public
+        viewModelScope.launch {
+            isPocketBlankingActive.collect { inPocket ->
+                if (sessionState.value.status == SessionStatus.RUNNING) {
+                    if (inPocket) {
+                        bgMusicManager.pause()
+                    } else if (_uiState.value.isBgMusicEnabled) {
+                        bgMusicManager.start()
+                    }
+                }
+            }
         }
 
         // Observe session status transitions to orchestrate foreground services and battery optimization
@@ -363,10 +393,20 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
     /**
      * Toggles automatic screen dimming during resting intervals.
      *
-     * @param enabled True to dim screen to 5% brightness during rest.
+     * @param enabled True to dim screen to low brightness during resting countdown.
      */
     fun setAutoDim(enabled: Boolean) {
         _uiState.update { it.copy(isAutoDim = enabled) }
+        saveSettings()
+    }
+
+    /**
+     * Temporarily wakes the display from auto-dimmed state upon user touch or interaction.
+     *
+     * @param seconds Duration in seconds to keep the display un-dimmed before auto-dimming resumes.
+     */
+    fun userInteractionWake(seconds: Int = 5) {
+        engine.wakeScreenTemporarily(seconds)
     }
 
     /**
@@ -625,6 +665,8 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
             com.habitbell.app.engine.BellSoundStyle.ZEN_TINGSHA
         }
 
+        val savedAutoDim = prefs.getBoolean("is_auto_dim", true)
+
         _uiState.update {
             it.copy(
                 isBgMusicEnabled = savedEnabled,
@@ -633,7 +675,8 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
                 bgMusicCustomName = savedName,
                 bgMusicVolume = savedVol,
                 bgMusicYouTubeUrl = savedYt,
-                bellStyle = savedStyle
+                bellStyle = savedStyle,
+                isAutoDim = savedAutoDim
             )
         }
 
@@ -655,6 +698,7 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
             .putFloat("bg_music_volume", state.bgMusicVolume)
             .putString("bg_music_yt_url", state.bgMusicYouTubeUrl)
             .putString("bell_style", state.bellStyle.name)
+            .putBoolean("is_auto_dim", state.isAutoDim)
             .apply()
     }
 

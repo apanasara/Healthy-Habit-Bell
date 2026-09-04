@@ -44,6 +44,8 @@ enum class SessionStatus {
  * @property phaseDurationSeconds Total duration allocated for the current active breathwork phase in seconds.
  * @property currentPose Active pose step details ([CompoundPose]) for compound sequencers.
  * @property poseRemainingSeconds Seconds remaining in the active compound pose step.
+ * @property isVisualAlertActive True during visual alert windows (1s pre-alert and chime duration).
+ * @property isDimmed True when session is resting between intervals and screen is auto-dimmed.
  */
 data class TimerSessionState(
     val status: SessionStatus = SessionStatus.IDLE,
@@ -59,7 +61,10 @@ data class TimerSessionState(
     val phaseDurationSeconds: Int = 0,
     // Compound Sequencer tracking
     val currentPose: CompoundPose? = null,
-    val poseRemainingSeconds: Int = 0
+    val poseRemainingSeconds: Int = 0,
+    // Display Mode auto-dimming and visual alert indicators
+    val isVisualAlertActive: Boolean = false,
+    val isDimmed: Boolean = false
 ) {
     /**
      * Normalized completion progress ranging from `0.0f` (start) to `1.0f` (complete).
@@ -147,6 +152,19 @@ class TimerEngine(
     /** Current 1-based round index of the active compound sequence. */
     private var compoundRound = 1
 
+    /** Countdown ticks keeping the screen un-dimmed during and immediately after bell chimes. */
+    private var visualAlertRemainingTicks: Int = 0
+
+    /**
+     * Temporarily wakes the screen from its dimmed power-saving state for a brief grace period.
+     *
+     * @param seconds Number of seconds to keep display un-dimmed before auto-dimming resumes.
+     */
+    fun wakeScreenTemporarily(seconds: Int = 5) {
+        visualAlertRemainingTicks = seconds
+        _state.update { it.copy(isVisualAlertActive = true, isDimmed = false) }
+    }
+
     /**
      * Loads a [TimerProfile] into the engine, resetting all internal step counters and
      * initializing state to [SessionStatus.IDLE].
@@ -155,6 +173,7 @@ class TimerEngine(
      */
     fun loadProfile(profile: TimerProfile) {
         pause()
+        visualAlertRemainingTicks = 0
         when (profile.type) {
             TimerType.LINEAR -> {
                 // Initialize linear countdown parameters
@@ -166,7 +185,9 @@ class TimerEngine(
                     profile = profile,
                     remainingSeconds = total,
                     totalSeconds = total,
-                    nextBellSeconds = interval
+                    nextBellSeconds = interval,
+                    isVisualAlertActive = false,
+                    isDimmed = false
                 )
             }
             TimerType.MULTI_INTERVAL -> {
@@ -240,8 +261,9 @@ class TimerEngine(
         if (_state.value.status == SessionStatus.RUNNING) {
             timerJob?.cancel()
             timerJob = null
+            visualAlertRemainingTicks = 0
             hapticManager.cancel()
-            _state.update { it.copy(status = SessionStatus.PAUSED) }
+            _state.update { it.copy(status = SessionStatus.PAUSED, isDimmed = false, isVisualAlertActive = false) }
         }
     }
 
@@ -251,8 +273,9 @@ class TimerEngine(
     fun stop() {
         timerJob?.cancel()
         timerJob = null
+        visualAlertRemainingTicks = 0
         hapticManager.cancel()
-        _state.update { it.copy(status = SessionStatus.IDLE) }
+        _state.update { it.copy(status = SessionStatus.IDLE, isDimmed = false, isVisualAlertActive = false) }
     }
 
     /**
@@ -295,19 +318,25 @@ class TimerEngine(
 
     /**
      * Advances linear timer countdown and evaluates interval chime boundaries.
+     * Enforces the silent Pocket Mode rule (muting audio bell, triggering 3 heavy vibrations)
+     * and the Display Mode dimming lifecycle (pre-alert un-dimming at 1s, bright during chime, auto-dimming after chime).
      */
     private fun tickLinear() {
         val newRemaining = _state.value.remainingSeconds - 1
         var nextBell = currentIntervalRemaining - 1
+        val inPocket = isPocketModeActive()
 
         // Check if an interval boundary has been reached
         if (nextBell <= 0) {
-            // Trigger audio chime cue
-            audioManager.playIntervalBell()
-
-            // Restrict haptic vibration strictly to pocket mode
-            if (isPocketModeActive()) {
+            if (inPocket) {
+                // Pocket Mode: Absolute public eating silence. DO NOT play audible bell!
+                // Trigger 3 heavy vibration pulses
                 hapticManager.triggerIntervalHaptic()
+            } else {
+                // Open Air / Mobile Display Mode: Play Option C 3-bell sequence
+                audioManager.playIntervalBell()
+                // Keep screen bright during 3-bell playback (~4.5s)
+                visualAlertRemainingTicks = 5
             }
 
             // Reset interval countdown
@@ -318,10 +347,29 @@ class TimerEngine(
             currentIntervalRemaining = nextBell
         }
 
+        // Determine screen auto-dimming and visual alert state
+        val visualAlert: Boolean
+        val dimmed: Boolean
+        if (visualAlertRemainingTicks > 0) {
+            visualAlertRemainingTicks--
+            visualAlert = true
+            dimmed = false
+        } else if (nextBell == 1) {
+            // 1 second before interval bell triggers: un-dim screen as visual pre-alert!
+            visualAlert = true
+            dimmed = false
+        } else {
+            // Normal resting session countdown: dimmed for dominant battery optimization
+            visualAlert = false
+            dimmed = true
+        }
+
         _state.update {
             it.copy(
                 remainingSeconds = newRemaining,
-                nextBellSeconds = nextBell
+                nextBellSeconds = nextBell,
+                isVisualAlertActive = visualAlert,
+                isDimmed = dimmed
             )
         }
     }
@@ -429,23 +477,30 @@ class TimerEngine(
 
     /**
      * Finalizes session completion: halts coroutine ticker, zero-out countdown offsets,
-     * and triggers deep resonant Temple Gong completion chime.
+     * and triggers completion feedback (Temple Gong in open air, or silent vibration in Pocket Mode).
      */
     private fun onSessionCompleted() {
         timerJob?.cancel()
+        visualAlertRemainingTicks = 0
         _state.update {
             it.copy(
                 status = SessionStatus.COMPLETED,
                 remainingSeconds = 0,
                 nextBellSeconds = 0,
                 phaseRemainingSeconds = 0,
-                poseRemainingSeconds = 0
+                poseRemainingSeconds = 0,
+                isVisualAlertActive = true,
+                isDimmed = false
             )
         }
-        // Trigger session completion chime: Deep Resonant Temple Gong
-        audioManager.playCompletionBell()
-        if (isPocketModeActive()) {
+
+        val inPocket = isPocketModeActive()
+        if (inPocket) {
+            // Pocket Mode: Silent completion, distinct sustained vibration pattern
             hapticManager.triggerCompletionHaptic()
+        } else {
+            // Open Air / Display Mode: Trigger session completion chime: Deep Resonant Temple Gong
+            audioManager.playCompletionBell()
         }
     }
 }
