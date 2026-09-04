@@ -241,10 +241,20 @@
             }
         }
 
+        function playCountdownStrike(secondsRemaining) {
+            if (secondsRemaining === 3) {
+                playHarmonicChime(2048, 0.45, 4.0);
+            } else if (secondsRemaining === 2) {
+                playHarmonicChime(1536, 0.70, 4.5);
+            } else if (secondsRemaining === 1) {
+                playHarmonicChime(1024, 1.00, 7.5);
+            }
+        }
+
         function play321SoothingSequence() {
-            playHarmonicChime(528, 0.38, 5.0);
-            setTimeout(() => playHarmonicChime(432, 0.70, 6.5), 2200);
-            setTimeout(() => playHarmonicChime(360, 1.00, 7.5), 4800);
+            playHarmonicChime(2048, 0.45, 4.0);
+            setTimeout(() => playHarmonicChime(1536, 0.70, 4.5), 1000);
+            setTimeout(() => playHarmonicChime(1024, 1.00, 7.5), 2000);
         }
 
         function playIntervalChime() {
@@ -353,13 +363,21 @@
 
         function tick() {
             if (!isRunning) return;
+            if (remainingSeconds === 3) {
+                playCountdownStrike(3);
+                document.getElementById('bellText').innerText = "🔔 3s Remaining...";
+            } else if (remainingSeconds === 2) {
+                playCountdownStrike(2);
+                document.getElementById('bellText').innerText = "🔔 2s Remaining...";
+            }
+
             if (remainingSeconds <= 1) {
                 remainingSeconds = 0;
                 isRunning = false;
                 clearInterval(timer);
                 stopAumDrone();
                 stopYouTubeAudio();
-                play321SoothingSequence();
+                playCountdownStrike(1);
                 document.getElementById('bellText').innerText = "Session Completed 🙏";
                 updateUI();
                 return;

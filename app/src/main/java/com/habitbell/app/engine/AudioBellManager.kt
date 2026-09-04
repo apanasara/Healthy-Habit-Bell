@@ -49,6 +49,11 @@ class AudioBellManager(private val context: Context) {
     /** Background coroutine scope for offloading procedural PCM buffer computation. */
     private val scope = CoroutineScope(Dispatchers.Default)
 
+    /** Resource identifier handle for individual countdown strikes (Option C Tingsha cymbals). */
+    private var strike3SoundId = 0
+    private var strike2SoundId = 0
+    private var strike1SoundId = 0
+
     init {
         initSoundPool()
     }
@@ -63,7 +68,7 @@ class AudioBellManager(private val context: Context) {
             .build()
 
         soundPool = SoundPool.Builder()
-            .setMaxStreams(4)
+            .setMaxStreams(6)
             .setAudioAttributes(audioAttributes)
             .build().apply {
                 setOnLoadCompleteListener { _, _, status ->
@@ -76,19 +81,32 @@ class AudioBellManager(private val context: Context) {
     }
 
     /**
-     * Attempts to dynamically load raw Tibetan bell sound assets (`tibetan_bell_interval` and `tibetan_bell_complete`).
+     * Attempts to dynamically load raw Tibetan bell sound assets (`tibetan_bell_interval`, `tibetan_bell_complete`,
+     * and Option C countdown strikes `tingsha_strike_3s`, `tingsha_strike_2s`, `tingsha_strike_1s`).
      */
     private fun loadSounds() {
         try {
             soundPool?.let { pool ->
                 val intervalResId = context.resources.getIdentifier("tibetan_bell_interval", "raw", context.packageName)
                 val completeResId = context.resources.getIdentifier("tibetan_bell_complete", "raw", context.packageName)
+                val s3ResId = context.resources.getIdentifier("tingsha_strike_3s", "raw", context.packageName)
+                val s2ResId = context.resources.getIdentifier("tingsha_strike_2s", "raw", context.packageName)
+                val s1ResId = context.resources.getIdentifier("tingsha_strike_1s", "raw", context.packageName)
 
                 if (intervalResId != 0) {
                     intervalSoundId = pool.load(context, intervalResId, 1)
                 }
                 if (completeResId != 0) {
                     completionSoundId = pool.load(context, completeResId, 1)
+                }
+                if (s3ResId != 0) {
+                    strike3SoundId = pool.load(context, s3ResId, 1)
+                }
+                if (s2ResId != 0) {
+                    strike2SoundId = pool.load(context, s2ResId, 1)
+                }
+                if (s1ResId != 0) {
+                    strike1SoundId = pool.load(context, s1ResId, 1)
                 }
             }
         } catch (_: Exception) {
@@ -124,9 +142,50 @@ class AudioBellManager(private val context: Context) {
     }
 
     /**
-     * Triggers the 3-bell session completion cue.
+     * Plays an individual countdown chime strike during the final 3 seconds (Option C Zen Tingsha Triad).
      *
-     * Emits a descending harmonic progression (528Hz -> 432Hz -> 360Hz) with natural acoustic
+     * @param secondsRemaining Number of seconds remaining:
+     *   - 3: Strike 1 (2048 Hz crystalline bell, 45% volume)
+     *   - 2: Strike 2 (1536 Hz centering bell, 70% volume)
+     *   - 1: Strike 3 (1024 Hz deep resonance finish, 100% volume)
+     */
+    fun playCountdownStrike(secondsRemaining: Int) {
+        requestTransientAudioFocus()
+        when (secondsRemaining) {
+            3 -> {
+                if (isLoaded && strike3SoundId != 0) {
+                    soundPool?.play(strike3SoundId, bellVolume * 0.45f, bellVolume * 0.45f, 2, 0, 1.0f)
+                } else {
+                    scope.launch {
+                        playSynthesizedChime(f0 = 2048.0, durationSeconds = 4.0, volumeScale = 0.45f)
+                    }
+                }
+            }
+            2 -> {
+                if (isLoaded && strike2SoundId != 0) {
+                    soundPool?.play(strike2SoundId, bellVolume * 0.70f, bellVolume * 0.70f, 2, 0, 1.0f)
+                } else {
+                    scope.launch {
+                        playSynthesizedChime(f0 = 1536.0, durationSeconds = 4.5, volumeScale = 0.70f)
+                    }
+                }
+            }
+            1 -> {
+                if (isLoaded && strike1SoundId != 0) {
+                    soundPool?.play(strike1SoundId, bellVolume, bellVolume, 3, 0, 1.0f)
+                } else {
+                    scope.launch {
+                        playSynthesizedChime(f0 = 1024.0, durationSeconds = 7.5, volumeScale = 1.00f)
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Triggers the 3-bell session completion cue (Option C Zen Tingsha Triad).
+     *
+     * Emits a crystalline harmonic progression (2048Hz -> 1536Hz -> 1024Hz) with natural acoustic
      * reverberation and zero abrupt audio boundaries.
      */
     fun playCompletionBell() {
@@ -134,13 +193,13 @@ class AudioBellManager(private val context: Context) {
         if (isLoaded && completionSoundId != 0) {
             soundPool?.play(completionSoundId, bellVolume, bellVolume, 1, 0, 1.0f)
         } else {
-            // Triad progression: 528Hz (Transformation) -> 432Hz (Harmonic Balance) -> 360Hz (Grounding)
+            // Option C Triad progression: 2048Hz -> 1536Hz -> 1024Hz
             scope.launch {
-                playSynthesizedChime(f0 = 528.0, durationSeconds = 6.0, volumeScale = 0.42f)
-                kotlinx.coroutines.delay(2200)
-                playSynthesizedChime(f0 = 432.0, durationSeconds = 7.5, volumeScale = 0.72f)
-                kotlinx.coroutines.delay(2600)
-                playSynthesizedChime(f0 = 360.0, durationSeconds = 8.0, volumeScale = 1.00f)
+                playSynthesizedChime(f0 = 2048.0, durationSeconds = 4.0, volumeScale = 0.45f)
+                kotlinx.coroutines.delay(1000)
+                playSynthesizedChime(f0 = 1536.0, durationSeconds = 4.5, volumeScale = 0.70f)
+                kotlinx.coroutines.delay(1000)
+                playSynthesizedChime(f0 = 1024.0, durationSeconds = 7.5, volumeScale = 1.00f)
             }
         }
     }
