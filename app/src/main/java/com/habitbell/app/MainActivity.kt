@@ -6,6 +6,9 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
@@ -42,6 +45,11 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O_MR1) {
+            setShowWhenLocked(true)
+            setTurnScreenOn(true)
+        }
 
         setContent {
             // Collect reactive state streams with lifecycle awareness to prevent unnecessary background recomposition
@@ -95,6 +103,14 @@ class MainActivity : ComponentActivity() {
             // Dynamically modulate hardware screen brightness based on the Display Mode dimming lifecycle
             LaunchedEffect(isDisplayDimmed) {
                 viewModel.batteryOptimizer.setScreenBrightness(this@MainActivity, isDisplayDimmed)
+            }
+
+            // Distraction-free full-screen immersion: dynamically hide system status bar
+            // (time clock, battery percentage, app notification icons, and network indicators)
+            // whenever the user is on an active timer session screen (SESSION or TV_DASHBOARD)
+            val isTimerScreen = uiState.currentScreen == AppScreen.SESSION || uiState.currentScreen == AppScreen.TV_DASHBOARD
+            LaunchedEffect(isTimerScreen) {
+                setStatusBarHidden(isTimerScreen)
             }
 
             HabitBellTheme(themeMode = uiState.selectedTheme) {
@@ -323,19 +339,54 @@ class MainActivity : ComponentActivity() {
     }
 
     /**
-     * Restores system screen brightness when the activity is stopped or backgrounded.
+     * Modulates the visibility of the Android system status bar.
+     *
+     * When entering an active mindful timer screen ([AppScreen.SESSION] or [AppScreen.TV_DASHBOARD]),
+     * the system status bar (displaying time clock, notification icons, battery gauge, and cellular/Wi-Fi
+     * signals) is hidden to eliminate visual clutter, reduce cognitive distraction, and promote sustained presence.
+     *
+     * Transient reveals are supported via [WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE]:
+     * swiping down from the screen edge allows a brief glance at battery or notifications without permanently
+     * unhiding the status bar.
+     *
+     * @param hide `true` to hide the status bar for immersive focus; `false` to restore standard visibility.
+     */
+    private fun setStatusBarHidden(hide: Boolean) {
+        val insetsController = WindowCompat.getInsetsController(window, window.decorView)
+        if (hide) {
+            insetsController.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            insetsController.hide(WindowInsetsCompat.Type.statusBars())
+        } else {
+            insetsController.show(WindowInsetsCompat.Type.statusBars())
+        }
+    }
+
+    /**
+     * Synchronizes status bar visibility whenever the activity returns to the foreground.
+     */
+    override fun onResume() {
+        super.onResume()
+        val isTimerScreen = viewModel.uiState.value.currentScreen == AppScreen.SESSION ||
+                viewModel.uiState.value.currentScreen == AppScreen.TV_DASHBOARD
+        setStatusBarHidden(isTimerScreen)
+    }
+
+    /**
+     * Restores system screen brightness and unhides system status bars when the activity is backgrounded.
      */
     override fun onStop() {
         super.onStop()
         viewModel.batteryOptimizer.setScreenBrightness(this, false)
+        setStatusBarHidden(false)
     }
 
     /**
-     * Cancels any pending hardware haptic pulses when the Activity is destroyed.
+     * Cancels any pending hardware haptic pulses and ensures status bars are restored on termination.
      */
     override fun onDestroy() {
         super.onDestroy()
         viewModel.batteryOptimizer.setScreenBrightness(this, false)
+        setStatusBarHidden(false)
         if (isFinishing) {
             viewModel.cancelHaptics()
         }
