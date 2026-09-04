@@ -18,3 +18,8 @@ Whenever writing, modifying, refactoring, or generating code across all projects
 - **TypeScript / JavaScript**: Full TSDoc / JSDoc standard with `@param`, `@returns`, `@throws`.
 - **Python**: Google Style or NumPy docstrings with Types, Args, Returns, Raises, and Units.
 - **Java / Swift**: Standard Javadoc / Swift-Doc with explicit parameter and return specifications.
+
+## 3. Feature Branch Lifecycle & Remote Synchronization Standard
+- **Pull Request on Feature Completion**: On every feature branch completion, always open a Pull Request (PR) targeting the primary tracking branch (`origin/main`).
+- **Merge Operation**: Complete the merge operation into `origin` (e.g. via `gh pr merge` or project-specified merge strategy).
+- **Origin Synchronization & Lag Verification**: Verify that the local workspace and remote `origin` are fully synchronized with 0 lag (`git rev-list --left-right --count origin/main...main`), ensuring no unpushed or unmerged commits remain adrift.
