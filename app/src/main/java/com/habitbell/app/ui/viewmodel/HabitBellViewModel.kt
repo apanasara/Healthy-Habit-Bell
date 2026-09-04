@@ -66,7 +66,7 @@ data class AppUiState(
     val bgMusicType: BackgroundSoundType = BackgroundSoundType.DEFAULT_AUM,
     val bgMusicCustomUri: String? = null,
     val bgMusicCustomName: String? = null,
-    val bgMusicYouTubeUrl: String = "https://www.youtube.com/watch?v=x6UITRjhijI",
+    val bgMusicYouTubeUrl: String = "https://youtu.be/x6UITRjhijI",
     val bgMusicVolume: Float = 0.35f
 )
 
@@ -579,6 +579,19 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     /**
+     * Toggles live preview auditioning of background ambient audio in settings.
+     *
+     * @param play True to start audio playback; false to stop.
+     */
+    fun previewBgMusic(play: Boolean) {
+        if (play) {
+            bgMusicManager.start()
+        } else {
+            bgMusicManager.stop()
+        }
+    }
+
+    /**
      * Sets the active bell chime timbre style (Option C Zen Tingsha, Tibetan Bowl, Temple Gong, Crystal Quartz).
      */
     fun setBellStyle(style: com.habitbell.app.engine.BellSoundStyle) {
@@ -603,7 +616,7 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
         val savedName = prefs.getString("bg_music_custom_name", if (hasInternalAum) "aum.mp3" else null)
         val savedEnabled = prefs.getBoolean("bg_music_enabled", true)
         val savedVol = prefs.getFloat("bg_music_volume", 0.35f)
-        val savedYt = prefs.getString("bg_music_yt_url", "https://www.youtube.com/watch?v=x6UITRjhijI") ?: "https://www.youtube.com/watch?v=x6UITRjhijI"
+        val savedYt = prefs.getString("bg_music_yt_url", "https://youtu.be/x6UITRjhijI") ?: "https://youtu.be/x6UITRjhijI"
 
         val savedStyleStr = prefs.getString("bell_style", com.habitbell.app.engine.BellSoundStyle.ZEN_TINGSHA.name)
         val savedStyle = try {

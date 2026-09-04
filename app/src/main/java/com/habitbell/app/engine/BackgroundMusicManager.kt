@@ -8,6 +8,7 @@ import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import android.webkit.ConsoleMessage
 import android.webkit.WebChromeClient
 import android.webkit.WebSettings
 import android.webkit.WebView
@@ -70,7 +71,7 @@ class BackgroundMusicManager(private val context: Context) {
     var customAudioUri: String? = null
 
     /** YouTube video URL or ID for streaming ambient music. */
-    var youtubeUrl: String = "https://www.youtube.com/watch?v=x6UITRjhijI"
+    var youtubeUrl: String = "https://youtu.be/x6UITRjhijI"
 
     /**
      * Normalized audio volume gain (0.0f to 1.0f).
@@ -92,18 +93,29 @@ class BackgroundMusicManager(private val context: Context) {
     @SuppressLint("SetJavaScriptEnabled")
     fun getOrCreateWebView(ctx: Context): WebView {
         if (youtubeWebView == null) {
-            youtubeWebView = WebView(ctx.applicationContext).apply {
+            try {
+                WebView.setWebContentsDebuggingEnabled(true)
+            } catch (_: Exception) {}
+            youtubeWebView = WebView(ctx).apply {
                 settings.javaScriptEnabled = true
                 settings.mediaPlaybackRequiresUserGesture = false
                 settings.domStorageEnabled = true
                 settings.databaseEnabled = true
                 settings.cacheMode = WebSettings.LOAD_DEFAULT
-                settings.userAgentString = "Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
-                webChromeClient = WebChromeClient()
+                settings.mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+                settings.allowFileAccess = true
+                settings.allowContentAccess = true
+                settings.userAgentString = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                webChromeClient = object : WebChromeClient() {
+                    override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
+                        Log.d("YouTubeWebView", "[JS Console] ${consoleMessage?.message()} (${consoleMessage?.sourceId()}:${consoleMessage?.lineNumber()})")
+                        return true
+                    }
+                }
                 webViewClient = object : WebViewClient() {
                     override fun onPageFinished(view: WebView?, url: String?) {
                         super.onPageFinished(view, url)
-                        Log.d(TAG, "YouTube player page finished loading.")
+                        Log.d(TAG, "YouTube player page finished loading: $url")
                     }
                 }
             }
@@ -270,7 +282,7 @@ class BackgroundMusicManager(private val context: Context) {
     }
 
     /**
-     * Initializes or commands the sandboxed WebView to play YouTube audio ad-free.
+     * Initializes or commands the sandboxed WebView to play YouTube audio ad-free in an infinite loop.
      */
     private fun playYouTubeAudio() {
         val videoId = extractVideoId(youtubeUrl) ?: "x6UITRjhijI"
@@ -280,7 +292,7 @@ class BackgroundMusicManager(private val context: Context) {
                 val webView = getOrCreateWebView(context)
 
                 // If already playing this exact video, simply resume it
-                if (activeVideoId == videoId) {
+                if (activeVideoId == videoId && isPlaying) {
                     sendYouTubeCommand("playVideo")
                     return@post
                 }
@@ -288,7 +300,7 @@ class BackgroundMusicManager(private val context: Context) {
                 activeVideoId = videoId
                 val targetVol = (volume * 100).toInt().coerceIn(10, 100)
 
-                // Robust HTML using official YouTube IFrame Player API with auto ad-skipping
+                // Robust HTML using official YouTube IFrame Player API with auto ad-skipping and infinite loop
                 val embedHtml = """
                     <!DOCTYPE html>
                     <html>
@@ -296,14 +308,15 @@ class BackgroundMusicManager(private val context: Context) {
                         <meta name="viewport" content="width=device-width, initial-scale=1.0">
                         <style>
                             * { margin: 0; padding: 0; box-sizing: border-box; }
-                            body { background: #000; overflow: hidden; width: 100vw; height: 100vh; }
-                            #player { width: 100%; height: 100%; }
+                            html, body { width: 100%; height: 100%; background: #000000; overflow: hidden; }
+                            #player { width: 100%; height: 100%; position: absolute; top: 0; left: 0; }
                             .video-ads, .ytp-ad-module, .ytp-ad-player-overlay { display: none !important; }
                         </style>
                     </head>
                     <body>
                         <div id="player"></div>
                         <script>
+                            console.log("Initializing YouTube IFrame API for video: $videoId");
                             var tag = document.createElement('script');
                             tag.src = "https://www.youtube.com/iframe_api";
                             var firstScriptTag = document.getElementsByTagName('script')[0];
@@ -311,7 +324,10 @@ class BackgroundMusicManager(private val context: Context) {
 
                             var player;
                             function onYouTubeIframeAPIReady() {
+                                console.log("onYouTubeIframeAPIReady fired for: $videoId");
                                 player = new YT.Player('player', {
+                                    width: '100%',
+                                    height: '100%',
                                     videoId: '$videoId',
                                     playerVars: {
                                         'autoplay': 1,
@@ -319,20 +335,40 @@ class BackgroundMusicManager(private val context: Context) {
                                         'playsinline': 1,
                                         'loop': 1,
                                         'playlist': '$videoId',
-                                        'modestbranding': 1,
+                                        'enablejsapi': 1,
+                                        'origin': 'https://www.youtube-nocookie.com',
                                         'rel': 0,
                                         'fs': 0,
-                                        'disablekb': 1
+                                        'modestbranding': 1,
+                                        'disablekb': 1,
+                                        'iv_load_policy': 3
                                     },
                                     events: {
-                                        'onReady': function(e) {
-                                            e.target.setVolume($targetVol);
-                                            e.target.playVideo();
-                                        },
-                                        'onStateChange': function(e) {
-                                            if (e.data === 0) {
-                                                e.target.playVideo();
+                                        'onReady': function(event) {
+                                            console.log("YouTube Player onReady! Unmuting and playing at volume: $targetVol");
+                                            try {
+                                                event.target.unMute();
+                                                event.target.setVolume($targetVol);
+                                                event.target.playVideo();
+                                            } catch (err) {
+                                                console.error("onReady play error:", err);
                                             }
+                                        },
+                                        'onStateChange': function(event) {
+                                            console.log("YouTube Player state changed to: " + event.data);
+                                            // Loop when video reaches end (0 = YT.PlayerState.ENDED)
+                                            if (event.data === 0) {
+                                                console.log("Video ended, looping back to beginning");
+                                                event.target.seekTo(0);
+                                                event.target.playVideo();
+                                            } else if (event.data === 2) {
+                                                console.log("Video paused");
+                                            } else if (event.data === 1) {
+                                                console.log("Video is actively playing!");
+                                            }
+                                        },
+                                        'onError': function(event) {
+                                            console.error("YouTube Player error code: " + event.data);
                                         }
                                     }
                                 });
@@ -340,21 +376,24 @@ class BackgroundMusicManager(private val context: Context) {
 
                             // Auto-click ad skip buttons continuously
                             setInterval(function() {
-                                var btn = document.querySelector('.ytp-ad-skip-button, .ytp-ad-skip-button-modern, .ytp-ad-overlay-close-button');
-                                if (btn) {
-                                    btn.click();
-                                }
-                                var vid = document.querySelector('video');
-                                if (document.querySelector('.ad-showing') && vid) {
-                                    vid.currentTime = vid.duration || 9999;
-                                }
-                            }, 300);
+                                try {
+                                    var btn = document.querySelector('.ytp-ad-skip-button, .ytp-ad-skip-button-modern, .ytp-ad-overlay-close-button');
+                                    if (btn) {
+                                        btn.click();
+                                        console.log("Ad skip clicked");
+                                    }
+                                    var vid = document.querySelector('video');
+                                    if (document.querySelector('.ad-showing') && vid) {
+                                        vid.currentTime = vid.duration || 9999;
+                                    }
+                                } catch(e) {}
+                            }, 500);
                         </script>
                     </body>
                     </html>
                 """.trimIndent()
 
-                webView.loadDataWithBaseURL("https://www.youtube.com", embedHtml, "text/html", "UTF-8", null)
+                webView.loadDataWithBaseURL("https://www.youtube-nocookie.com", embedHtml, "text/html", "UTF-8", null)
                 Log.d(TAG, "Started ad-free YouTube player for video: $videoId")
             } catch (e: Exception) {
                 Log.e(TAG, "Failed starting YouTube audio player", e)

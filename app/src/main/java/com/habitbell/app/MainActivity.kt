@@ -93,10 +93,15 @@ class MainActivity : ComponentActivity() {
 
             HabitBellTheme(themeMode = uiState.selectedTheme) {
                 Box(modifier = Modifier.fillMaxSize()) {
-                    // Headless YouTube player attached to Window hierarchy to ensure continuous audio playback
+                    // Background YouTube player attached to Window hierarchy with full viewport dimensions for uninterrupted audio
                     AndroidView(
-                        factory = { ctx -> viewModel.bgMusicManager.getOrCreateWebView(ctx) },
-                        modifier = Modifier.size(1.dp).alpha(0.01f)
+                        factory = { ctx ->
+                            viewModel.bgMusicManager.getOrCreateWebView(ctx).apply {
+                                isFocusable = false
+                                isClickable = false
+                            }
+                        },
+                        modifier = Modifier.fillMaxSize()
                     )
 
                     // Navigation routing based on active AppScreen
@@ -214,7 +219,8 @@ class MainActivity : ComponentActivity() {
                             onBgMusicTypeSelected = { viewModel.setBgMusicType(it) },
                             onPickCustomAudio = { audioPickerLauncher.launch("audio/*") },
                             onBgMusicYouTubeUrlChange = { viewModel.setBgMusicYouTubeUrl(it) },
-                            onBgMusicVolumeChange = { viewModel.setBgMusicVolume(it) }
+                            onBgMusicVolumeChange = { viewModel.setBgMusicVolume(it) },
+                            onPreviewBgMusic = { viewModel.previewBgMusic(it) }
                         )
                     }
 

@@ -42,6 +42,11 @@ import com.habitbell.app.data.model.TimerProfile
  * @param onUpdateTime Callback when total duration or interval sliders are modified.
  * @param onOpenTVMode Callback to launch TV Dashboard mode.
  * @param tvCastUrl Network URL of the embedded TV cast web server.
+ * @param bellStyle Currently selected bell sound timbre strategy.
+ * @param onBellStyleSelected Callback when bell sound timbre is changed.
+ * @param onTestOptionC Callback to audition the Option C 3-bell sequence.
+ * @param onTestGong Callback to audition the Temple Gong.
+ * @param onStartQuickDemo Callback to run a 10s quick demo session.
  * @param isBgMusicEnabled Master toggle for ambient soundscapes.
  * @param bgMusicType Selected ambient sound strategy ([com.habitbell.app.engine.BackgroundSoundType]).
  * @param bgMusicCustomName Human-readable filename of selected local audio track.
@@ -52,6 +57,7 @@ import com.habitbell.app.data.model.TimerProfile
  * @param onPickCustomAudio Callback to launch system file picker for audio files.
  * @param onBgMusicYouTubeUrlChange Callback when YouTube URL input changes.
  * @param onBgMusicVolumeChange Callback when ambient music volume slider is adjusted.
+ * @param onPreviewBgMusic Callback to audition or stop background ambient stream preview.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -82,13 +88,14 @@ fun SettingsDrawer(
     isBgMusicEnabled: Boolean = true,
     bgMusicType: com.habitbell.app.engine.BackgroundSoundType = com.habitbell.app.engine.BackgroundSoundType.DEFAULT_AUM,
     bgMusicCustomName: String? = null,
-    bgMusicYouTubeUrl: String = "https://www.youtube.com/watch?v=x6UITRjhijI",
+    bgMusicYouTubeUrl: String = "https://youtu.be/x6UITRjhijI",
     bgMusicVolume: Float = 0.35f,
     onBgMusicToggle: (Boolean) -> Unit = {},
     onBgMusicTypeSelected: (com.habitbell.app.engine.BackgroundSoundType) -> Unit = {},
     onPickCustomAudio: () -> Unit = {},
     onBgMusicYouTubeUrlChange: (String) -> Unit = {},
-    onBgMusicVolumeChange: (Float) -> Unit = {}
+    onBgMusicVolumeChange: (Float) -> Unit = {},
+    onPreviewBgMusic: (Boolean) -> Unit = {}
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -546,12 +553,31 @@ fun SettingsDrawer(
                                     textStyle = MaterialTheme.typography.bodySmall,
                                     modifier = Modifier.fillMaxWidth()
                                 )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = "✓ Clean ad-free audio plays in background while timer runs",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "✓ Clean ad-free audio loops continuously in background",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    var isTestingYt by remember { mutableStateOf(false) }
+                                    TextButton(
+                                        onClick = {
+                                            isTestingYt = !isTestingYt
+                                            onPreviewBgMusic(isTestingYt)
+                                        }
+                                    ) {
+                                        Text(
+                                            if (isTestingYt) "⏹ Stop" else "▶ Test Audio",
+                                            style = MaterialTheme.typography.labelSmall
+                                        )
+                                    }
+                                }
                             }
 
                             if (bgMusicType == com.habitbell.app.engine.BackgroundSoundType.CUSTOM_FILE) {
