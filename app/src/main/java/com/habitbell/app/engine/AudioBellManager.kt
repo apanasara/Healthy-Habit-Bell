@@ -81,23 +81,17 @@ class AudioBellManager(private val context: Context) {
     private fun loadSounds() {
         try {
             soundPool?.let { pool ->
-                val intervalResId = context.resources.getIdentifier("tibetan_bell_interval", "raw", context.packageName)
-                val completeResId = context.resources.getIdentifier("tibetan_bell_complete", "raw", context.packageName)
-                val s3ResId = context.resources.getIdentifier("tingsha_strike_3s", "raw", context.packageName)
-                val s2ResId = context.resources.getIdentifier("tingsha_strike_2s", "raw", context.packageName)
-                val s1ResId = context.resources.getIdentifier("tingsha_strike_1s", "raw", context.packageName)
-                val gongResId = context.resources.getIdentifier("temple_gong", "raw", context.packageName)
-                val crystalResId = context.resources.getIdentifier("crystal_quartz", "raw", context.packageName)
-
-                if (intervalResId != 0) intervalSoundId = pool.load(context, intervalResId, 1)
-                if (completeResId != 0) completionSoundId = pool.load(context, completeResId, 1)
-                if (s3ResId != 0) strike3SoundId = pool.load(context, s3ResId, 1)
-                if (s2ResId != 0) strike2SoundId = pool.load(context, s2ResId, 1)
-                if (s1ResId != 0) strike1SoundId = pool.load(context, s1ResId, 1)
-                if (gongResId != 0) templeGongSoundId = pool.load(context, gongResId, 1)
-                if (crystalResId != 0) crystalQuartzSoundId = pool.load(context, crystalResId, 1)
+                intervalSoundId = pool.load(context, R.raw.tibetan_bell_interval, 1)
+                completionSoundId = pool.load(context, R.raw.tibetan_bell_complete, 1)
+                strike3SoundId = pool.load(context, R.raw.tingsha_strike_3s, 1)
+                strike2SoundId = pool.load(context, R.raw.tingsha_strike_2s, 1)
+                strike1SoundId = pool.load(context, R.raw.tingsha_strike_1s, 1)
+                templeGongSoundId = pool.load(context, R.raw.temple_gong, 1)
+                crystalQuartzSoundId = pool.load(context, R.raw.crystal_quartz, 1)
             }
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            android.util.Log.e("AudioBellManager", "Error loading SoundPool assets", e)
+        }
     }
 
     fun setVolume(volume: Float) {
@@ -202,6 +196,16 @@ class AudioBellManager(private val context: Context) {
                 playSynthesizedChime(f0 = 1024.0, durationSeconds = 7.5, volumeScale = 1.00f)
             }
         }
+    }
+
+    /**
+     * Auditions the approved Option C 3-bell countdown sequence:
+     * - Strike 1 (3s remaining): 2048 Hz (high vibration crystalline cue, 45% volume)
+     * - Strike 2 (2s remaining): 1536 Hz (centering chime, 70% volume)
+     * - Strike 3 (1s remaining / finish): 1024 Hz (deep resonance finale, 100% volume with 7.5s sustain)
+     */
+    fun playOptionCPreview() {
+        playCompletionBell()
     }
 
     /**

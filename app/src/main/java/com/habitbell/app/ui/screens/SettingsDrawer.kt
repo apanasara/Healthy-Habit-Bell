@@ -76,6 +76,8 @@ fun SettingsDrawer(
     tvCastUrl: String = "",
     bellStyle: com.habitbell.app.engine.BellSoundStyle = com.habitbell.app.engine.BellSoundStyle.ZEN_TINGSHA,
     onBellStyleSelected: (com.habitbell.app.engine.BellSoundStyle) -> Unit = {},
+    onTestOptionC: () -> Unit = {},
+    onStartQuickDemo: () -> Unit = {},
     isBgMusicEnabled: Boolean = true,
     bgMusicType: com.habitbell.app.engine.BackgroundSoundType = com.habitbell.app.engine.BackgroundSoundType.DEFAULT_AUM,
     bgMusicCustomName: String? = null,
@@ -290,13 +292,15 @@ fun SettingsDrawer(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        text = "Tibetan Bell Volume",
+                        text = "Bell Master Volume",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onBackground
                     )
-                    TextButton(onClick = onTestBell) {
-                        Text("Test Chime", color = MaterialTheme.colorScheme.primary)
-                    }
+                    Text(
+                        text = "${(bellVolume * 100).toInt()}%",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
                 }
                 Slider(
                     value = bellVolume,
@@ -308,7 +312,131 @@ fun SettingsDrawer(
                     )
                 )
 
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Option C 3-Bell Countdown Feature Card (Approved by User)
+                Card(
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                Icons.Outlined.Notifications,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Text(
+                                text = "Option C: 3-Bell Countdown (Active)",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Rings 3 bells in last 3s: 2048Hz (3s) ➔ 1536Hz (2s) ➔ 1024Hz (1s finish)",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Button(
+                                onClick = onTestOptionC,
+                                shape = RoundedCornerShape(8.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.primary
+                                ),
+                                modifier = Modifier.weight(1.2f)
+                            ) {
+                                Text("▶ Play 3 Bells", style = MaterialTheme.typography.labelMedium)
+                            }
+                            OutlinedButton(
+                                onClick = onStartQuickDemo,
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier.weight(1.1f)
+                            ) {
+                                Text("⏱ 5s Demo", style = MaterialTheme.typography.labelMedium)
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Bell Timbre / Chime Style Selector
+                Text(
+                    text = "BELL TIMBRE & CHIME STYLE",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    listOf(
+                        com.habitbell.app.engine.BellSoundStyle.ZEN_TINGSHA to "🔔 Tingsha",
+                        com.habitbell.app.engine.BellSoundStyle.TIBETAN_BOWL to "🥣 Singing Bowl",
+                        com.habitbell.app.engine.BellSoundStyle.TEMPLE_GONG to "⛩️ Gong",
+                        com.habitbell.app.engine.BellSoundStyle.CRYSTAL_QUARTZ to "💎 Crystal"
+                    ).forEach { (style, label) ->
+                        val isSelected = bellStyle == style
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable {
+                                    onBellStyleSelected(style)
+                                    if (style == com.habitbell.app.engine.BellSoundStyle.ZEN_TINGSHA) {
+                                        onTestOptionC()
+                                    } else {
+                                        onTestBell()
+                                    }
+                                }
+                        ) {
+                            Text(
+                                text = label,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onBackground,
+                                modifier = Modifier
+                                    .padding(vertical = 8.dp)
+                                    .wrapContentWidth(Alignment.CenterHorizontally)
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "Mid-Session Interval Cue",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    TextButton(onClick = onTestBell) {
+                        Text("Test Single Chime", style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
 
                 // Global Background Music Setting (User Requirement)
                 Card(
