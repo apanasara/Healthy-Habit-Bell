@@ -256,14 +256,16 @@ class BackgroundMusicManager(private val context: Context) {
             }
         }
 
-        // 3. Fallback to bundled Aum Chanting Drone from raw assets
-        val resId = context.resources.getIdentifier("aum_chant_drone", "raw", context.packageName)
-        if (resId != 0) {
-            mediaPlayer = MediaPlayer.create(context, resId, audioAttributes, 0)?.apply {
+        // 3. Fallback to bundled pristine Aum audio from compile-time raw assets
+        try {
+            mediaPlayer = MediaPlayer.create(context, com.habitbell.app.R.raw.aum, audioAttributes, 0)?.apply {
                 isLooping = true
                 setVolume(this@BackgroundMusicManager.volume, this@BackgroundMusicManager.volume)
                 start()
             }
+            Log.d(TAG, "Playing bundled raw Aum ambient track")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed creating MediaPlayer with bundled R.raw.aum", e)
         }
     }
 
