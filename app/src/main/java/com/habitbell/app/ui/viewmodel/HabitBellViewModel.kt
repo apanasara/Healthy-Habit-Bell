@@ -82,6 +82,9 @@ data class AppUiState(
  */
 class HabitBellViewModel(application: Application) : AndroidViewModel(application) {
 
+    /** SharedPreferences handle for persisting background music and bell preferences. */
+    private val prefs = application.getSharedPreferences("habit_bell_settings", android.content.Context.MODE_PRIVATE)
+
     /** Repository managing persistent profiles, favorites, and routine reminders. */
     private val repository = TimerRepository(application)
 
@@ -540,8 +543,6 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
         audioManager.bellStyle = style
         saveSettings()
     }
-
-    private val prefs = getApplication<Application>().getSharedPreferences("habit_bell_settings", android.content.Context.MODE_PRIVATE)
 
     private fun loadSettings() {
         val internalAumFile = java.io.File(getApplication<Application>().filesDir, "custom_aum.mp3")
