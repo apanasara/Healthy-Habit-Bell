@@ -56,3 +56,10 @@ app/build/
 *.aab
 local.properties
 .cxx/
+
+# AI Agent & Auxiliary Local Artifacts (kept in outer project folder)
+.agents/
+scripts/
+docs/
+AGENTS.md
+GEMINI.md
