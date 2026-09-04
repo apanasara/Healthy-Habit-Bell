@@ -41,6 +41,7 @@ class AudioBellManager(private val context: Context) {
 
     private var intervalSoundId = 0
     private var completionSoundId = 0
+    private var optionCIntervalSoundId = 0
     private var templeGongSoundId = 0
     private var crystalQuartzSoundId = 0
 
@@ -81,12 +82,13 @@ class AudioBellManager(private val context: Context) {
     private fun loadSounds() {
         try {
             soundPool?.let { pool ->
+                optionCIntervalSoundId = pool.load(context, R.raw.option_c_3bells, 1)
                 intervalSoundId = pool.load(context, R.raw.tibetan_bell_interval, 1)
-                completionSoundId = pool.load(context, R.raw.tibetan_bell_complete, 1)
+                completionSoundId = pool.load(context, R.raw.temple_gong, 1)
+                templeGongSoundId = pool.load(context, R.raw.temple_gong, 1)
                 strike3SoundId = pool.load(context, R.raw.tingsha_strike_3s, 1)
                 strike2SoundId = pool.load(context, R.raw.tingsha_strike_2s, 1)
                 strike1SoundId = pool.load(context, R.raw.tingsha_strike_1s, 1)
-                templeGongSoundId = pool.load(context, R.raw.temple_gong, 1)
                 crystalQuartzSoundId = pool.load(context, R.raw.crystal_quartz, 1)
             }
         } catch (e: Exception) {
@@ -100,15 +102,26 @@ class AudioBellManager(private val context: Context) {
 
     /**
      * Triggers the interval bell according to the configured [bellStyle].
+     * For the primary [BellSoundStyle.ZEN_TINGSHA] (Option C), it plays the 3-bell sequence:
+     * Strike 1 (2048 Hz) -> Strike 2 (1536 Hz) -> Strike 3 (1024 Hz, 7.5s sustained ringout).
      */
     fun playIntervalBell() {
         requestTransientAudioFocus()
         when (bellStyle) {
             BellSoundStyle.ZEN_TINGSHA -> {
-                if (isLoaded && strike1SoundId != 0) {
-                    soundPool?.play(strike1SoundId, bellVolume, bellVolume, 1, 0, 1.0f)
+                if (isLoaded && optionCIntervalSoundId != 0) {
+                    soundPool?.play(optionCIntervalSoundId, bellVolume, bellVolume, 1, 0, 1.0f)
+                } else if (isLoaded && intervalSoundId != 0) {
+                    soundPool?.play(intervalSoundId, bellVolume, bellVolume, 1, 0, 1.0f)
                 } else {
-                    scope.launch { playSynthesizedChime(f0 = 1024.0, durationSeconds = 7.5, volumeScale = 0.95f) }
+                    // Procedural Option C 3-bell fallback
+                    scope.launch {
+                        playSynthesizedChime(f0 = 2048.0, durationSeconds = 4.0, volumeScale = 0.45f)
+                        kotlinx.coroutines.delay(1000)
+                        playSynthesizedChime(f0 = 1536.0, durationSeconds = 4.5, volumeScale = 0.70f)
+                        kotlinx.coroutines.delay(1000)
+                        playSynthesizedChime(f0 = 1024.0, durationSeconds = 7.5, volumeScale = 1.00f)
+                    }
                 }
             }
             BellSoundStyle.TEMPLE_GONG -> {
@@ -136,7 +149,7 @@ class AudioBellManager(private val context: Context) {
     }
 
     /**
-     * Plays an individual countdown chime strike during the final 3 seconds (Option C Zen Tingsha Triad).
+     * Plays an individual countdown chime strike if required by a multi-phase countdown.
      *
      * @param secondsRemaining Number of seconds remaining:
      *   - 3: Strike 1 (2048 Hz crystalline bell, 45% volume)
@@ -177,34 +190,36 @@ class AudioBellManager(private val context: Context) {
     }
 
     /**
-     * Triggers the 3-bell session completion cue (Option C Zen Tingsha Triad).
+     * Triggers the session completion bell: Deep Resonant Temple Gong.
      *
-     * Emits a crystalline harmonic progression (2048Hz -> 1536Hz -> 1024Hz) with natural acoustic
-     * reverberation and zero abrupt audio boundaries.
+     * Emits a rich 324 Hz harmonic temple gong with long acoustic decay
+     * to honor the conclusion of the wellness session.
      */
     fun playCompletionBell() {
         requestTransientAudioFocus()
-        if (isLoaded && completionSoundId != 0) {
-            soundPool?.play(completionSoundId, bellVolume, bellVolume, 1, 0, 1.0f)
+        if (isLoaded && templeGongSoundId != 0) {
+            soundPool?.play(templeGongSoundId, bellVolume, bellVolume, 1, 0, 1.0f)
         } else {
-            // Option C Triad progression: 2048Hz -> 1536Hz -> 1024Hz
             scope.launch {
-                playSynthesizedChime(f0 = 2048.0, durationSeconds = 4.0, volumeScale = 0.45f)
-                kotlinx.coroutines.delay(1000)
-                playSynthesizedChime(f0 = 1536.0, durationSeconds = 4.5, volumeScale = 0.70f)
-                kotlinx.coroutines.delay(1000)
-                playSynthesizedChime(f0 = 1024.0, durationSeconds = 7.5, volumeScale = 1.00f)
+                playSynthesizedChime(f0 = 324.0, durationSeconds = 8.5, volumeScale = 0.95f)
             }
         }
     }
 
     /**
-     * Auditions the approved Option C 3-bell countdown sequence:
-     * - Strike 1 (3s remaining): 2048 Hz (high vibration crystalline cue, 45% volume)
-     * - Strike 2 (2s remaining): 1536 Hz (centering chime, 70% volume)
-     * - Strike 3 (1s remaining / finish): 1024 Hz (deep resonance finale, 100% volume with 7.5s sustain)
+     * Auditions the approved Option C 3-bell interval sequence:
+     * - Strike 1: 2048 Hz (high vibration crystalline cue, 45% volume)
+     * - Strike 2: 1536 Hz (centering chime, 70% volume)
+     * - Strike 3: 1024 Hz (deep resonance finale, 100% volume with 7.5s sustain)
      */
     fun playOptionCPreview() {
+        playIntervalBell()
+    }
+
+    /**
+     * Auditions the session completion Deep Temple Gong.
+     */
+    fun playGongPreview() {
         playCompletionBell()
     }
 

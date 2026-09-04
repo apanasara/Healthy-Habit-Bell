@@ -77,6 +77,7 @@ fun SettingsDrawer(
     bellStyle: com.habitbell.app.engine.BellSoundStyle = com.habitbell.app.engine.BellSoundStyle.ZEN_TINGSHA,
     onBellStyleSelected: (com.habitbell.app.engine.BellSoundStyle) -> Unit = {},
     onTestOptionC: () -> Unit = {},
+    onTestGong: () -> Unit = {},
     onStartQuickDemo: () -> Unit = {},
     isBgMusicEnabled: Boolean = true,
     bgMusicType: com.habitbell.app.engine.BackgroundSoundType = com.habitbell.app.engine.BackgroundSoundType.DEFAULT_AUM,
@@ -314,7 +315,7 @@ fun SettingsDrawer(
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // Option C 3-Bell Countdown Feature Card (Approved by User)
+                // Option C Interval Bell & Session End Gong Card (Approved Configuration)
                 Card(
                     shape = RoundedCornerShape(12.dp),
                     colors = CardDefaults.cardColors(
@@ -334,7 +335,7 @@ fun SettingsDrawer(
                                 modifier = Modifier.size(20.dp)
                             )
                             Text(
-                                text = "Option C: 3-Bell Countdown (Active)",
+                                text = "Option C: 3 Bells Interval • Gong at End",
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.primary
@@ -342,14 +343,14 @@ fun SettingsDrawer(
                         }
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "Rings 3 bells in last 3s: 2048Hz (3s) ➔ 1536Hz (2s) ➔ 1024Hz (1s finish)",
+                            text = "Interval bell: Option C (3 bells: 2048Hz ➔ 1536Hz ➔ 1024Hz).\nSession end: Deep resonant Temple Gong.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(modifier = Modifier.height(12.dp))
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             Button(
                                 onClick = onTestOptionC,
@@ -357,16 +358,26 @@ fun SettingsDrawer(
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = MaterialTheme.colorScheme.primary
                                 ),
-                                modifier = Modifier.weight(1.2f)
+                                modifier = Modifier.weight(1.1f)
                             ) {
-                                Text("▶ Play 3 Bells", style = MaterialTheme.typography.labelMedium)
+                                Text("▶ 3 Bells", style = MaterialTheme.typography.labelSmall)
+                            }
+                            Button(
+                                onClick = onTestGong,
+                                shape = RoundedCornerShape(8.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.secondary
+                                ),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Text("▶ Gong", style = MaterialTheme.typography.labelSmall)
                             }
                             OutlinedButton(
                                 onClick = onStartQuickDemo,
                                 shape = RoundedCornerShape(8.dp),
                                 modifier = Modifier.weight(1.1f)
                             ) {
-                                Text("⏱ 5s Demo", style = MaterialTheme.typography.labelMedium)
+                                Text("⏱ 10s Demo", style = MaterialTheme.typography.labelSmall)
                             }
                         }
                     }
@@ -432,7 +443,7 @@ fun SettingsDrawer(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     TextButton(onClick = onTestBell) {
-                        Text("Test Single Chime", style = MaterialTheme.typography.labelSmall)
+                        Text("Test Interval Chime", style = MaterialTheme.typography.labelSmall)
                     }
                 }
 

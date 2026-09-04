@@ -286,22 +286,6 @@ class TimerEngine(
             return
         }
 
-        // 3 bells in last 3 seconds (Option C Zen Tingsha Triad):
-        // Strike 1 at remainingSeconds == 3 (2048 Hz)
-        // Strike 2 at remainingSeconds == 2 (1536 Hz)
-        // Strike 3 triggers at remainingSeconds <= 1 inside onSessionCompleted() (1024 Hz finale)
-        if (current.remainingSeconds == 3) {
-            audioManager.playCountdownStrike(3)
-            if (isPocketModeActive()) {
-                hapticManager.triggerIntervalHaptic()
-            }
-        } else if (current.remainingSeconds == 2) {
-            audioManager.playCountdownStrike(2)
-            if (isPocketModeActive()) {
-                hapticManager.triggerIntervalHaptic()
-            }
-        }
-
         when (current.profile.type) {
             TimerType.LINEAR -> tickLinear()
             TimerType.MULTI_INTERVAL -> tickPranayama()
@@ -445,10 +429,9 @@ class TimerEngine(
 
     /**
      * Finalizes session completion: halts coroutine ticker, zero-out countdown offsets,
-     * and triggers harmonic 3-bell Tibetan completion chime sequence.
+     * and triggers deep resonant Temple Gong completion chime.
      */
     private fun onSessionCompleted() {
-        val wasCountdown = _state.value.remainingSeconds in 1..2
         timerJob?.cancel()
         _state.update {
             it.copy(
@@ -459,12 +442,8 @@ class TimerEngine(
                 poseRemainingSeconds = 0
             )
         }
-        // Final chime of the 3-bell sequence (Strike 3 @ 1024 Hz with 7.5s deep resonance)
-        if (wasCountdown) {
-            audioManager.playCountdownStrike(1)
-        } else {
-            audioManager.playCompletionBell()
-        }
+        // Trigger session completion chime: Deep Resonant Temple Gong
+        audioManager.playCompletionBell()
         if (isPocketModeActive()) {
             hapticManager.triggerCompletionHaptic()
         }

@@ -260,8 +260,12 @@
             setTimeout(() => playHarmonicChime(1024, 1.00, 7.5), 2000);
         }
 
+        function playGongChime() {
+            playHarmonicChime(324, 0.95, 8.5);
+        }
+
         function playIntervalChime() {
-            playHarmonicChime(432, 0.85, 8.0);
+            play321SoothingSequence();
         }
 
         function startAumDrone() {
@@ -380,7 +384,7 @@
                 clearInterval(timer);
                 stopAumDrone();
                 stopYouTubeAudio();
-                playCountdownStrike(1);
+                playGongChime();
                 document.getElementById('bellText').innerText = "Session Completed 🙏";
                 updateUI();
                 return;

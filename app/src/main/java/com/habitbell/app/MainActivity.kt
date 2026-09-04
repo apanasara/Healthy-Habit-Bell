@@ -187,6 +187,7 @@ class MainActivity : ComponentActivity() {
                             bellStyle = uiState.bellStyle,
                             onBellStyleSelected = { viewModel.setBellStyle(it) },
                             onTestOptionC = { viewModel.playOptionCPreview() },
+                            onTestGong = { viewModel.playGongPreview() },
                             onStartQuickDemo = { viewModel.startQuickDemoSession() },
                             onDismiss = { viewModel.openSettingsDrawer(false) },
                             onThemeSelected = { viewModel.setTheme(it) },

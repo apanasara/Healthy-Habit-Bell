@@ -388,10 +388,10 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     /**
-     * Auditions the approved Option C 3-bell sequence:
-     * - Strike 1 @ 3s remaining: 2048 Hz (high-vibration crystalline cue, 45% volume)
-     * - Strike 2 @ 2s remaining: 1536 Hz (centering chime, 70% volume)
-     * - Strike 3 @ 1s remaining / session finish: 1024 Hz (deep resonance finale, 100% volume with 7.5s sustain)
+     * Auditions the approved Option C 3-bell interval sequence:
+     * - Strike 1: 2048 Hz (high-vibration crystalline cue, 45% volume)
+     * - Strike 2: 1536 Hz (centering chime, 70% volume)
+     * - Strike 3: 1024 Hz (deep resonance finale, 100% volume with 7.5s sustain)
      */
     fun playOptionCPreview() {
         audioManager.playOptionCPreview()
@@ -399,21 +399,26 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     /**
-     * Starts a rapid 5-second demo session to demonstrate the 3-bell countdown live in action.
-     * At 3s: Strike 1 (2048 Hz)
-     * At 2s: Strike 2 (1536 Hz)
-     * At 1s: Strike 3 (1024 Hz)
-     * At 0s: Session Completed
+     * Auditions the session completion Deep Temple Gong.
+     */
+    fun playGongPreview() {
+        audioManager.playGongPreview()
+        hapticManager.triggerCompletionHaptic()
+    }
+
+    /**
+     * Starts a rapid 10-second demo session to demonstrate both the Option C interval chime (at 5s)
+     * and the deep Temple Gong session completion chime (at 0s) live in action.
      */
     fun startQuickDemoSession() {
         val demoProfile = com.habitbell.app.data.model.TimerProfile(
-            id = "demo_5s",
-            name = "Option C 5s Demo",
+            id = "demo_10s",
+            name = "10s Demo (Interval + Gong)",
             type = com.habitbell.app.data.model.TimerType.LINEAR,
-            category = "Countdown Test",
-            iconName = "Notifications",
-            totalDurationSeconds = 5,
-            intervalDurationSeconds = 0
+            category = "Sound Test",
+            iconName = "notifications",
+            totalDurationSeconds = 10,
+            intervalDurationSeconds = 5
         )
         openSettingsDrawer(false)
         startProfileSession(demoProfile)
