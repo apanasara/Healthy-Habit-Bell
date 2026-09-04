@@ -17,16 +17,16 @@ import org.junit.Test
 class TimerEngineTest {
 
     /**
-     * Verifies that the Mindful Eating profile initializes with a 20-minute total duration
-     * and 30-second interval bite chimes.
+     * Verifies that the Mindful Eating profile initializes with a 45-minute total duration
+     * and 1-minute interval bite chimes.
      */
     @Test
     fun testEatingProfileDefaultValues() {
         val eating = DefaultProfiles.EATING
         assertEquals("Eating", eating.name)
         assertEquals(TimerType.LINEAR, eating.type)
-        assertEquals(1200, eating.totalDurationSeconds) // 20 minutes
-        assertEquals(30, eating.intervalDurationSeconds) // 30s bells
+        assertEquals(2700, eating.totalDurationSeconds) // 45 minutes
+        assertEquals(60, eating.intervalDurationSeconds) // 1 minute (60s)
         assertTrue(eating.isFavorite)
     }
 

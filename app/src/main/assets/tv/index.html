@@ -188,10 +188,13 @@
         const ytParam = urlParams.get('yt');
         const bgParam = urlParams.get('bg') || (ytParam ? 'yt' : 'aum');
 
-        let totalSeconds = 1200;
-        let remainingSeconds = 1200;
-        let intervalSeconds = 30;
-        let nextBell = 30;
+        const totalParam = parseInt(urlParams.get('total')) || 2700;
+        const intervalParam = parseInt(urlParams.get('interval')) || 60;
+
+        let totalSeconds = totalParam;
+        let remainingSeconds = totalParam;
+        let intervalSeconds = intervalParam;
+        let nextBell = intervalParam;
         let isRunning = true;
         let timer = null;
 

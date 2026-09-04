@@ -29,11 +29,50 @@ private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(na
  */
 class TimerRepository(private val context: Context) {
 
+    /** SharedPreferences handle for persisting user-customized profile durations and interval timings. */
+    private val prefs = context.getSharedPreferences("habit_bell_settings", Context.MODE_PRIVATE)
+
     /** Coroutine scope on [Dispatchers.IO] dedicated to background data persistence. */
     private val scope = CoroutineScope(Dispatchers.IO)
 
-    /** Mutable backing stream holding the complete catalog of preset and user-created profiles. */
-    private val _profiles = MutableStateFlow<List<TimerProfile>>(DefaultProfiles.ALL_PRESETS)
+    /** Mutable backing stream holding the complete catalog of preset and user-created profiles with persisted customizations. */
+    private val _profiles = MutableStateFlow<List<TimerProfile>>(loadInitialProfiles())
+
+    /**
+     * Loads the default preset catalog and overlays any persistent user customizations
+     * (total duration, interval timing) previously saved by the user.
+     *
+     * @return List of [TimerProfile] entities with user preferences restored.
+     */
+    private fun loadInitialProfiles(): List<TimerProfile> {
+        return DefaultProfiles.ALL_PRESETS.map { defaultProfile ->
+            val savedDuration = prefs.getInt("profile_duration_${defaultProfile.id}", -1)
+            val savedInterval = prefs.getInt("profile_interval_${defaultProfile.id}", -1)
+
+            val dur = if (savedDuration > 0) {
+                savedDuration
+            } else if (defaultProfile.id == "eating-mindful-20") {
+                val aliasDur = prefs.getInt("profile_duration_eating", -1)
+                if (aliasDur > 0) aliasDur else defaultProfile.totalDurationSeconds
+            } else {
+                defaultProfile.totalDurationSeconds
+            }
+
+            val inter = if (savedInterval >= 0) {
+                savedInterval
+            } else if (defaultProfile.id == "eating-mindful-20") {
+                val aliasInter = prefs.getInt("profile_interval_eating", -1)
+                if (aliasInter >= 0) aliasInter else defaultProfile.intervalDurationSeconds
+            } else {
+                defaultProfile.intervalDurationSeconds
+            }
+
+            defaultProfile.copy(
+                totalDurationSeconds = dur,
+                intervalDurationSeconds = inter
+            )
+        }
+    }
 
     /** Public read-only stream emitting the live list of available timer profiles. */
     val profiles: StateFlow<List<TimerProfile>> = _profiles.asStateFlow()
@@ -132,9 +171,26 @@ class TimerRepository(private val context: Context) {
         displayMode: Boolean? = null,
         pocketMode: Boolean? = null
     ) {
+        val editor = prefs.edit()
+        if (totalDuration != null) {
+            editor.putInt("profile_duration_$profileId", totalDuration)
+            if (profileId == "eating-mindful-20" || profileId == "eating") {
+                editor.putInt("profile_duration_eating", totalDuration)
+                editor.putInt("profile_duration_eating-mindful-20", totalDuration)
+            }
+        }
+        if (intervalDuration != null) {
+            editor.putInt("profile_interval_$profileId", intervalDuration)
+            if (profileId == "eating-mindful-20" || profileId == "eating") {
+                editor.putInt("profile_interval_eating", intervalDuration)
+                editor.putInt("profile_interval_eating-mindful-20", intervalDuration)
+            }
+        }
+        editor.apply()
+
         _profiles.update { list ->
             list.map { profile ->
-                if (profile.id == profileId) {
+                if (profile.id == profileId || (profile.id == "eating-mindful-20" && profileId == "eating")) {
                     profile.copy(
                         totalDurationSeconds = totalDuration ?: profile.totalDurationSeconds,
                         intervalDurationSeconds = intervalDuration ?: profile.intervalDurationSeconds,

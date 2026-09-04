@@ -9,7 +9,7 @@ import com.habitbell.app.data.model.*
 object DefaultProfiles {
 
     /**
-     * Mindful Eating: 20-minute total meal duration with a 30-second interval chime.
+     * Mindful Eating: 45-minute total meal duration with a 1-minute interval chime.
      * Encourages thorough chewing, paced eating, and improved digestive satiety signaling.
      */
     val EATING = TimerProfile(
@@ -18,8 +18,8 @@ object DefaultProfiles {
         type = TimerType.LINEAR,
         category = "Mindful Eating",
         iconName = "restaurant",
-        totalDurationSeconds = 1200,      // 20 minutes total mealtime
-        intervalDurationSeconds = 30,     // 30-second bite pacing bell
+        totalDurationSeconds = 2700,      // 45 minutes total mealtime
+        intervalDurationSeconds = 60,     // 1-minute bite pacing bell
         bellPattern = BellPattern.THREE_BELL,
         theme = ThemeMode.EYE_COMFORT,
         displayMode = true,

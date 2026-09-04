@@ -404,7 +404,10 @@ private fun FavoriteCard(
                 )
                 Text(
                     text = when (profile.type) {
-                        TimerType.LINEAR -> "${profile.totalDurationSeconds / 60}m • ${profile.intervalDurationSeconds}s bells"
+                        TimerType.LINEAR -> {
+                            val intervalStr = if (profile.intervalDurationSeconds >= 60) "${profile.intervalDurationSeconds / 60}m" else "${profile.intervalDurationSeconds}s"
+                            "${profile.totalDurationSeconds / 60}m • $intervalStr bells"
+                        }
                         TimerType.MULTI_INTERVAL -> "${profile.pranayamaConfig?.targetRounds ?: 0} rounds"
                         TimerType.COMPOUND -> "${profile.compoundConfig?.targetRounds ?: 0} rounds"
                     },
@@ -520,7 +523,10 @@ private fun TimerProfileListItem(
                     )
                     Text(
                         text = when (profile.type) {
-                            TimerType.LINEAR -> "${profile.totalDurationSeconds / 60} min • ${profile.intervalDurationSeconds}s interval bells"
+                            TimerType.LINEAR -> {
+                                val intervalStr = if (profile.intervalDurationSeconds >= 60) "${profile.intervalDurationSeconds / 60}m" else "${profile.intervalDurationSeconds}s"
+                                "${profile.totalDurationSeconds / 60} min • $intervalStr interval bells"
+                            }
                             TimerType.MULTI_INTERVAL -> "Breathwork • ${profile.pranayamaConfig?.targetRounds} rounds"
                             TimerType.COMPOUND -> "Yoga • 12 Poses • ${profile.compoundConfig?.targetRounds} rounds"
                         },

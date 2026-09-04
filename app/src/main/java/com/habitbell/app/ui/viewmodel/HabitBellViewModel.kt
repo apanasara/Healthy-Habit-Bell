@@ -157,6 +157,12 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
         // Restore persisted user background music and bell chime preferences
         loadSettings()
 
+        // Initialize engine with user-persisted or default Eating profile (45m duration, 1m interval)
+        val initialProfile = repository.getProfileById("eating-mindful-20") ?: repository.profiles.value.firstOrNull()
+        if (initialProfile != null) {
+            engine.loadProfile(initialProfile)
+        }
+
         // Observe session status transitions to orchestrate foreground services and battery optimization
         viewModelScope.launch {
             var lastStatus: SessionStatus? = null
@@ -276,7 +282,7 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
             lowerMessage.isNotEmpty() && (
                 lowerMessage.contains(it.name.lowercase()) ||
                 it.name.lowercase().contains(lowerMessage) ||
-                (lowerMessage.contains("eat") && it.id == "eating") ||
+                (lowerMessage.contains("eat") && it.id.contains("eating")) ||
                 (lowerMessage.contains("posture") && it.id == "posture") ||
                 (lowerMessage.contains("read") && it.id == "reading") ||
                 (lowerMessage.contains("walk") && it.id == "walking")

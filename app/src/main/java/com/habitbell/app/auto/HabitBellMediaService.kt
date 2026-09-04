@@ -141,7 +141,7 @@ class HabitBellMediaService : MediaBrowserServiceCompat() {
         val (title, subtitle) = when (mediaId) {
             "posture" -> "Posture Alignment" to "Spine check every 5 min"
             "breathing" -> "Driving Calm Breath" to "Mindful breath every 4 min"
-            else -> "Mindful Eating" to "Tibetan chime every 3 min"
+            else -> "Mindful Eating" to "Tibetan chime every 1 min"
         }
 
         val metadata = MediaMetadataCompat.Builder()
@@ -149,7 +149,7 @@ class HabitBellMediaService : MediaBrowserServiceCompat() {
             .putString(MediaMetadataCompat.METADATA_KEY_TITLE, title)
             .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, "Habit Bell • Soothing Chimes")
             .putString(MediaMetadataCompat.METADATA_KEY_ALBUM, subtitle)
-            .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, 1200000L)
+            .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, 2700000L)
             .build()
 
         mediaSession.setMetadata(metadata)
@@ -243,8 +243,8 @@ class HabitBellMediaService : MediaBrowserServiceCompat() {
             MediaBrowserCompat.MediaItem(
                 MediaDescriptionCompat.Builder()
                     .setMediaId("eating")
-                    .setTitle("Mindful Eating (15m)")
-                    .setSubtitle("3m interval Tibetan bell chime")
+                    .setTitle("Mindful Eating (45m)")
+                    .setSubtitle("1m interval Tibetan bell chime")
                     .build(),
                 MediaBrowserCompat.MediaItem.FLAG_PLAYABLE
             ),
