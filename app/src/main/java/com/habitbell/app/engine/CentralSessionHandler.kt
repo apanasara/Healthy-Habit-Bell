@@ -95,6 +95,14 @@ class CentralSessionHandler(private val application: Application) {
     /** Core 1Hz heartbeat finite state machine governing timer countdowns. */
     val engine: TimerEngine = TimerEngine(audioManager, hapticManager)
 
+    /** Unified screen display automation orchestrator (Pocket, Car, TV, and Watch modes). */
+    val displayAutomationManager: DisplayAutomationManager = DisplayAutomationManager(
+        application = application,
+        sessionStateProvider = { engine.state.value },
+        castManager = castManager,
+        airPlayManager = airPlayManager
+    )
+
     /** Authoritative Android media session shared by Car HUD, notifications, and Wear OS. */
     val mediaSession: MediaSessionCompat = MediaSessionCompat(application, "HabitBellMediaSession").apply {
         setFlags(
@@ -221,6 +229,7 @@ class CentralSessionHandler(private val application: Application) {
                             updatePlaybackState(PlaybackStateCompat.STATE_PLAYING, elapsedMs)
                             updateMetadata(state.profile)
                             batteryOptimizer.acquireWakeLock()
+                            displayAutomationManager.startMonitoring()
                             bgMusicManager.start()
                             startMediaService()
 
@@ -252,6 +261,7 @@ class CentralSessionHandler(private val application: Application) {
                         SessionStatus.COMPLETED -> {
                             updatePlaybackState(PlaybackStateCompat.STATE_STOPPED, 0L)
                             batteryOptimizer.releaseWakeLock()
+                            displayAutomationManager.stopMonitoring()
                             bgMusicManager.stop()
                             repository.recordSessionCompleted(state.profile.id)
 
@@ -270,6 +280,7 @@ class CentralSessionHandler(private val application: Application) {
                         SessionStatus.IDLE -> {
                             updatePlaybackState(PlaybackStateCompat.STATE_STOPPED, 0L)
                             batteryOptimizer.releaseWakeLock()
+                            displayAutomationManager.stopMonitoring()
                             bgMusicManager.stop()
                             healthStepManager.resetSession()
 

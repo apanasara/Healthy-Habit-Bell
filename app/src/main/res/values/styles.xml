@@ -1,6 +1,32 @@
 <resources>
-    <style name="Theme.HabitBell" parent="android:Theme.Material.Light.NoActionBar">
+    <!-- Base Application Theme: Inherits from AppCompat to ensure full compatibility with FragmentActivity and MediaRouter -->
+    <style name="Theme.HabitBell" parent="Theme.AppCompat.DayNight.NoActionBar">
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowBackground">#FAF6EE</item>
+        <item name="android:colorBackground">#FAF6EE</item>
+        <item name="colorBackgroundFloating">#FFFDF9</item>
+        <item name="colorPrimary">#D97706</item>
+        <item name="mediaRouteTheme">@style/Theme.MediaRouter.Light</item>
+    </style>
+
+    <!-- Google Cast Media Route Theme for Dark / AMOLED modes (crisp warm white icon with solid dark dialog background) -->
+    <style name="HabitBellMediaRouteTheme.Dark" parent="Theme.AppCompat.NoActionBar">
+        <item name="android:windowBackground">#121212</item>
+        <item name="android:colorBackground">#121212</item>
+        <item name="colorBackgroundFloating">#1E1E1E</item>
+        <item name="mediaRouteTheme">@style/Theme.MediaRouter</item>
+        <item name="colorControlNormal">#EDE8DE</item>
+        <item name="colorPrimary">#D4AF37</item>
+    </style>
+
+    <!-- Google Cast Media Route Theme for Light / Sun modes (dark charcoal icon with solid parchment dialog background) -->
+    <style name="HabitBellMediaRouteTheme.Light" parent="Theme.AppCompat.Light.NoActionBar">
+        <item name="android:windowBackground">#FAF6EE</item>
+        <item name="android:colorBackground">#FAF6EE</item>
+        <item name="colorBackgroundFloating">#FFFDF9</item>
+        <item name="mediaRouteTheme">@style/Theme.MediaRouter.Light</item>
+        <item name="colorControlNormal">#2E261F</item>
+        <item name="colorPrimary">#D97706</item>
     </style>
 </resources>

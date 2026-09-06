@@ -21,7 +21,7 @@ object DefaultProfiles {
         totalDurationSeconds = 2700,      // 45 minutes total mealtime
         intervalDurationSeconds = 60,     // 1-minute bite pacing bell
         bellPattern = BellPattern.THREE_BELL,
-        theme = ThemeMode.EYE_COMFORT,
+        theme = ThemeMode.AMOLED,
         displayMode = true,
         pocketMode = false,
         isFavorite = true

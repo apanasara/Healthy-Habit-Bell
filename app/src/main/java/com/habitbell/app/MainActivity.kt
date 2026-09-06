@@ -17,10 +17,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.habitbell.app.data.model.ThemeMode
 import com.habitbell.app.engine.SessionStatus
-import com.habitbell.app.ui.components.PocketOverlay
+import com.habitbell.app.ui.components.DisplayAutomationOverlay
 import com.habitbell.app.ui.screens.*
 import com.habitbell.app.ui.theme.HabitBellTheme
 import com.habitbell.app.ui.viewmodel.AppScreen
@@ -62,6 +64,7 @@ class MainActivity : FragmentActivity() {
             val recentProfiles by viewModel.recentProfiles.collectAsStateWithLifecycle()
             val reminders by viewModel.reminders.collectAsStateWithLifecycle()
             val isPocketBlanking by viewModel.isPocketBlankingActive.collectAsStateWithLifecycle()
+            val curtainState by viewModel.displayCurtainState.collectAsStateWithLifecycle()
             val isDisplayDimmed by viewModel.isDisplayDimmed.collectAsStateWithLifecycle()
             val isCasting by viewModel.castManager.isCasting.collectAsStateWithLifecycle()
             val castDeviceName by viewModel.castManager.castDeviceName.collectAsStateWithLifecycle()
@@ -127,7 +130,18 @@ class MainActivity : FragmentActivity() {
             }
 
             HabitBellTheme(themeMode = uiState.selectedTheme) {
-                Box(modifier = Modifier.fillMaxSize()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .pointerInput(Unit) {
+                            awaitPointerEventScope {
+                                while (true) {
+                                    awaitPointerEvent(PointerEventPass.Initial)
+                                    viewModel.onUserTouchDisplay()
+                                }
+                            }
+                        }
+                ) {
                     // Background YouTube player attached to Window hierarchy only when YouTube streaming is actively selected
                     if (uiState.isBgMusicEnabled && uiState.bgMusicType == com.habitbell.app.engine.BackgroundSoundType.YOUTUBE_LINK) {
                         AndroidView(
@@ -137,19 +151,17 @@ class MainActivity : FragmentActivity() {
                                     isClickable = false
                                 }
                             },
-                            modifier = Modifier.fillMaxSize()
+                            modifier = Modifier.size(1.dp).alpha(0.01f)
                         )
                     }
 
                     // Navigation routing based on active AppScreen
                     when (uiState.currentScreen) {
                         AppScreen.HOME -> {
-                            HomeScreen(
+                            ModernHomeScreenSample(
                                 profiles = profiles,
                                 favorites = favorites,
-                                recentProfiles = recentProfiles,
                                 reminders = reminders,
-                                currentTheme = uiState.selectedTheme,
                                 isZenMode = uiState.isZenMode,
                                 onSelectProfile = { profile ->
                                     if (isTelevisionDevice()) {
@@ -158,36 +170,20 @@ class MainActivity : FragmentActivity() {
                                         viewModel.startProfileSession(profile)
                                     }
                                 },
-                                onConfigureProfile = { profile ->
-                                    if (isTelevisionDevice()) {
-                                        viewModel.startProfileSession(profile, openTVMode = true)
-                                    } else {
-                                        viewModel.startProfileSession(profile)
-                                        viewModel.openSettingsDrawer(true, com.habitbell.app.ui.viewmodel.SettingsDrawerTab.TIMER)
-                                    }
-                                },
-                                onToggleFavorite = { id ->
-                                    viewModel.toggleFavorite(id)
-                                },
                                 onToggleZenMode = {
                                     viewModel.setZenMode(!uiState.isZenMode)
                                 },
                                 onCycleTheme = {
                                     val nextTheme = when (uiState.selectedTheme) {
-                                        ThemeMode.AMOLED -> ThemeMode.EYE_COMFORT
-                                        ThemeMode.EYE_COMFORT -> ThemeMode.DARK
-                                        ThemeMode.DARK -> ThemeMode.LIGHT
                                         ThemeMode.LIGHT -> ThemeMode.AMOLED
+                                        else -> ThemeMode.LIGHT
                                     }
                                     viewModel.setTheme(nextTheme)
                                 },
                                 onCreateNewClick = {
                                     viewModel.navigateTo(AppScreen.CREATE_TIMER)
                                 },
-                                onOpenTVMode = { profile ->
-                                    viewModel.startProfileSession(profile, openTVMode = true)
-                                },
-                                onOpenGlobalSettings = {
+                                onOpenSettings = {
                                     viewModel.openSettingsDrawer(true, com.habitbell.app.ui.viewmodel.SettingsDrawerTab.GLOBAL)
                                 }
                             )
@@ -202,8 +198,12 @@ class MainActivity : FragmentActivity() {
                                     viewModel.openSettingsDrawer(true, com.habitbell.app.ui.viewmodel.SettingsDrawerTab.TIMER)
                                 },
                                 onExit = { viewModel.exitSessionToHome() },
-                                onTriggerPocketMode = {
-                                    viewModel.setPocketMode(!uiState.isPocketModeManual)
+                                onToggleTheme = {
+                                    val nextTheme = when (uiState.selectedTheme) {
+                                        ThemeMode.LIGHT -> ThemeMode.AMOLED
+                                        else -> ThemeMode.LIGHT
+                                    }
+                                    viewModel.setTheme(nextTheme)
                                 },
                                 onOpenTVMode = {
                                     viewModel.navigateTo(AppScreen.TV_DASHBOARD)
@@ -296,11 +296,12 @@ class MainActivity : FragmentActivity() {
                         )
                     }
 
-                    // Hardware & Manual Pocket Mode Blanking (Pure OLED Black #000000)
-                    if (isPocketBlanking) {
-                        PocketOverlay(
+                    // Automated Full-Screen AMOLED Blackout Curtain (Pocket, Car, TV, Watch)
+                    if (curtainState.isActive) {
+                        DisplayAutomationOverlay(
+                            state = curtainState,
                             onDismiss = {
-                                viewModel.setPocketMode(false)
+                                viewModel.dismissDisplayCurtain()
                             }
                         )
                     }

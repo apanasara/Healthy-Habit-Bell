@@ -165,18 +165,18 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
         recentIds.mapNotNull { id -> allProfiles.find { it.id == id } }
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
+    /** Unified display automation manager handle from process singleton. */
+    val displayAutomationManager: com.habitbell.app.engine.DisplayAutomationManager = sessionHandler.displayAutomationManager
+
+    /** Live reactive stream governing the AMOLED blackout curtain across Pocket, Car, TV, and Watch modes. */
+    val displayCurtainState: StateFlow<com.habitbell.app.engine.DisplayCurtainState> = displayAutomationManager.curtainState
+
     /**
      * Evaluates whether the AMOLED pure-black `#000000` curtain should be active.
-     * Engages when the session is RUNNING and either manual pocket mode is switched on
-     * or the hardware proximity sensor detects the device is face down or in a pocket.
+     * Delegates directly to [displayCurtainState.isActive].
      */
-    val isPocketBlankingActive: StateFlow<Boolean> = combine(
-        _uiState.map { it.isPocketModeManual },
-        batteryOptimizer.isPocketCovered,
-        sessionState.map { it.status == SessionStatus.RUNNING }
-    ) { manual, sensorCovered, isRunning ->
-        isRunning && (manual || sensorCovered)
-    }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    val isPocketBlankingActive: StateFlow<Boolean> = displayCurtainState.map { it.isActive }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     /**
      * Determines whether the display should dim to 5% power-saving brightness during resting intervals.
@@ -233,7 +233,6 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
         _uiState.update {
             it.copy(
                 currentScreen = if (openTVMode) AppScreen.TV_DASHBOARD else AppScreen.SESSION,
-                selectedTheme = profile.theme,
                 isDisplayMode = profile.displayMode,
                 isPocketModeManual = profile.pocketMode
             )
@@ -329,6 +328,24 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
      */
     fun setPocketMode(enabled: Boolean) {
         _uiState.update { it.copy(isPocketModeManual = enabled) }
+        displayAutomationManager.setPocketModeManual(enabled)
+    }
+
+    /**
+     * Notifies the display automation engine of user touch activity to reset the flat inactivity countdown.
+     */
+    fun onUserTouchDisplay() {
+        displayAutomationManager.notifyUserTouched()
+    }
+
+    /**
+     * Dismisses the automated AMOLED blackout curtain on explicit tap or wake action.
+     */
+    fun dismissDisplayCurtain() {
+        displayAutomationManager.dismissCurtainTemporarily()
+        if (_uiState.value.isPocketModeManual) {
+            setPocketMode(false)
+        }
     }
 
     /**
