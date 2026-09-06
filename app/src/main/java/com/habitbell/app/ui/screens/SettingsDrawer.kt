@@ -95,7 +95,10 @@ fun SettingsDrawer(
     onPickCustomAudio: () -> Unit = {},
     onBgMusicYouTubeUrlChange: (String) -> Unit = {},
     onBgMusicVolumeChange: (Float) -> Unit = {},
-    onPreviewBgMusic: (Boolean) -> Unit = {}
+    onPreviewBgMusic: (Boolean) -> Unit = {},
+    isCasting: Boolean = false,
+    castDeviceName: String? = null,
+    onDisconnectCast: () -> Unit = {}
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -698,11 +701,12 @@ fun SettingsDrawer(
                 SettingsSectionHeader(title = "Casting & Living Room")
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Autonomous TV Cast (Zero Phone Battery)
+                // 1. Native Pure Google Cast (Chromecast / Google TV / Android TV)
                 Card(
                     shape = RoundedCornerShape(14.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                        containerColor = if (isCasting) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
+                        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
                     ),
                     modifier = Modifier.fillMaxWidth()
                 ) {
@@ -711,68 +715,37 @@ fun SettingsDrawer(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            Icon(
-                                Icons.Outlined.CastConnected,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(26.dp)
-                            )
+                            com.habitbell.app.ui.components.CastButton(modifier = Modifier.size(36.dp))
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = "TV Web Cast • Zero Mobile Battery",
+                                    text = "Google Cast • TV Streaming",
                                     style = MaterialTheme.typography.titleSmall,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onBackground
                                 )
                                 Text(
-                                    text = "Runs 100% on your TV hardware (like YouTube Cast). You can lock your phone or turn it off with zero battery drain!",
+                                    text = if (isCasting) {
+                                        "Connected to: ${castDeviceName ?: "Living Room TV"} (Streaming directly on TV hardware)"
+                                    } else {
+                                        "Tap the Cast icon to stream to Chromecast or Google TV without screen mirroring (like YouTube/Netflix)."
+                                    },
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    color = if (isCasting) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
 
-                        if (tvCastUrl.isNotBlank()) {
-                            Spacer(modifier = Modifier.height(10.dp))
-                            Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = MaterialTheme.colorScheme.surface,
-                                modifier = Modifier.fillMaxWidth()
+                        if (isCasting) {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.End
                             ) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(horizontal = 12.dp, vertical = 8.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
+                                OutlinedButton(
+                                    onClick = onDisconnectCast,
+                                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
                                 ) {
-                                    Text(
-                                        text = tvCastUrl,
-                                        style = MaterialTheme.typography.labelMedium,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                        TextButton(
-                                            onClick = {
-                                                val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                                                clipboard.setPrimaryClip(android.content.ClipData.newPlainText("TV URL", tvCastUrl))
-                                            },
-                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
-                                        ) {
-                                            Text("Copy Link", style = MaterialTheme.typography.labelSmall)
-                                        }
-                                        TextButton(
-                                            onClick = {
-                                                try {
-                                                    context.startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(tvCastUrl)))
-                                                } catch (_: Exception) {}
-                                            },
-                                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
-                                        ) {
-                                            Text("Open", style = MaterialTheme.typography.labelSmall)
-                                        }
-                                    }
+                                    Text("Disconnect TV", style = MaterialTheme.typography.labelSmall)
                                 }
                             }
                         }
@@ -781,7 +754,7 @@ fun SettingsDrawer(
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // TV Dashboard on Phone
+                // 2. TV Dashboard on Phone
                 Card(
                     shape = RoundedCornerShape(12.dp),
                     colors = CardDefaults.cardColors(
@@ -824,52 +797,71 @@ fun SettingsDrawer(
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // Standard Google Cast Screen Mirror
+                // 3. Smart TV Web Browser (Samsung Tizen / LG webOS without Chromecast)
                 Card(
                     shape = RoundedCornerShape(12.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
                     ),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable {
-                            try {
-                                context.startActivity(Intent(android.provider.Settings.ACTION_CAST_SETTINGS))
-                            } catch (e: Exception) {
-                                try {
-                                    context.startActivity(Intent(android.provider.Settings.ACTION_WIRELESS_SETTINGS))
-                                } catch (_: Exception) {}
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Icon(
+                                Icons.Outlined.Language,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(22.dp)
+                            )
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Smart TV Browser Link (Samsung/LG)",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onBackground
+                                )
+                                Text(
+                                    text = "For TVs without Chromecast: open the TV's browser app and type this URL",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
                             }
                         }
-                ) {
-                    Row(
-                        modifier = Modifier.padding(14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Icon(
-                            Icons.Outlined.Cast,
-                            contentDescription = "Google Cast",
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Google Cast / Chromecast (System Mirror)",
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.onBackground
-                            )
-                            Text(
-                                text = "Connect wirelessly to Chromecast or Android TV device",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
+                        if (tvCastUrl.isNotBlank()) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = MaterialTheme.colorScheme.surface,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = tvCastUrl,
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    TextButton(
+                                        onClick = {
+                                            val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                                            clipboard.setPrimaryClip(android.content.ClipData.newPlainText("TV URL", tvCastUrl))
+                                        },
+                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                                    ) {
+                                        Text("Copy Link", style = MaterialTheme.typography.labelSmall)
+                                    }
+                                }
+                            }
                         }
-                        Icon(
-                            Icons.Outlined.ChevronRight,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
                     }
                 }
             }

@@ -80,6 +80,9 @@ class CentralSessionHandler(private val application: Application) {
     /** Ambient background soundscape manager (bundled Aum drone, custom SAF files, YouTube audio). */
     val bgMusicManager: BackgroundMusicManager = BackgroundMusicManager(application)
 
+    /** Native Google Cast manager enabling pure app casting to TV hardware without mirroring. */
+    val castManager: com.habitbell.app.cast.HabitBellCastManager = com.habitbell.app.cast.HabitBellCastManager.getInstance(application)
+
     /** Core 1Hz heartbeat finite state machine governing timer countdowns. */
     val engine: TimerEngine = TimerEngine(audioManager, hapticManager)
 
@@ -107,6 +110,7 @@ class CentralSessionHandler(private val application: Application) {
     init {
         setupMediaSessionCallback()
         observeEngineState()
+        setupCastListener()
 
         // Initialize engine with default profile
         val initialProfile = repository.getProfileById("eating-mindful-20")
@@ -115,6 +119,15 @@ class CentralSessionHandler(private val application: Application) {
         engine.loadProfile(initialProfile)
         updateMetadata(initialProfile)
         updatePlaybackState(PlaybackStateCompat.STATE_PAUSED, 0L)
+    }
+
+    /**
+     * Connects remote media action callbacks from Google Cast TV remotes to central session control.
+     */
+    private fun setupCastListener() {
+        castManager.onRemotePlaybackAction = { isPlay ->
+            if (isPlay) resume() else pause()
+        }
     }
 
     /**
@@ -187,27 +200,44 @@ class CentralSessionHandler(private val application: Application) {
                             batteryOptimizer.acquireWakeLock()
                             bgMusicManager.start()
                             startMediaService()
+
+                            if (castManager.isCasting.value) {
+                                castManager.loadSession(
+                                    profileName = state.profile.name,
+                                    subtitle = "${state.profile.totalDurationSeconds / 60}m Mindful Session",
+                                    durationSeconds = state.totalSeconds
+                                )
+                            }
                         }
                         SessionStatus.PAUSED -> {
                             updatePlaybackState(PlaybackStateCompat.STATE_PAUSED, elapsedMs)
                             bgMusicManager.pause()
                             startMediaService()
+
+                            if (castManager.isCasting.value) {
+                                castManager.pause()
+                            }
                         }
                         SessionStatus.COMPLETED -> {
                             updatePlaybackState(PlaybackStateCompat.STATE_STOPPED, 0L)
                             batteryOptimizer.releaseWakeLock()
                             bgMusicManager.stop()
                             repository.recordSessionCompleted(state.profile.id)
+
+                            if (castManager.isCasting.value) {
+                                castManager.stop()
+                            }
                         }
                         SessionStatus.IDLE -> {
                             updatePlaybackState(PlaybackStateCompat.STATE_STOPPED, 0L)
                             batteryOptimizer.releaseWakeLock()
                             bgMusicManager.stop()
+
+                            if (castManager.isCasting.value) {
+                                castManager.stop()
+                            }
                         }
                     }
-                } else if (state.status == SessionStatus.RUNNING) {
-                    // Periodic countdown tick: update media position for car HUD scrubbers
-                    updatePlaybackState(PlaybackStateCompat.STATE_PLAYING, elapsedMs)
                 }
             }
         }
@@ -386,5 +416,6 @@ class CentralSessionHandler(private val application: Application) {
         batteryOptimizer.releaseWakeLock()
         batteryOptimizer.stopProximityMonitoring()
         mediaSession.release()
+        castManager.destroy()
     }
 }

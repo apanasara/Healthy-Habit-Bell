@@ -107,7 +107,10 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
     /** Core 1Hz finite state machine governing timer countdowns and phase cycles. */
     val engine: TimerEngine = sessionHandler.engine
 
-    /** Embedded local HTTP daemon and NSD service for broadcasting to Smart TVs. */
+    /** Google Cast manager coordinating pure app streaming to TV hardware. */
+    val castManager: com.habitbell.app.cast.HabitBellCastManager = sessionHandler.castManager
+
+    /** Embedded local HTTP daemon and NSD service for auxiliary Smart TV web browsers (Samsung/LG). */
     val castServer = com.habitbell.app.cast.LocalCastWebServer(application)
 
     /** Mutable state flow holding the reactive application UI state. */
@@ -152,13 +155,8 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
     }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
     /**
-     * Authoritative reactive stream determining if screen brightness should currently be dimmed.
-     *
-     * Engages when:
-     * 1. Session is actively [SessionStatus.RUNNING].
-     * 2. [AppUiState.isDisplayMode] and [AppUiState.isAutoDim] are enabled.
-     * 3. Hardware Pocket Mode is NOT active (which uses the pure AMOLED black curtain instead).
-     * 4. [TimerSessionState.isDimmed] is true (resting interval countdown between bells).
+     * Determines whether the display should dim to 5% power-saving brightness during resting intervals.
+     * Lifted immediately on interval chimes, session completion, or manual screen taps.
      */
     val isDisplayDimmed: StateFlow<Boolean> = combine(
         sessionState,
@@ -171,9 +169,6 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
     init {
         // Enforce project rule: Haptic vibration ONLY triggers when device is in pocket mode
         engine.isPocketModeActive = { _uiState.value.isPocketModeManual || isPocketBlankingActive.value }
-
-        // Start local TV web receiver server for decoupled TV casting
-        castServer.start()
 
         // Restore persisted user background music and bell chime preferences
         loadSettings()
@@ -403,11 +398,31 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     /**
+     * Starts the auxiliary Smart TV HTTP server on demand.
+     */
+    fun startSmartTvServer() {
+        if (!castServer.isRunning) {
+            castServer.start()
+        }
+    }
+
+    /**
+     * Stops the auxiliary Smart TV HTTP server to conserve battery and radio resources.
+     */
+    fun stopSmartTvServer() {
+        if (castServer.isRunning) {
+            castServer.stop()
+        }
+    }
+
+    /**
      * Retrieves the local LAN HTTP URL for Smart TV browser casting (e.g., `http://192.168.1.5:8888`).
+     * Starts the server on demand if not already running.
      *
      * @return Formatted network URL string.
      */
     fun getTvCastUrl(): String {
+        startSmartTvServer()
         val base = castServer.getTvUrl()
         val ui = _uiState.value
         return if (ui.isBgMusicEnabled) {

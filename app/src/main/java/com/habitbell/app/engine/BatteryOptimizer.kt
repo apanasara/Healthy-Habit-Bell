@@ -100,7 +100,6 @@ class BatteryOptimizer(private val context: Context) : SensorEventListener {
             }
         }
         wakeLock?.acquire(3 * 3600 * 1000L) // 3-hour automatic timeout failsafe
-        acquireWifiLock()
     }
 
     /**

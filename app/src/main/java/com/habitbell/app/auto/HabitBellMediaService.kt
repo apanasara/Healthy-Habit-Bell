@@ -75,27 +75,54 @@ class HabitBellMediaService : MediaBrowserServiceCompat() {
         observeSessionState()
     }
 
+    /** Tracks whether the service is currently promoted to foreground execution. */
+    private var isForeground = false
+
+    /** Last recorded session status to detect actual lifecycle transitions. */
+    private var lastRecordedStatus: SessionStatus? = null
+
     /**
      * Subscribes to [CentralSessionHandler.sessionState] to synchronize the ongoing
-     * automotive media notification with current playback status.
+     * automotive media notification with current playback status without IPC thrashing.
      */
     private fun observeSessionState() {
         stateObserverJob?.cancel()
         stateObserverJob = serviceScope.launch {
+            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             sessionHandler.sessionState.collect { state ->
+                val statusChanged = state.status != lastRecordedStatus
+                lastRecordedStatus = state.status
+
                 when (state.status) {
                     SessionStatus.RUNNING -> {
-                        val notification = buildNotification(state)
-                        startForeground(NOTIFICATION_ID, notification)
+                        if (!isForeground) {
+                            // Promote to foreground once on active transition
+                            val notification = buildNotification(state)
+                            startForeground(NOTIFICATION_ID, notification)
+                            isForeground = true
+                        } else if (statusChanged || state.remainingSeconds % 5 == 0) {
+                            // Non-blocking content update throttled to every 5s to eliminate 1Hz IPC spam
+                            val notification = buildNotification(state)
+                            notificationManager.notify(NOTIFICATION_ID, notification)
+                        }
                     }
                     SessionStatus.PAUSED -> {
-                        val notification = buildNotification(state)
-                        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-                        manager.notify(NOTIFICATION_ID, notification)
-                        stopForeground(STOP_FOREGROUND_DETACH)
+                        if (isForeground) {
+                            stopForeground(STOP_FOREGROUND_DETACH)
+                            isForeground = false
+                        }
+                        if (statusChanged) {
+                            val notification = buildNotification(state)
+                            notificationManager.notify(NOTIFICATION_ID, notification)
+                        }
                     }
                     SessionStatus.COMPLETED, SessionStatus.IDLE -> {
-                        stopForeground(STOP_FOREGROUND_REMOVE)
+                        if (isForeground) {
+                            stopForeground(STOP_FOREGROUND_REMOVE)
+                            isForeground = false
+                        } else {
+                            notificationManager.cancel(NOTIFICATION_ID)
+                        }
                     }
                 }
             }

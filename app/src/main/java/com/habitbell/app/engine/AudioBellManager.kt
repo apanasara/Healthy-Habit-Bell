@@ -49,6 +49,12 @@ class AudioBellManager(private val context: Context) {
     private var bellVolume = 0.9f
     private val scope = CoroutineScope(Dispatchers.Default)
 
+    /** Active AudioFocusRequest handle to enable deterministic focus release after chime playback. */
+    private var activeFocusRequest: AudioFocusRequest? = null
+
+    /** Thread-safe registry of active synthesized AudioTracks to guarantee clean resource reclamation. */
+    private val activeAudioTracks = java.util.Collections.synchronizedList(mutableListOf<AudioTrack>())
+
     /** Resource identifier handle for individual countdown strikes (Option C Tingsha cymbals). */
     private var strike3SoundId = 0
     private var strike2SoundId = 0
@@ -109,7 +115,7 @@ class AudioBellManager(private val context: Context) {
      * Strike 1 (2048 Hz) -> Strike 2 (1536 Hz) -> Strike 3 (1024 Hz, 7.5s sustained ringout).
      */
     fun playIntervalBell() {
-        requestTransientAudioFocus()
+        requestTransientAudioFocus(durationMs = 8000L)
         when (bellStyle) {
             BellSoundStyle.ZEN_TINGSHA -> {
                 if (isLoaded && optionCIntervalSoundId != 0) {
@@ -160,7 +166,7 @@ class AudioBellManager(private val context: Context) {
      *   - 1: Strike 3 (1024 Hz deep resonance finish, 100% volume)
      */
     fun playCountdownStrike(secondsRemaining: Int) {
-        requestTransientAudioFocus()
+        requestTransientAudioFocus(durationMs = 4500L)
         when (secondsRemaining) {
             3 -> {
                 if (isLoaded && strike3SoundId != 0) {
@@ -199,7 +205,7 @@ class AudioBellManager(private val context: Context) {
      * to honor the conclusion of the wellness session.
      */
     fun playCompletionBell() {
-        requestTransientAudioFocus()
+        requestTransientAudioFocus(durationMs = 9000L)
         if (isLoaded && templeGongSoundId != 0) {
             soundPool?.play(templeGongSoundId, bellVolume, bellVolume, 1, 0, 1.0f)
         } else {
@@ -229,8 +235,12 @@ class AudioBellManager(private val context: Context) {
     /**
      * Requests temporary ducking audio focus on the primary media channel so background music
      * decreases in volume while the bell resonates over vehicle or device media speakers.
+     * Automatically schedules abandonment of focus once the chime ringout completes to eliminate leaks.
+     *
+     * @param durationMs Length of time in milliseconds to retain ducking audio focus.
      */
-    private fun requestTransientAudioFocus() {
+    private fun requestTransientAudioFocus(durationMs: Long = 5000L) {
+        abandonTransientAudioFocus()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val focusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
                 .setAudioAttributes(
@@ -239,9 +249,15 @@ class AudioBellManager(private val context: Context) {
                         .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
                         .build()
                 )
-                .setOnAudioFocusChangeListener { /* Background media automatically restores volume */ }
+                .setOnAudioFocusChangeListener { /* Background media automatically ducked/restored */ }
                 .build()
+            activeFocusRequest = focusRequest
             audioManager.requestAudioFocus(focusRequest)
+
+            scope.launch {
+                kotlinx.coroutines.delay(durationMs)
+                abandonTransientAudioFocus()
+            }
         } else {
             @Suppress("DEPRECATION")
             audioManager.requestAudioFocus(
@@ -249,6 +265,28 @@ class AudioBellManager(private val context: Context) {
                 AudioManager.STREAM_MUSIC,
                 AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK
             )
+            scope.launch {
+                kotlinx.coroutines.delay(durationMs)
+                @Suppress("DEPRECATION")
+                try { audioManager.abandonAudioFocus(null) } catch (_: Exception) {}
+            }
+        }
+    }
+
+    /**
+     * Abandons the active audio focus request, restoring full media volume and preventing stack bloat.
+     */
+    private fun abandonTransientAudioFocus() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            activeFocusRequest?.let {
+                try { audioManager.abandonAudioFocusRequest(it) } catch (_: Exception) {}
+            }
+            activeFocusRequest = null
+        } else {
+            try {
+                @Suppress("DEPRECATION")
+                audioManager.abandonAudioFocus(null)
+            } catch (_: Exception) {}
         }
     }
 
@@ -323,17 +361,39 @@ class AudioBellManager(private val context: Context) {
                 .setTransferMode(AudioTrack.MODE_STATIC)
                 .build()
 
+            activeAudioTracks.add(audioTrack)
             audioTrack.write(buffer, 0, buffer.size)
             audioTrack.play()
+
+            // Deterministic reclamation: release native AudioTrack memory once playback concludes
+            val totalPlayDurationMs = (durationSeconds * 1000).toLong() + 500L
+            scope.launch {
+                kotlinx.coroutines.delay(totalPlayDurationMs)
+                try {
+                    audioTrack.stop()
+                    audioTrack.release()
+                    activeAudioTracks.remove(audioTrack)
+                } catch (_: Exception) {}
+            }
         } catch (_: Exception) {
             // Silence any audio buffer allocation errors under memory pressure
         }
     }
 
     /**
-     * Releases hardware [SoundPool] instances and frees audio decoder memory.
+     * Releases hardware [SoundPool] instances, frees active AudioTracks, and clears focus locks.
      */
     fun release() {
+        abandonTransientAudioFocus()
+        synchronized(activeAudioTracks) {
+            for (track in activeAudioTracks) {
+                try {
+                    track.stop()
+                    track.release()
+                } catch (_: Exception) {}
+            }
+            activeAudioTracks.clear()
+        }
         soundPool?.release()
         soundPool = null
     }
