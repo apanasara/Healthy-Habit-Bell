@@ -51,6 +51,9 @@ class LocalCastWebServer(private val context: Context, private val port: Int = 8
     var isRunning: Boolean = false
         private set
 
+    /** Bounded thread pool executor for processing client HTTP requests without thread thrashing. */
+    private var clientExecutor: java.util.concurrent.ExecutorService? = null
+
     /**
      * Starts the local HTTP server daemon and advertises the NSD Bonjour service.
      * Binds to `0.0.0.0` (all IPv4 network interfaces).
@@ -59,6 +62,7 @@ class LocalCastWebServer(private val context: Context, private val port: Int = 8
         if (isRunning) return
         try {
             acquireLocks()
+            clientExecutor = java.util.concurrent.Executors.newFixedThreadPool(4)
 
             System.setProperty("java.net.preferIPv4Stack", "true")
             val ipv4Any = InetAddress.getByAddress(byteArrayOf(0, 0, 0, 0))
@@ -89,17 +93,17 @@ class LocalCastWebServer(private val context: Context, private val port: Int = 8
     }
 
     /**
-     * Handles an incoming HTTP request on a dedicated background thread,
+     * Handles an incoming HTTP request on a bounded executor worker thread,
      * returning the bundled `tv/index.html` dashboard asset with CORS headers.
      *
      * @param socket Client socket connection.
      */
     private fun handleClientAsync(socket: Socket) {
-        thread(isDaemon = true, name = "HabitBell-TVClient") {
+        clientExecutor?.submit {
             try {
                 socket.soTimeout = 8000 // 8s read timeout to prevent stale client hangs
                 val reader = BufferedReader(InputStreamReader(socket.getInputStream()))
-                val requestLine = reader.readLine() ?: return@thread
+                val requestLine = reader.readLine() ?: return@submit
                 val parts = requestLine.split(" ")
                 val path = if (parts.size > 1) parts[1] else "/"
 
@@ -117,10 +121,7 @@ class LocalCastWebServer(private val context: Context, private val port: Int = 8
                     out.write(bytes)
                     out.flush()
                     socket.close()
-                    return@thread
-                }
-
-                if (path.startsWith("/api/action/")) {
+                } else if (path.startsWith("/api/action/")) {
                     when {
                         path.contains("toggle") -> sessionHandler.togglePlayPause()
                         path.contains("play") -> sessionHandler.resume()
@@ -134,31 +135,30 @@ class LocalCastWebServer(private val context: Context, private val port: Int = 8
                     out.write(bytes)
                     out.flush()
                     socket.close()
-                    return@thread
+                } else {
+                    // Read bundled TV dashboard HTML asset
+                    val html = try {
+                        context.assets.open("tv/index.html").bufferedReader().use { it.readText() }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Could not open tv/index.html asset", e)
+                        "<!DOCTYPE html><html><head><title>Habit Bell TV</title></head><body style='background:#000;color:#fff;text-align:center;padding:50px;font-family:sans-serif;'><h1>Habit Bell TV Dashboard</h1><p>Ready for mindfulness sessions.</p></body></html>"
+                    }
+
+                    val bodyBytes = html.toByteArray(Charsets.UTF_8)
+                    val response = StringBuilder()
+                        .append("HTTP/1.1 200 OK\r\n")
+                        .append("Content-Type: text/html; charset=UTF-8\r\n")
+                        .append("Content-Length: ${bodyBytes.size}\r\n")
+                        .append("Access-Control-Allow-Origin: *\r\n")
+                        .append("Connection: close\r\n\r\n")
+                        .toString()
+
+                    out.write(response.toByteArray(Charsets.UTF_8))
+                    out.write(bodyBytes)
+                    out.flush()
+                    socket.close()
+                    Log.i(TAG, "Successfully served TV Webcast dashboard (${bodyBytes.size} bytes)")
                 }
-
-                // Read bundled TV dashboard HTML asset
-                val html = try {
-                    context.assets.open("tv/index.html").bufferedReader().use { it.readText() }
-                } catch (e: Exception) {
-                    Log.e(TAG, "Could not open tv/index.html asset", e)
-                    "<!DOCTYPE html><html><head><title>Habit Bell TV</title></head><body style='background:#000;color:#fff;text-align:center;padding:50px;font-family:sans-serif;'><h1>Habit Bell TV Dashboard</h1><p>Ready for mindfulness sessions.</p></body></html>"
-                }
-
-                val bodyBytes = html.toByteArray(Charsets.UTF_8)
-                val response = StringBuilder()
-                    .append("HTTP/1.1 200 OK\r\n")
-                    .append("Content-Type: text/html; charset=UTF-8\r\n")
-                    .append("Content-Length: ${bodyBytes.size}\r\n")
-                    .append("Access-Control-Allow-Origin: *\r\n")
-                    .append("Connection: close\r\n\r\n")
-                    .toString()
-
-                out.write(response.toByteArray(Charsets.UTF_8))
-                out.write(bodyBytes)
-                out.flush()
-                socket.close()
-                Log.i(TAG, "Successfully served TV Webcast dashboard (${bodyBytes.size} bytes)")
             } catch (e: Exception) {
                 Log.w(TAG, "Error handling client socket: ${e.message}")
                 try { socket.close() } catch (_: Exception) {}
@@ -173,7 +173,7 @@ class LocalCastWebServer(private val context: Context, private val port: Int = 8
         try {
             val wifi = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
             multicastLock = wifi?.createMulticastLock("HabitBellTVMulticast")?.apply {
-                setReferenceCounted(true)
+                setReferenceCounted(false)
                 acquire()
             }
         } catch (_: Exception) {}
@@ -215,6 +215,8 @@ class LocalCastWebServer(private val context: Context, private val port: Int = 8
         try { serverSocket?.close() } catch (_: Exception) {}
         try { registrationListener?.let { nsdManager?.unregisterService(it) } } catch (_: Exception) {}
         try { if (multicastLock?.isHeld == true) multicastLock?.release() } catch (_: Exception) {}
+        try { clientExecutor?.shutdownNow() } catch (_: Exception) {}
+        clientExecutor = null
         serverSocket = null
         serverThread = null
         multicastLock = null

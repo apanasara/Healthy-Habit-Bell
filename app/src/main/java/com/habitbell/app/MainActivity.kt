@@ -61,6 +61,8 @@ class MainActivity : ComponentActivity() {
             val reminders by viewModel.reminders.collectAsStateWithLifecycle()
             val isPocketBlanking by viewModel.isPocketBlankingActive.collectAsStateWithLifecycle()
             val isDisplayDimmed by viewModel.isDisplayDimmed.collectAsStateWithLifecycle()
+            val isCasting by viewModel.castManager.isCasting.collectAsStateWithLifecycle()
+            val castDeviceName by viewModel.castManager.castDeviceName.collectAsStateWithLifecycle()
 
             // System file picker contract for selecting local audio files for ambient soundscapes
             val audioPickerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
@@ -115,16 +117,18 @@ class MainActivity : ComponentActivity() {
 
             HabitBellTheme(themeMode = uiState.selectedTheme) {
                 Box(modifier = Modifier.fillMaxSize()) {
-                    // Background YouTube player attached to Window hierarchy with full viewport dimensions for uninterrupted audio
-                    AndroidView(
-                        factory = { ctx ->
-                            viewModel.bgMusicManager.getOrCreateWebView(ctx).apply {
-                                isFocusable = false
-                                isClickable = false
-                            }
-                        },
-                        modifier = Modifier.fillMaxSize()
-                    )
+                    // Background YouTube player attached to Window hierarchy only when YouTube streaming is actively selected
+                    if (uiState.isBgMusicEnabled && uiState.bgMusicType == com.habitbell.app.engine.BackgroundSoundType.YOUTUBE_LINK) {
+                        AndroidView(
+                            factory = { ctx ->
+                                viewModel.bgMusicManager.getOrCreateWebView(ctx).apply {
+                                    isFocusable = false
+                                    isClickable = false
+                                }
+                            },
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
 
                     // Navigation routing based on active AppScreen
                     when (uiState.currentScreen) {
@@ -137,11 +141,19 @@ class MainActivity : ComponentActivity() {
                                 currentTheme = uiState.selectedTheme,
                                 isZenMode = uiState.isZenMode,
                                 onSelectProfile = { profile ->
-                                    viewModel.startProfileSession(profile)
+                                    if (isTelevisionDevice()) {
+                                        viewModel.startProfileSession(profile, openTVMode = true)
+                                    } else {
+                                        viewModel.startProfileSession(profile)
+                                    }
                                 },
                                 onConfigureProfile = { profile ->
-                                    viewModel.startProfileSession(profile)
-                                    viewModel.openSettingsDrawer(true)
+                                    if (isTelevisionDevice()) {
+                                        viewModel.startProfileSession(profile, openTVMode = true)
+                                    } else {
+                                        viewModel.startProfileSession(profile)
+                                        viewModel.openSettingsDrawer(true)
+                                    }
                                 },
                                 onToggleFavorite = { id ->
                                     viewModel.toggleFavorite(id)
@@ -190,6 +202,7 @@ class MainActivity : ComponentActivity() {
                             TVDashboardScreen(
                                 sessionState = sessionState,
                                 onTogglePlayPause = { viewModel.togglePlayPause() },
+                                onReset = { viewModel.resetSession() },
                                 onExitTVMode = { viewModel.exitSessionToHome() }
                             )
                         }
@@ -378,6 +391,21 @@ class MainActivity : ComponentActivity() {
         super.onStop()
         viewModel.batteryOptimizer.setScreenBrightness(this, false)
         setStatusBarHidden(false)
+    }
+
+    /**
+     * Determines whether the host execution environment is an Android TV, Google TV, or set-top box.
+     *
+     * Queries the system [UiModeManager.getCurrentModeType] configuration and inspects the
+     * [PackageManager.FEATURE_LEANBACK] hardware profile.
+     *
+     * @return `true` if executing on television hardware; `false` for handheld phones, tablets, or cars.
+     */
+    private fun isTelevisionDevice(): Boolean {
+        val uiModeManager = getSystemService(android.content.Context.UI_MODE_SERVICE) as? android.app.UiModeManager
+        val isTvUi = uiModeManager?.currentModeType == android.content.res.Configuration.UI_MODE_TYPE_TELEVISION
+        val hasLeanback = packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_LEANBACK)
+        return isTvUi || hasLeanback
     }
 
     /**
