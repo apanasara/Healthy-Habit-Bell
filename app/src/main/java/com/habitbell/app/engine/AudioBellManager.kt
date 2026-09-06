@@ -62,9 +62,12 @@ class AudioBellManager(private val context: Context) {
     }
 
     private fun initSoundPool() {
+        // Configured with USAGE_MEDIA and CONTENT_TYPE_MUSIC to guarantee sound routing
+        // over automotive media channels (Android Auto / Bluetooth A2DP / car head units)
+        // rather than isolating chimes to handset physical speakers (Bug-1).
         val audioAttributes = AudioAttributes.Builder()
-            .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
-            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+            .setUsage(AudioAttributes.USAGE_MEDIA)
+            .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
             .build()
 
         soundPool = SoundPool.Builder()
@@ -224,15 +227,16 @@ class AudioBellManager(private val context: Context) {
     }
 
     /**
-     * Requests temporary ducking audio focus so background music decreases in volume while the bell resonates.
+     * Requests temporary ducking audio focus on the primary media channel so background music
+     * decreases in volume while the bell resonates over vehicle or device media speakers.
      */
     private fun requestTransientAudioFocus() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val focusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
                 .setAudioAttributes(
                     AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .setUsage(AudioAttributes.USAGE_MEDIA)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
                         .build()
                 )
                 .setOnAudioFocusChangeListener { /* Background media automatically restores volume */ }
@@ -300,12 +304,12 @@ class AudioBellManager(private val context: Context) {
                 buffer[i] = (saturated * 32767).toInt().coerceIn(-32768, 32767).toShort()
             }
 
-            // 5. Output via dedicated Static AudioTrack
+            // 5. Output via dedicated Static AudioTrack using USAGE_MEDIA for car speaker routing
             val audioTrack = AudioTrack.Builder()
                 .setAudioAttributes(
                     AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .setUsage(AudioAttributes.USAGE_MEDIA)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
                         .build()
                 )
                 .setAudioFormat(

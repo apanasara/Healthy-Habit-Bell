@@ -105,6 +105,38 @@ class LocalCastWebServer(private val context: Context, private val port: Int = 8
 
                 Log.i(TAG, "TV Request from ${socket.remoteSocketAddress}: $path")
 
+                val out: OutputStream = socket.getOutputStream()
+                val sessionHandler = com.habitbell.app.engine.CentralSessionHandler.getInstance(context)
+
+                if (path.startsWith("/api/state")) {
+                    val state = sessionHandler.sessionState.value
+                    val json = """{"status":"${state.status.name}","profileName":"${state.profile.name}","remainingSeconds":${state.remainingSeconds},"totalSeconds":${state.totalSeconds},"nextBellSeconds":${state.nextBellSeconds},"formattedTime":"${state.formattedRemainingTime}","formattedNextBell":"${state.formattedNextBellTime}","progressFraction":${state.progressFraction}}"""
+                    val bytes = json.toByteArray(Charsets.UTF_8)
+                    val response = "HTTP/1.1 200 OK\r\nContent-Type: application/json; charset=UTF-8\r\nContent-Length: ${bytes.size}\r\nAccess-Control-Allow-Origin: *\r\nConnection: close\r\n\r\n"
+                    out.write(response.toByteArray(Charsets.UTF_8))
+                    out.write(bytes)
+                    out.flush()
+                    socket.close()
+                    return@thread
+                }
+
+                if (path.startsWith("/api/action/")) {
+                    when {
+                        path.contains("toggle") -> sessionHandler.togglePlayPause()
+                        path.contains("play") -> sessionHandler.resume()
+                        path.contains("pause") -> sessionHandler.pause()
+                        path.contains("stop") -> sessionHandler.stop()
+                    }
+                    val json = """{"ok":true,"status":"${sessionHandler.sessionState.value.status.name}"}"""
+                    val bytes = json.toByteArray(Charsets.UTF_8)
+                    val response = "HTTP/1.1 200 OK\r\nContent-Type: application/json; charset=UTF-8\r\nContent-Length: ${bytes.size}\r\nAccess-Control-Allow-Origin: *\r\nConnection: close\r\n\r\n"
+                    out.write(response.toByteArray(Charsets.UTF_8))
+                    out.write(bytes)
+                    out.flush()
+                    socket.close()
+                    return@thread
+                }
+
                 // Read bundled TV dashboard HTML asset
                 val html = try {
                     context.assets.open("tv/index.html").bufferedReader().use { it.readText() }
@@ -114,7 +146,6 @@ class LocalCastWebServer(private val context: Context, private val port: Int = 8
                 }
 
                 val bodyBytes = html.toByteArray(Charsets.UTF_8)
-                val out: OutputStream = socket.getOutputStream()
                 val response = StringBuilder()
                     .append("HTTP/1.1 200 OK\r\n")
                     .append("Content-Type: text/html; charset=UTF-8\r\n")

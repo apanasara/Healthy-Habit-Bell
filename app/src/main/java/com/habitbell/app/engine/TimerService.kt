@@ -45,18 +45,14 @@ class TimerService : Service() {
         const val EXTRA_TIME = "EXTRA_TIME"
 
         /**
-         * Helper method to start or update the foreground service.
+         * Helper method to start or update the unified foreground media service.
          *
          * @param context Application or component context.
          * @param title Title of the active wellness profile (e.g. "Mindful Eating").
          * @param timeText Formatted remaining countdown string (e.g. "08:45").
          */
         fun startService(context: Context, title: String, timeText: String) {
-            val intent = Intent(context, TimerService::class.java).apply {
-                action = ACTION_START
-                putExtra(EXTRA_TITLE, title)
-                putExtra(EXTRA_TIME, timeText)
-            }
+            val intent = Intent(context, com.habitbell.app.auto.HabitBellMediaService::class.java)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 context.startForegroundService(intent)
             } else {
@@ -65,14 +61,12 @@ class TimerService : Service() {
         }
 
         /**
-         * Helper method to halt and tear down the foreground service.
+         * Helper method to halt and tear down the foreground media service.
          *
          * @param context Application or component context.
          */
         fun stopService(context: Context) {
-            val intent = Intent(context, TimerService::class.java).apply {
-                action = ACTION_STOP
-            }
+            val intent = Intent(context, com.habitbell.app.auto.HabitBellMediaService::class.java)
             context.stopService(intent)
         }
     }

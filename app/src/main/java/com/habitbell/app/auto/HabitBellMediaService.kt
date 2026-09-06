@@ -6,173 +6,179 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.support.v4.media.MediaBrowserCompat
 import android.support.v4.media.MediaDescriptionCompat
-import android.support.v4.media.MediaMetadataCompat
-import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
 import androidx.core.app.NotificationCompat
 import androidx.media.MediaBrowserServiceCompat
 import androidx.media.session.MediaButtonReceiver
 import com.habitbell.app.MainActivity
-import com.habitbell.app.engine.AudioBellManager
+import com.habitbell.app.R
+import com.habitbell.app.engine.CentralSessionHandler
+import com.habitbell.app.engine.SessionStatus
+import com.habitbell.app.engine.TimerSessionState
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 
 /**
- * MediaBrowserServiceCompat providing standard media playback integration for Android Auto,
- * Bluetooth audio metadata, Wear OS, and lock screen media controls.
+ * # HabitBellMediaService
+ *
+ * Primary [MediaBrowserServiceCompat] implementation exposing Habit Bell routines to Android Auto,
+ * Automotive OS, Bluetooth car head units, Wear OS, and system lockscreen media controls.
+ *
+ * ## Architectural Role & Single Session Handler Integration
+ * Binds directly to the authoritative [CentralSessionHandler] process singleton.
+ * Does NOT instantiate private MediaSessions or disconnected audio engines:
+ * - Emits [CentralSessionHandler.sessionToken] so the Car HUD, mobile app, and watch share a single source of truth.
+ * - Reflects real-time playback state transitions (PLAYING, PAUSED, STOPPED) from [CentralSessionHandler].
+ * - Forwards media button intents and browsable catalog choices to [CentralSessionHandler].
+ *
+ * ## Concurrency & Lifecycle
+ * - Service lifecycle managed by Android Media Framework and foreground playback demands.
+ * - Subscribes to [CentralSessionHandler.sessionState] on [Dispatchers.Main] via a scoped supervisor job.
  */
 class HabitBellMediaService : MediaBrowserServiceCompat() {
 
-    private val CHANNEL_ID = "habit_bell_auto_channel"
-    private val NOTIFICATION_ID = 2002
+    companion object {
+        /** Dedicated notification channel identifier for Android Auto media sessions. */
+        const val CHANNEL_ID = "habit_bell_auto_channel"
 
-    /** Dedicated media session managing playback state, audio buttons, and track metadata. */
-    private lateinit var mediaSession: MediaSessionCompat
+        /** Fixed ongoing notification ID for automotive media foreground execution. */
+        const val NOTIFICATION_ID = 2002
+    }
 
-    /** Audio engine for playing Tibetan chimes directly in the vehicle. */
-    private lateinit var audioManager: AudioBellManager
+    /** Authoritative process-level session handler. */
+    private lateinit var sessionHandler: CentralSessionHandler
 
-    private var currentMediaId = "eating"
-    private var isPlaying = false
+    /** Service-bound coroutine scope for observing state emissions. */
+    private val serviceScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+
+    /** Observer job tracking [CentralSessionHandler.sessionState] emissions. */
+    private var stateObserverJob: Job? = null
 
     override fun onCreate() {
         super.onCreate()
 
-        audioManager = AudioBellManager(this)
+        // Acquire process-level single session handler
+        sessionHandler = CentralSessionHandler.getInstance(this)
+
+        // Set session token ONCE on the service pointing to the single authoritative session
+        sessionToken = sessionHandler.sessionToken
+
         createNotificationChannel()
-
-        mediaSession = MediaSessionCompat(this, "HabitBellMediaSession").apply {
-            setFlags(MediaSessionCompat.FLAG_HANDLES_MEDIA_BUTTONS or MediaSessionCompat.FLAG_HANDLES_TRANSPORT_CONTROLS)
-            setCallback(object : MediaSessionCompat.Callback() {
-                override fun onPlay() {
-                    handlePlayAction(currentMediaId)
-                }
-
-                override fun onPlayFromMediaId(mediaId: String?, extras: Bundle?) {
-                    handlePlayAction(mediaId ?: "eating")
-                }
-
-                override fun onPause() {
-                    handlePauseAction()
-                }
-
-                override fun onStop() {
-                    handleStopAction()
-                }
-
-                override fun onSkipToNext() {
-                    val nextId = when (currentMediaId) {
-                        "eating" -> "posture"
-                        "posture" -> "breathing"
-                        else -> "eating"
-                    }
-                    handlePlayAction(nextId)
-                }
-
-                override fun onSkipToPrevious() {
-                    val prevId = when (currentMediaId) {
-                        "eating" -> "breathing"
-                        "breathing" -> "posture"
-                        else -> "eating"
-                    }
-                    handlePlayAction(prevId)
-                }
-            })
-            isActive = true
-        }
-
-        // Set session token ONCE on the service - DO NOT call this inside mediaSession.apply
-        sessionToken = mediaSession.sessionToken
-        updatePlaybackState(PlaybackStateCompat.STATE_PAUSED)
-        updateMetadata("eating")
-    }
-
-    private fun handlePlayAction(mediaId: String) {
-        currentMediaId = mediaId
-        isPlaying = true
-        updatePlaybackState(PlaybackStateCompat.STATE_PLAYING)
-        updateMetadata(mediaId)
-
-        // Play gentle chime through car speakers
-        audioManager.playIntervalBell()
-
-        // Launch session on phone app
-        try {
-            val launchIntent = Intent(this, MainActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
-                data = Uri.parse("habitbell://start?profile=$mediaId")
-            }
-            startActivity(launchIntent)
-        } catch (_: Exception) {}
-
-        startForeground(NOTIFICATION_ID, buildNotification())
-    }
-
-    private fun handlePauseAction() {
-        isPlaying = false
-        updatePlaybackState(PlaybackStateCompat.STATE_PAUSED)
-        try {
-            val pauseIntent = Intent(this, MainActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
-                data = Uri.parse("habitbell://action/pause")
-            }
-            startActivity(pauseIntent)
-        } catch (_: Exception) {}
-        stopForeground(STOP_FOREGROUND_DETACH)
-    }
-
-    private fun handleStopAction() {
-        isPlaying = false
-        updatePlaybackState(PlaybackStateCompat.STATE_STOPPED)
-        try {
-            val stopIntent = Intent(this, MainActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
-                data = Uri.parse("habitbell://action/stop")
-            }
-            startActivity(stopIntent)
-        } catch (_: Exception) {}
-        stopForeground(STOP_FOREGROUND_REMOVE)
-    }
-
-    private fun updateMetadata(mediaId: String) {
-        val (title, subtitle) = when (mediaId) {
-            "posture" -> "Posture Alignment" to "Spine check every 5 min"
-            "breathing" -> "Driving Calm Breath" to "Mindful breath every 4 min"
-            else -> "Mindful Eating" to "Tibetan chime every 1 min"
-        }
-
-        val metadata = MediaMetadataCompat.Builder()
-            .putString(MediaMetadataCompat.METADATA_KEY_MEDIA_ID, mediaId)
-            .putString(MediaMetadataCompat.METADATA_KEY_TITLE, title)
-            .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, "Habit Bell • Soothing Chimes")
-            .putString(MediaMetadataCompat.METADATA_KEY_ALBUM, subtitle)
-            .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, 2700000L)
-            .build()
-
-        mediaSession.setMetadata(metadata)
+        observeSessionState()
     }
 
     /**
-     * Broadcasts updated transport state (playing, paused, stopped) to automotive and system media receivers.
+     * Subscribes to [CentralSessionHandler.sessionState] to synchronize the ongoing
+     * automotive media notification with current playback status.
      */
-    private fun updatePlaybackState(state: Int) {
-        val playbackState = PlaybackStateCompat.Builder()
-            .setActions(
-                PlaybackStateCompat.ACTION_PLAY or
-                PlaybackStateCompat.ACTION_PAUSE or
-                PlaybackStateCompat.ACTION_STOP or
-                PlaybackStateCompat.ACTION_PLAY_PAUSE or
-                PlaybackStateCompat.ACTION_SKIP_TO_NEXT or
-                PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS
-            )
-            .setState(state, PlaybackStateCompat.PLAYBACK_POSITION_UNKNOWN, 1.0f)
-            .build()
-        mediaSession.setPlaybackState(playbackState)
+    private fun observeSessionState() {
+        stateObserverJob?.cancel()
+        stateObserverJob = serviceScope.launch {
+            sessionHandler.sessionState.collect { state ->
+                when (state.status) {
+                    SessionStatus.RUNNING -> {
+                        val notification = buildNotification(state)
+                        startForeground(NOTIFICATION_ID, notification)
+                    }
+                    SessionStatus.PAUSED -> {
+                        val notification = buildNotification(state)
+                        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                        manager.notify(NOTIFICATION_ID, notification)
+                        stopForeground(STOP_FOREGROUND_DETACH)
+                    }
+                    SessionStatus.COMPLETED, SessionStatus.IDLE -> {
+                        stopForeground(STOP_FOREGROUND_REMOVE)
+                    }
+                }
+            }
+        }
     }
 
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        MediaButtonReceiver.handleIntent(sessionHandler.mediaSession, intent)
+        return START_NOT_STICKY
+    }
+
+    /**
+     * Constructs a driver-optimized [NotificationCompat.MediaStyle] ongoing notification
+     * linked directly to the authoritative [CentralSessionHandler.sessionToken].
+     *
+     * @param state Active [TimerSessionState] snapshot.
+     * @return Formatted ongoing [Notification] instance.
+     */
+    private fun buildNotification(state: TimerSessionState): Notification {
+        val isPlaying = state.status == SessionStatus.RUNNING
+        val title = state.profile.name
+        val subtitle = "${state.formattedRemainingTime} • ${if (isPlaying) "Active" else "Paused"}"
+
+        val contentIntent = PendingIntent.getActivity(
+            this,
+            0,
+            Intent(this, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
+            },
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val playPauseAction = if (isPlaying) {
+            NotificationCompat.Action(
+                android.R.drawable.ic_media_pause,
+                "Pause",
+                MediaButtonReceiver.buildMediaButtonPendingIntent(
+                    this,
+                    PlaybackStateCompat.ACTION_PAUSE
+                )
+            )
+        } else {
+            NotificationCompat.Action(
+                android.R.drawable.ic_media_play,
+                "Play",
+                MediaButtonReceiver.buildMediaButtonPendingIntent(
+                    this,
+                    PlaybackStateCompat.ACTION_PLAY
+                )
+            )
+        }
+
+        val stopAction = NotificationCompat.Action(
+            android.R.drawable.ic_menu_close_clear_cancel,
+            "Stop",
+            MediaButtonReceiver.buildMediaButtonPendingIntent(
+                this,
+                PlaybackStateCompat.ACTION_STOP
+            )
+        )
+
+        return NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle("Habit Bell • $title")
+            .setContentText(subtitle)
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setContentIntent(contentIntent)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setOngoing(isPlaying)
+            .setOnlyAlertOnce(true)
+            .setStyle(
+                androidx.media.app.NotificationCompat.MediaStyle()
+                    .setMediaSession(sessionToken)
+                    .setShowActionsInCompactView(0, 1)
+            )
+            .addAction(playPauseAction)
+            .addAction(stopAction)
+            .build()
+    }
+
+    /**
+     * Configures the system notification channel with [NotificationManager.IMPORTANCE_LOW]
+     * to eliminate intrusive alert sounds or head-up popups while driving.
+     */
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
@@ -182,47 +188,21 @@ class HabitBellMediaService : MediaBrowserServiceCompat() {
             ).apply {
                 description = "Android Auto media controls and status"
                 setShowBadge(false)
+                setSound(null, null)
+                enableVibration(false)
             }
             val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             manager.createNotificationChannel(channel)
         }
     }
 
-    private fun buildNotification(): Notification {
-        val (title, subtitle) = when (currentMediaId) {
-            "posture" -> "Posture Alignment" to "Spine check chime active"
-            "breathing" -> "Driving Calm Breath" to "Calm breathing chime active"
-            else -> "Mindful Eating" to "Mindful intervals active"
-        }
-
-        val contentIntent = PendingIntent.getActivity(
-            this,
-            0,
-            Intent(this, MainActivity::class.java),
-            PendingIntent.FLAG_IMMUTABLE
-        )
-
-        return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle(title)
-            .setContentText(subtitle)
-            .setSmallIcon(android.R.drawable.ic_media_play)
-            .setContentIntent(contentIntent)
-            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setStyle(
-                androidx.media.app.NotificationCompat.MediaStyle()
-                    .setMediaSession(mediaSession.sessionToken)
-                    .setShowActionsInCompactView(0)
-            )
-            .addAction(
-                if (isPlaying) android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play,
-                if (isPlaying) "Pause" else "Play",
-                MediaButtonReceiver.buildMediaButtonPendingIntent(this, PlaybackStateCompat.ACTION_PLAY_PAUSE)
-            )
-            .build()
-    }
-
     /**
      * Returns the root node for media tree browsing by external car head units or media clients.
+     *
+     * @param clientPackageName Calling package identifier.
+     * @param clientUid Calling user identifier.
+     * @param rootHints Optional bundle parameters passed by the client.
+     * @return [BrowserRoot] handle for browsing.
      */
     override fun onGetRoot(
         clientPackageName: String,
@@ -233,7 +213,10 @@ class HabitBellMediaService : MediaBrowserServiceCompat() {
     }
 
     /**
-     * Loads the list of playable mindful audio routines for the car media browser.
+     * Loads the list of playable mindful audio routines for the vehicle media browser.
+     *
+     * @param parentId Browsable hierarchy parent identifier.
+     * @param result Result callback receiver.
      */
     override fun onLoadChildren(
         parentId: String,
@@ -270,7 +253,8 @@ class HabitBellMediaService : MediaBrowserServiceCompat() {
 
     override fun onDestroy() {
         super.onDestroy()
-        audioManager.release()
-        mediaSession.release()
+        stateObserverJob?.cancel()
+        serviceScope.cancel()
+        // Do NOT release sessionHandler.mediaSession here since it is owned by the process singleton
     }
 }
