@@ -20,6 +20,9 @@ package com.habitbell.app.data.model
  * @property isFavorite Whether the user has marked this profile as a favorite.
  * @property pranayamaConfig Breathwork step sequence parameters (required when type is [TimerType.MULTI_INTERVAL]).
  * @property compoundConfig Multi-pose sequence parameters (required when type is [TimerType.COMPOUND]).
+ * @property stepGoal Optional target step count required to complete session (e.g. 2000, 5000 steps).
+ * @property stepInterval Optional interval chime cadence triggered every N steps (e.g. every 250, 500 steps).
+ * @property stepTriggerMode Trigger evaluation rule governing completion ([StepTriggerMode.TIME_OR_STEPS], etc.).
  */
 data class TimerProfile(
     val id: String,
@@ -35,8 +38,19 @@ data class TimerProfile(
     val pocketMode: Boolean = false,
     val isFavorite: Boolean = false,
     val pranayamaConfig: PranayamaConfig? = null,
-    val compoundConfig: CompoundConfig? = null
+    val compoundConfig: CompoundConfig? = null,
+    val stepGoal: Int? = null,
+    val stepInterval: Int? = null,
+    val stepTriggerMode: StepTriggerMode = StepTriggerMode.TIME_OR_STEPS
 ) {
+    /** Whether this profile uses step tracking or step-based interval cues. */
+    val isStepTrackingEnabled: Boolean
+        get() = (stepGoal != null && stepGoal > 0) ||
+                (stepInterval != null && stepInterval > 0) ||
+                category.contains("Walk", ignoreCase = true) ||
+                category.contains("Movement", ignoreCase = true) ||
+                name.contains("Walk", ignoreCase = true)
+
     /** Whether this timer makes sense to cast to a stationary TV (false for walking/running/mobile activities). */
     val isCastSupported: Boolean
         get() {

@@ -89,6 +89,9 @@ class CentralSessionHandler(private val application: Application) {
     /** DIAL & SSDP discoverer enabling zero-click launch on Samsung Tizen & LG webOS smart TVs. */
     val dialTvDiscoverer: com.habitbell.app.cast.DialTvDiscoverer = com.habitbell.app.cast.DialTvDiscoverer.getInstance(application)
 
+    /** Health and step tracking orchestrator connecting Google Fit, Health Connect, Apple bridge & sensors. */
+    val healthStepManager: com.habitbell.app.health.HealthStepManager = com.habitbell.app.health.HealthStepManager(application)
+
     /** Core 1Hz heartbeat finite state machine governing timer countdowns. */
     val engine: TimerEngine = TimerEngine(audioManager, hapticManager)
 
@@ -117,6 +120,7 @@ class CentralSessionHandler(private val application: Application) {
         setupMediaSessionCallback()
         observeEngineState()
         setupCastListener()
+        setupHealthStepListener()
 
         // Initialize engine with default profile
         val initialProfile = repository.getProfileById("eating-mindful-20")
@@ -125,6 +129,19 @@ class CentralSessionHandler(private val application: Application) {
         engine.loadProfile(initialProfile)
         updateMetadata(initialProfile)
         updatePlaybackState(PlaybackStateCompat.STATE_PAUSED, 0L)
+    }
+
+    /**
+     * Ingests live step updates and pipes them to the active [TimerEngine] session.
+     */
+    private fun setupHealthStepListener() {
+        scope.launch {
+            healthStepManager.activeStepUpdate.collect { stepUpdate ->
+                if (engine.state.value.status == SessionStatus.RUNNING) {
+                    engine.onStepCountUpdated(stepUpdate.sessionSteps, stepUpdate.cadenceStepsPerMinute)
+                }
+            }
+        }
     }
 
     /**
@@ -207,6 +224,10 @@ class CentralSessionHandler(private val application: Application) {
                             bgMusicManager.start()
                             startMediaService()
 
+                            if (state.profile.isStepTrackingEnabled) {
+                                healthStepManager.startSession()
+                            }
+
                             if (castManager.isCasting.value) {
                                 castManager.loadSession(
                                     profileName = state.profile.name,
@@ -220,6 +241,10 @@ class CentralSessionHandler(private val application: Application) {
                             bgMusicManager.pause()
                             startMediaService()
 
+                            if (state.profile.isStepTrackingEnabled) {
+                                healthStepManager.pauseSession()
+                            }
+
                             if (castManager.isCasting.value) {
                                 castManager.pause()
                             }
@@ -230,6 +255,14 @@ class CentralSessionHandler(private val application: Application) {
                             bgMusicManager.stop()
                             repository.recordSessionCompleted(state.profile.id)
 
+                            if (state.profile.isStepTrackingEnabled) {
+                                val finalSteps = state.currentSteps
+                                scope.launch {
+                                    healthStepManager.recordCompletedWalkingSession(state.profile.name, finalSteps)
+                                }
+                                healthStepManager.stopSession()
+                            }
+
                             if (castManager.isCasting.value) {
                                 castManager.stop()
                             }
@@ -238,6 +271,7 @@ class CentralSessionHandler(private val application: Application) {
                             updatePlaybackState(PlaybackStateCompat.STATE_STOPPED, 0L)
                             batteryOptimizer.releaseWakeLock()
                             bgMusicManager.stop()
+                            healthStepManager.resetSession()
 
                             if (castManager.isCasting.value) {
                                 castManager.stop()
@@ -382,6 +416,12 @@ class CentralSessionHandler(private val application: Application) {
     fun updateMetadata(profile: TimerProfile) {
         val durationMs = profile.totalDurationSeconds * 1000L
         val subtitle = when {
+            profile.stepGoal != null && profile.stepInterval != null ->
+                "Goal: %,d steps • Bell every %,d steps".format(profile.stepGoal, profile.stepInterval)
+            profile.stepGoal != null ->
+                "Goal: %,d steps".format(profile.stepGoal)
+            profile.stepInterval != null ->
+                "Bell every %,d steps".format(profile.stepInterval)
             profile.intervalDurationSeconds > 0 -> "${profile.intervalDurationSeconds / 60}m interval chime"
             else -> "Continuous mindfulness"
         }
@@ -416,6 +456,7 @@ class CentralSessionHandler(private val application: Application) {
      */
     fun destroy() {
         engine.destroy()
+        healthStepManager.destroy()
         hapticManager.cancel()
         bgMusicManager.release()
         audioManager.release()

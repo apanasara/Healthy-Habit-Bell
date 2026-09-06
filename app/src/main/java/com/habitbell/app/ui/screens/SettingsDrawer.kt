@@ -98,8 +98,17 @@ fun SettingsDrawer(
     onPreviewBgMusic: (Boolean) -> Unit = {},
     isCasting: Boolean = false,
     castDeviceName: String? = null,
-    onDisconnectCast: () -> Unit = {}
+    onDisconnectCast: () -> Unit = {},
+    selectedHealthProvider: com.habitbell.app.health.HealthProviderType = com.habitbell.app.health.HealthProviderType.HARDWARE_SENSOR,
+    onHealthProviderSelected: (com.habitbell.app.health.HealthProviderType) -> Unit = {},
+    onTestStep: () -> Unit = {},
+    onUpdateSteps: (goal: Int?, interval: Int?, mode: com.habitbell.app.data.model.StepTriggerMode) -> Unit = { _, _, _ -> },
+    hasActivityPermission: Boolean = true,
+    onRequestActivityPermission: () -> Unit = {}
 ) {
+    var activeStepGoal by remember(profile) { mutableStateOf(profile.stepGoal) }
+    var activeStepInterval by remember(profile) { mutableStateOf(profile.stepInterval) }
+    var activeTriggerMode by remember(profile) { mutableStateOf(profile.stepTriggerMode) }
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
@@ -290,6 +299,192 @@ fun SettingsDrawer(
                             )
                         }
                     }
+                }
+            }
+
+            // 1b. Walking & Health Connectivity
+            item {
+                SettingsSectionHeader(title = "Walking & Health Connectivity")
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = "Health Step Provider",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    com.habitbell.app.health.HealthProviderType.values().forEach { provider ->
+                        val isSelected = selectedHealthProvider == provider
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onHealthProviderSelected(provider) }
+                        ) {
+                            Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = provider.displayName,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onBackground
+                                    )
+                                    if (isSelected) {
+                                        Text(
+                                            text = "Active",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onPrimary
+                                        )
+                                    }
+                                }
+                                Text(
+                                    text = provider.description,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontSize = 11.sp,
+                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.85f) else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Activity Permission status
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Sensor Permission", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onBackground)
+                        Text(
+                            text = if (hasActivityPermission) "Granted • Sub-second hardware tracking" else "Required for device pedometer",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (hasActivityPermission) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                        )
+                    }
+                    if (!hasActivityPermission) {
+                        Button(
+                            onClick = onRequestActivityPermission,
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                        ) {
+                            Text("Grant", style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Step Goal Selection
+                Text(
+                    text = "Session Step Goal (End Bell)",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    val goals = listOf(
+                        "None" to null,
+                        "1,000" to 1000,
+                        "2,000" to 2000,
+                        "3,000" to 3000,
+                        "5,000" to 5000
+                    )
+                    goals.forEach { (label, count) ->
+                        val isSelected = activeStepGoal == count
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable {
+                                    activeStepGoal = count
+                                    onUpdateSteps(count, activeStepInterval, activeTriggerMode)
+                                }
+                        ) {
+                            Text(
+                                text = label,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onBackground,
+                                modifier = Modifier
+                                    .padding(vertical = 8.dp)
+                                    .wrapContentWidth(Alignment.CenterHorizontally)
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Step Interval Bell Selection
+                Text(
+                    text = "Step Interval Bell (Chime Every N Steps)",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    val intervals = listOf(
+                        "None" to null,
+                        "250" to 250,
+                        "500" to 500,
+                        "1,000" to 1000
+                    )
+                    intervals.forEach { (label, count) ->
+                        val isSelected = activeStepInterval == count
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable {
+                                    activeStepInterval = count
+                                    onUpdateSteps(activeStepGoal, count, activeTriggerMode)
+                                }
+                        ) {
+                            Text(
+                                text = label,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onBackground,
+                                modifier = Modifier
+                                    .padding(vertical = 8.dp)
+                                    .wrapContentWidth(Alignment.CenterHorizontally)
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Test Chime Button
+                Button(
+                    onClick = onTestStep,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                ) {
+                    Icon(Icons.Outlined.DirectionsWalk, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Test Step Chime (+250 steps)", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold)
                 }
             }
 

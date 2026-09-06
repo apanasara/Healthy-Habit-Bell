@@ -96,7 +96,11 @@ dependencies {
     implementation("com.google.android.gms:play-services-cast-framework:22.0.0")
     implementation("androidx.mediarouter:mediarouter:1.7.0")
 
+    // Health Connect Client (Google Fit, Samsung Health, Wearable & Step Syncing)
+    implementation("androidx.health.connect:connect-client:1.1.0-alpha11")
+
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20240303")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")

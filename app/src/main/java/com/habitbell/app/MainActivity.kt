@@ -63,6 +63,15 @@ class MainActivity : ComponentActivity() {
             val isDisplayDimmed by viewModel.isDisplayDimmed.collectAsStateWithLifecycle()
             val isCasting by viewModel.castManager.isCasting.collectAsStateWithLifecycle()
             val castDeviceName by viewModel.castManager.castDeviceName.collectAsStateWithLifecycle()
+            val selectedHealthProvider by viewModel.selectedHealthProvider.collectAsStateWithLifecycle()
+            var hasActivityPermission by remember { mutableStateOf(viewModel.healthStepManager.hasActivityRecognitionPermission()) }
+
+            // Activity recognition permission request launcher for step counting
+            val activityRecognitionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+                contract = androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+            ) { isGranted ->
+                hasActivityPermission = isGranted
+            }
 
             // System file picker contract for selecting local audio files for ambient soundscapes
             val audioPickerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
@@ -258,7 +267,22 @@ class MainActivity : ComponentActivity() {
                             onPickCustomAudio = { audioPickerLauncher.launch("audio/*") },
                             onBgMusicYouTubeUrlChange = { viewModel.setBgMusicYouTubeUrl(it) },
                             onBgMusicVolumeChange = { viewModel.setBgMusicVolume(it) },
-                            onPreviewBgMusic = { viewModel.previewBgMusic(it) }
+                            onPreviewBgMusic = { viewModel.previewBgMusic(it) },
+                            isCasting = isCasting,
+                            castDeviceName = castDeviceName,
+                            onDisconnectCast = { viewModel.castManager.disconnect() },
+                            selectedHealthProvider = selectedHealthProvider,
+                            onHealthProviderSelected = { viewModel.selectHealthProvider(it) },
+                            onTestStep = { viewModel.injectTestSteps(250) },
+                            onUpdateSteps = { goal, interval, mode ->
+                                viewModel.updateActiveProfileSteps(goal, interval, mode)
+                            },
+                            hasActivityPermission = hasActivityPermission,
+                            onRequestActivityPermission = {
+                                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                                    activityRecognitionLauncher.launch(android.Manifest.permission.ACTIVITY_RECOGNITION)
+                                }
+                            }
                         )
                     }
 

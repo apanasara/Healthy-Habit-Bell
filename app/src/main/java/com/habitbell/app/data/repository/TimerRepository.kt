@@ -169,7 +169,10 @@ class TimerRepository(private val context: Context) {
         totalDuration: Int? = null,
         intervalDuration: Int? = null,
         displayMode: Boolean? = null,
-        pocketMode: Boolean? = null
+        pocketMode: Boolean? = null,
+        stepGoal: Int? = null,
+        stepInterval: Int? = null,
+        stepTriggerMode: com.habitbell.app.data.model.StepTriggerMode? = null
     ) {
         val editor = prefs.edit()
         if (totalDuration != null) {
@@ -186,6 +189,12 @@ class TimerRepository(private val context: Context) {
                 editor.putInt("profile_interval_eating-mindful-20", intervalDuration)
             }
         }
+        if (stepGoal != null) {
+            editor.putInt("profile_step_goal_$profileId", stepGoal)
+        }
+        if (stepInterval != null) {
+            editor.putInt("profile_step_interval_$profileId", stepInterval)
+        }
         editor.apply()
 
         _profiles.update { list ->
@@ -195,7 +204,10 @@ class TimerRepository(private val context: Context) {
                         totalDurationSeconds = totalDuration ?: profile.totalDurationSeconds,
                         intervalDurationSeconds = intervalDuration ?: profile.intervalDurationSeconds,
                         displayMode = displayMode ?: profile.displayMode,
-                        pocketMode = pocketMode ?: profile.pocketMode
+                        pocketMode = pocketMode ?: profile.pocketMode,
+                        stepGoal = stepGoal ?: profile.stepGoal,
+                        stepInterval = stepInterval ?: profile.stepInterval,
+                        stepTriggerMode = stepTriggerMode ?: profile.stepTriggerMode
                     )
                 } else {
                     profile
