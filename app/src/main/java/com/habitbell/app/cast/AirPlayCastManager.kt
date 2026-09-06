@@ -26,8 +26,11 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.net.InetAddress
 
@@ -82,6 +85,11 @@ class AirPlayCastManager(private val context: Context) {
 
     /** Public immutable stream of the currently connected Apple TV device. */
     val activeDevice: StateFlow<AirPlayDevice?> = _activeDevice.asStateFlow()
+
+    /** Public immutable stream indicating whether an AirPlay receiver is actively streaming. */
+    val isAirPlayActive: StateFlow<Boolean> = _activeDevice
+        .map { it != null }
+        .stateIn(scope, SharingStarted.Eagerly, false)
 
     /** Flag indicating whether active mDNS scanning is ongoing. */
     @Volatile

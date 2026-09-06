@@ -1,11 +1,16 @@
 package com.habitbell.app.ui.screens
 
 import android.content.res.Configuration
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
@@ -18,7 +23,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.res.painterResource
+import com.habitbell.app.R
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
@@ -45,7 +54,7 @@ import com.habitbell.app.ui.components.CompoundPoseCard
  * @param onReset Callback to reset countdown back to initial profile duration.
  * @param onOpenSettings Callback to open the settings configuration drawer.
  * @param onExit Callback to exit session and return to the Home dashboard.
- * @param onTriggerPocketMode Callback to engage manual Pocket Mode AMOLED screen blanking.
+ * @param onToggleTheme Callback to centrally cycle or toggle the application visual theme.
  * @param onOpenTVMode Callback to open leanback TV Dashboard mode.
  * @param onUserInteraction Callback triggered when the user interacts with the display to wake from dimming.
  * @param modifier Composable layout modifier.
@@ -57,7 +66,7 @@ fun SessionScreen(
     onReset: () -> Unit,
     onOpenSettings: () -> Unit,
     onExit: () -> Unit,
-    onTriggerPocketMode: () -> Unit,
+    onToggleTheme: () -> Unit,
     onOpenTVMode: () -> Unit,
     onUserInteraction: () -> Unit = {},
     modifier: Modifier = Modifier
@@ -93,7 +102,7 @@ fun SessionScreen(
                 onReset = onReset,
                 onOpenSettings = onOpenSettings,
                 onExit = onExit,
-                onTriggerPocketMode = onTriggerPocketMode,
+                onToggleTheme = onToggleTheme,
                 onOpenTVMode = onOpenTVMode
             )
         } else {
@@ -103,7 +112,7 @@ fun SessionScreen(
                 onReset = onReset,
                 onOpenSettings = onOpenSettings,
                 onExit = onExit,
-                onTriggerPocketMode = onTriggerPocketMode,
+                onToggleTheme = onToggleTheme,
                 onOpenTVMode = onOpenTVMode
             )
         }
@@ -119,7 +128,7 @@ fun SessionScreen(
  * @param onReset Reset timer callback.
  * @param onOpenSettings Open settings callback.
  * @param onExit Exit to home callback.
- * @param onTriggerPocketMode Manual pocket mode trigger callback.
+ * @param onToggleTheme Central theme switcher callback.
  * @param onOpenTVMode TV leanback mode trigger callback.
  */
 @Composable
@@ -129,7 +138,7 @@ private fun LandscapeSessionLayout(
     onReset: () -> Unit,
     onOpenSettings: () -> Unit,
     onExit: () -> Unit,
-    onTriggerPocketMode: () -> Unit,
+    onToggleTheme: () -> Unit,
     onOpenTVMode: () -> Unit
 ) {
     Row(
@@ -265,15 +274,17 @@ private fun LandscapeSessionLayout(
                     color = MaterialTheme.colorScheme.onBackground
                 )
 
+                val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (sessionState.profile.isCastSupported) {
                         CastButton(modifier = Modifier.size(36.dp))
                     }
-                    IconButton(onClick = onTriggerPocketMode, modifier = Modifier.size(36.dp)) {
+                    IconButton(onClick = onToggleTheme, modifier = Modifier.size(36.dp)) {
                         Icon(
-                            Icons.Outlined.PhoneAndroid,
-                            contentDescription = "Pocket Mode",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            painter = painterResource(id = if (isDark) R.drawable.ic_ph_sun else R.drawable.ic_ph_moon),
+                            contentDescription = if (isDark) "Switch to Light Mode" else "Switch to Dark Mode",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp)
                         )
                     }
                     IconButton(onClick = onOpenSettings, modifier = Modifier.size(36.dp)) {
@@ -377,7 +388,7 @@ private fun LandscapeSessionLayout(
  * @param onReset Reset timer callback.
  * @param onOpenSettings Open settings callback.
  * @param onExit Exit to home callback.
- * @param onTriggerPocketMode Manual pocket mode trigger callback.
+ * @param onToggleTheme Central theme switcher callback.
  * @param onOpenTVMode TV leanback mode trigger callback.
  */
 @Composable
@@ -387,61 +398,116 @@ private fun PortraitSessionLayout(
     onReset: () -> Unit,
     onOpenSettings: () -> Unit,
     onExit: () -> Unit,
-    onTriggerPocketMode: () -> Unit,
+    onToggleTheme: () -> Unit,
     onOpenTVMode: () -> Unit
 ) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 24.dp, vertical = 20.dp),
+            .statusBarsPadding()
+            .displayCutoutPadding()
+            .navigationBarsPadding()
+            .padding(horizontal = 24.dp, vertical = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceBetween
     ) {
-        // Top Bar: Exit, Activity Name, TV Mode, Pocket Mode
-        Row(
+        val isEating = sessionState.profile.category.contains("Eating", ignoreCase = true) ||
+            sessionState.profile.id.contains("eating", ignoreCase = true)
+
+        val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+        val buttonPillBg = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (isDark) 0.35f else 0.75f)
+        val buttonBorder = BorderStroke(
+            1.dp,
+            if (isDark) MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f)
+            else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.15f)
+        )
+
+        // Top Section: Clean Action Bar + Lowered Activity Title (100% immune to camera punch-hole)
+        Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(top = 12.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            IconButton(onClick = onExit) {
-                Icon(
-                    Icons.Default.ArrowBack,
-                    contentDescription = "Exit Session",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+            // Action Bar: Back button on left, Cast / Pocket / Settings on right
+            // The top center is kept completely open so the camera cutout never overlaps any interactive element
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(
+                    onClick = onExit,
+                    modifier = Modifier
+                        .size(42.dp)
+                        .background(buttonPillBg, CircleShape)
+                        .border(buttonBorder, CircleShape)
+                ) {
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_ph_back),
+                        contentDescription = "Exit Session",
+                        tint = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    if (sessionState.profile.isCastSupported) {
+                        Box(
+                            modifier = Modifier
+                                .size(42.dp)
+                                .background(buttonPillBg, CircleShape)
+                                .border(buttonBorder, CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CastButton(modifier = Modifier.size(24.dp))
+                        }
+                    }
+                    val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+                    IconButton(
+                        onClick = onToggleTheme,
+                        modifier = Modifier
+                            .size(42.dp)
+                            .background(buttonPillBg, CircleShape)
+                            .border(buttonBorder, CircleShape)
+                    ) {
+                        Icon(
+                            painter = painterResource(id = if (isDark) R.drawable.ic_ph_sun else R.drawable.ic_ph_moon),
+                            contentDescription = if (isDark) "Switch to Light Mode" else "Switch to Dark Mode",
+                            tint = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    IconButton(
+                        onClick = onOpenSettings,
+                        modifier = Modifier
+                            .size(42.dp)
+                            .background(buttonPillBg, CircleShape)
+                            .border(buttonBorder, CircleShape)
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_ph_tune),
+                            contentDescription = "Settings",
+                            tint = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
             }
 
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Lowered Title: Centered, serene, and completely below the physical camera cutout
             Text(
-                text = sessionState.profile.name,
+                text = if (isEating) "Mindful Eating" else sessionState.profile.name,
                 style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Light,
-                letterSpacing = 1.sp,
+                fontWeight = FontWeight.Normal,
+                letterSpacing = 0.8.sp,
                 color = MaterialTheme.colorScheme.onBackground
             )
-
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (sessionState.profile.isCastSupported) {
-                    CastButton(modifier = Modifier.size(36.dp))
-                }
-                IconButton(onClick = onTriggerPocketMode) {
-                    Icon(
-                        Icons.Outlined.PhoneAndroid,
-                        contentDescription = "Pocket Mode",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
-                IconButton(onClick = onOpenSettings) {
-                    Icon(
-                        Icons.Outlined.Settings,
-                        contentDescription = "Settings",
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-            }
         }
 
         // Center: Ultra Minimal Countdown & Visual Guide
@@ -451,7 +517,12 @@ private fun PortraitSessionLayout(
                 .fillMaxWidth(),
             contentAlignment = Alignment.Center
         ) {
-            when (sessionState.profile.type) {
+            if (isEating) {
+                MindfulEatingContent(
+                    sessionState = sessionState,
+                    onOpenSettings = onOpenSettings
+                )
+            } else when (sessionState.profile.type) {
                 TimerType.LINEAR -> {
                     val progress = if (sessionState.profile.stepTriggerMode == com.habitbell.app.data.model.StepTriggerMode.STEPS_ONLY) {
                         sessionState.stepProgressFraction ?: sessionState.progressFraction
@@ -589,14 +660,16 @@ private fun PortraitSessionLayout(
                                 size = 260.dp
                             )
                         }
-                        Spacer(modifier = Modifier.height(20.dp))
+
+                        Spacer(modifier = Modifier.height(28.dp))
+
                         Text(
                             text = "Round ${sessionState.currentRound} of ${sessionState.totalRounds}",
-                            style = MaterialTheme.typography.labelSmall,
-                            letterSpacing = 2.sp,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Medium,
                             color = MaterialTheme.colorScheme.primary
                         )
-                        Spacer(modifier = Modifier.height(6.dp))
+                        Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = "Total Remaining: ${sessionState.formattedRemainingTime}",
                             style = MaterialTheme.typography.bodySmall,
@@ -628,7 +701,7 @@ private fun PortraitSessionLayout(
             }
         }
 
-        // Bottom Controls (PRD: "Play / Pause, Reset, Settings. No clutter.")
+        // Bottom Controls (Play / Pause, Reset, Settings with Phosphor Line Icons)
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -640,56 +713,52 @@ private fun PortraitSessionLayout(
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Reset Button
+                // Reset Button (Phosphor Line Icon)
                 IconButton(
                     onClick = onReset,
                     modifier = Modifier
                         .size(54.dp)
-                        .background(
-                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-                            shape = CircleShape
-                        )
+                        .background(buttonPillBg, shape = CircleShape)
+                        .border(buttonBorder, shape = CircleShape)
                 ) {
                     Icon(
-                        Icons.Outlined.Refresh,
+                        painter = painterResource(id = R.drawable.ic_ph_reset),
                         contentDescription = "Reset",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(24.dp)
+                        tint = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(22.dp)
                     )
                 }
 
-                // Main Play/Pause Button
+                // Main Play/Pause Button (Phosphor Line Icon in primary container)
                 val isRunning = sessionState.status == SessionStatus.RUNNING
                 FilledIconButton(
                     onClick = onTogglePlayPause,
                     modifier = Modifier.size(76.dp),
                     colors = IconButtonDefaults.filledIconButtonColors(
                         containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary
+                        contentColor = if (isDark) MaterialTheme.colorScheme.onPrimary else Color.White
                     )
                 ) {
                     Icon(
-                        imageVector = if (isRunning) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        painter = painterResource(id = if (isRunning) R.drawable.ic_ph_pause else R.drawable.ic_ph_play),
                         contentDescription = if (isRunning) "Pause" else "Play",
-                        modifier = Modifier.size(36.dp)
+                        modifier = Modifier.size(34.dp)
                     )
                 }
 
-                // Settings Button
+                // Settings Button (Phosphor Line Icon)
                 IconButton(
                     onClick = onOpenSettings,
                     modifier = Modifier
                         .size(54.dp)
-                        .background(
-                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-                            shape = CircleShape
-                        )
+                        .background(buttonPillBg, shape = CircleShape)
+                        .border(buttonBorder, shape = CircleShape)
                 ) {
                     Icon(
-                        Icons.Outlined.Settings,
+                        painter = painterResource(id = R.drawable.ic_ph_tune),
                         contentDescription = "Settings",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(24.dp)
+                        tint = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(22.dp)
                     )
                 }
             }
@@ -698,7 +767,7 @@ private fun PortraitSessionLayout(
 
             Text(
                 text = when (sessionState.status) {
-                    SessionStatus.RUNNING -> "● Active Mindful Session"
+                    SessionStatus.RUNNING -> if (isEating) "● Mindful Chewing Rhythm" else "● Active Mindful Session"
                     SessionStatus.PAUSED -> "Paused"
                     SessionStatus.COMPLETED -> "Session Completed 🙏"
                     SessionStatus.IDLE -> "Ready"
@@ -707,6 +776,154 @@ private fun PortraitSessionLayout(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 letterSpacing = 1.sp
             )
+        }
+    }
+}
+
+/**
+ * Mindful Eating specific visualizer.
+ * Minimizes cognitive load through prominent Phosphor bowl & bell icons,
+ * warm candlelit radial aura, total meal ring, and an inner bite-cycle progress indicator.
+ *
+ * @param sessionState Reactive timer state snapshot ([TimerSessionState]).
+ * @param onOpenSettings Open settings callback.
+ */
+@Composable
+private fun MindfulEatingContent(
+    sessionState: TimerSessionState,
+    onOpenSettings: () -> Unit
+) {
+    val progress = sessionState.progressFraction
+    val isRunning = sessionState.status == SessionStatus.RUNNING
+
+    // Calculate normalized progress within the current bite interval (0.0f -> 1.0f)
+    val intervalDuration = sessionState.profile.intervalDurationSeconds
+    val biteProgress = if (intervalDuration > 0) {
+        (1f - (sessionState.nextBellSeconds.toFloat() / intervalDuration.toFloat())).coerceIn(0f, 1f)
+    } else 0f
+
+    val animatedBiteProgress by animateFloatAsState(
+        targetValue = biteProgress,
+        animationSpec = tween(durationMillis = 800),
+        label = "BiteProgress"
+    )
+
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val surfaceVariantColor = MaterialTheme.colorScheme.surfaceVariant
+
+    Box(
+        modifier = Modifier.fillMaxWidth(),
+        contentAlignment = Alignment.Center
+    ) {
+        // Ambient candlelit radial aura behind the bowl
+        Box(
+            modifier = Modifier
+                .size(320.dp)
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(
+                            primaryColor.copy(alpha = if (isRunning) 0.15f else 0.05f),
+                            Color.Transparent
+                        ),
+                        radius = 450f
+                    )
+                )
+        )
+
+        // Mealtime Circular Progress Ring
+        CircularProgressRing(
+            progress = progress,
+            size = 300.dp,
+            strokeWidth = 5.dp
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.clickable { onOpenSettings() }
+            ) {
+                // Phosphor Bowl Line Icon framed by the active Bite-Cycle progress ring
+                Box(
+                    modifier = Modifier.size(72.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    // Bite cycle progress ring (inner ring sweeping every bite interval)
+                    Canvas(modifier = Modifier.matchParentSize()) {
+                        val stroke = 3.dp.toPx()
+                        val radius = (size.minDimension - stroke) / 2f
+
+                        // Subtle track
+                        drawCircle(
+                            color = surfaceVariantColor.copy(alpha = 0.35f),
+                            radius = radius,
+                            style = Stroke(width = stroke)
+                        )
+
+                        // Active bite arc
+                        if (intervalDuration > 0) {
+                            drawArc(
+                                color = primaryColor,
+                                startAngle = -90f,
+                                sweepAngle = 360f * animatedBiteProgress,
+                                useCenter = false,
+                                style = Stroke(width = stroke, cap = StrokeCap.Round)
+                            )
+                        }
+                    }
+
+                    // Inner bowl icon
+                    Icon(
+                        painter = painterResource(id = R.drawable.ic_ph_bowl),
+                        contentDescription = "Mindful Eating",
+                        tint = primaryColor,
+                        modifier = Modifier.size(34.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Large, readable countdown numerals
+                Text(
+                    text = sessionState.formattedRemainingTime,
+                    fontSize = 62.sp,
+                    fontWeight = FontWeight.ExtraLight,
+                    letterSpacing = (-1.5).sp,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Bite Pacing Rhythm Capsule (driven through icons)
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = surfaceVariantColor.copy(alpha = 0.5f),
+                    border = BorderStroke(1.dp, primaryColor.copy(alpha = 0.3f))
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_ph_bell),
+                            contentDescription = "Bite Bell",
+                            tint = primaryColor,
+                            modifier = Modifier.size(15.dp)
+                        )
+                        Text(
+                            text = sessionState.formattedNextBellTime,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = primaryColor
+                        )
+                        Text(
+                            text = "• CHEW & SAVOR",
+                            fontSize = 10.sp,
+                            letterSpacing = 1.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
         }
     }
 }

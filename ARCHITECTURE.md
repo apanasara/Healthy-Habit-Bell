@@ -168,6 +168,18 @@ Habit Bell provides deep automotive integration complying with Android for Cars 
 ### 2.7. Presentation Layer & Immersive Display
 - **Jetpack Compose**: 100% declarative UI built with Material 3 design tokens.
 - **Distraction-Free Immersion**: When a timer session transitions to `RUNNING`, `MainActivity` uses `WindowInsetsControllerCompat` to hide the system status bar and navigation bar (`BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE`), preventing notification distractions during mindfulness sessions.
+- **Punch-Hole Cutout Safe Geometry (`SessionScreen.kt`)**:
+  - Modern smartphones feature centered or offset physical camera punch-holes. When immersive session mode engages (`setStatusBarHidden(true)`), standard system status bar insets collapse to zero.
+  - `SessionScreen` enforces `Modifier.displayCutoutPadding()` and implements a **decoupled header architecture**: the top action bar splits navigation (`Back`) to the far-left and controls (`Cast`, `Pocket Mode`, `Settings`) to the far-right, leaving the top-center column completely unobstructed.
+  - The session title (e.g. "Mindful Eating") is placed on a secondary centered row beneath the action bar with safe vertical breathing room (`Spacer(14.dp)`), guaranteeing 100% immunity from camera punch-holes across all hardware form factors.
+- **Dynamic Theme-Aware Google Cast Surface (`CastButton.kt`, `styles.xml`)**:
+  - `MediaRouteButton` relies on underlying Android View AppCompat styling. To ensure high-contrast visibility across varying background luminances, `styles.xml` defines two dedicated themes:
+    - `HabitBellMediaRouteTheme.Dark`: Based on `Theme.AppCompat.NoActionBar`, routing `colorControlNormal` to warm white (`#EDE8DE`).
+    - `HabitBellMediaRouteTheme.Light`: Based on `Theme.AppCompat.Light.NoActionBar`, routing `colorControlNormal` to dark charcoal (`#2E261F`).
+  - `CastButton` dynamically samples `MaterialTheme.colorScheme.background.luminance()` and recomposes within `key(isDark)` to switch themes instantly whenever the user toggles between Day (Sun) and Night (Moon) modes.
+- **Icon-Driven Minimal Presentation (Phosphor Line 1.5px)**:
+  - Replaces text-heavy UI with minimalist 1.5px line icons to eliminate cognitive reading stress.
+  - Mindful Eating sessions incorporate a concentric dual-ring layout: an outer total mealtime ring (45m) and an animated inner bite-pacing arc framing a Phosphor bowl glyph, paired with a subtle chew-and-savor pacing bell indicator.
 - **Key Visual Components**:
   - `BreathIndicator`: Canvas-drawn dynamic expanding/contracting circle visualizing the 4 phases of Pranayama.
   - `CircularProgressRing`: High-precision remaining-time stroke animation with smooth color interpolation.
@@ -235,7 +247,7 @@ The health subsystem elevates Habit Bell into an embodied, distraction-free walk
 
 ---
 
-### 2.7. Dual-Domain Settings Architecture & Acoustic Identity (`SettingsDrawer.kt`)
+### 2.10. Dual-Domain Settings Architecture & Acoustic Identity (`SettingsDrawer.kt`)
 
 To eliminate vertical clutter and decouple dynamic session parameters from persistent system hardware settings, the configuration drawer is structured into two strict architectural domains mediated by a top segmented `TabRow` (`SettingsDrawerTab`):
 
@@ -281,6 +293,45 @@ To eliminate vertical clutter and decouple dynamic session parameters from persi
 
 ---
 
+### 2.11. Unified Display Automation Subsystem (`DisplayAutomationManager.kt`, `DisplayAutomationOverlay.kt`)
+
+The Unified Display Automation Subsystem orchestrates intelligent screen power state management, peripheral awareness, and touch/lift interactions across 4 distinct contextual environments.
+
+#### 1. Core Architectural Role & Hardware Sensor Fusion
+Managed directly by `CentralSessionHandler`, `DisplayAutomationManager` coordinates low-power continuous hardware sensors:
+- **Optical Proximity Sensor (`Sensor.TYPE_PROXIMITY`)**: Detects physical obstruction within $< 5\text{ cm}$ of the front bezel receiver.
+- **Ambient Light Sensor (`Sensor.TYPE_LIGHT`)**: Measures surrounding illuminance in lux ($\text{lx}$). Pocket classification requires $< 10.0\text{ lux}$ to prevent false-positives under bright external illumination.
+- **3-Axis Gravity Sensor (`Sensor.TYPE_GRAVITY` / `TYPE_ACCELEROMETER`)**: Isolates Earth's gravitational acceleration vector ($9.81\text{ m/s}^2$).
+  - **Flat Surface Detection**: When resting flat face-up on a tabletop, $z \ge 8.8\text{ m/s}^2$, $|x| < 3.0\text{ m/s}^2$, and $|y| < 3.0\text{ m/s}^2$.
+  - **Lift & Tilt Detection**: When tilted toward the user, $z < 7.5\text{ m/s}^2$ and $|y| > 3.5\text{ m/s}^2$, or acceleration vector jerk delta $\Delta a = |\vec{a}_{t} - \vec{a}_{t-1}| > 1.2\text{ m/s}^2$.
+- **Significant Motion Hardware Trigger (`Sensor.TYPE_SIGNIFICANT_MOTION`)**: Low-power hardware interrupt that fires instantly upon physical pickup without CPU polling.
+
+#### 2. AMOLED Zero-Power Blackout Curtain (Option A Implementation)
+- **Power Optimization**: Rendered at the root window hierarchy in `MainActivity` via `DisplayAutomationOverlay`. On OLED/AMOLED panels, pure `#000000` pixels are completely de-energized ($0\text{ mW}$ emission penalty).
+- **Frictionless Zero-Latency Wake**: Unlike standard Android keyguard screen locks (`FLAG_DISMISS_KEYGUARD`, system power manager locks), the blackout curtain avoids lockscreen friction, pin codes, and biometric fingerprint hurdles. A single tap anywhere on the screen or physical phone lift instantly lifts the curtain.
+- **Haptic & Visual Badging**: Discreet contextual badges (Golden Lock, Car HUD, Smart TV, or Smart Watch icon) rendered with low-luminance accents to communicate active mode without disrupting nighttime dark adaptation.
+
+#### 3. Contextual Environmental Priority Hierarchy
+1. **Pocket Mode (Highest Priority)**:
+   - Evaluated via `evaluatePocketMode()`: activated either by manual user toggle (`isPocketModeManual == true`) or automatic optical sensor fusion (proximity obstructed $< 5\text{ cm}$ AND ambient lux $< 10\text{ lx}$).
+   - Automatically silences visual distractions and blocks accidental screen touches in pockets/bags while delivering tactile haptic chimes.
+2. **Car Mode (Automotive HUD)**:
+   - Engaged automatically when connected to Android Auto (`HabitBellCarSession`) or vehicle CarPlay.
+   - Mobile screen defaults to `#000000` blackout curtain while vehicle in-dash head unit displays timer templates and media scrubbers.
+   - Users can tap the screen or lift the device to access mobile settings and timer controls without interrupting car audio.
+3. **Smart TV Cast Mode (Chromecast, Apple TV / AirPlay 2, and WebCast)**:
+   - Automatically activates when streaming to living room televisions via Google Cast or Apple TV tvOS.
+   - Mobile screen blacks out to conserve handset battery while the big screen displays high-visibility session rings and progress sweeps.
+4. **Smart Watch Mode (Wear OS)**:
+   - Engaged during paired smartwatch sessions, allowing wrist transport controls while the phone display rests powered off.
+
+#### 4. Flat Inactivity Timeout (10-Second Grace Period)
+- When the phone is resting flat on a surface during external display sessions (Car, TV, Watch) and the user taps the screen to adjust settings, a background coroutine timer begins a **10-second countdown** (`_inactivityCountdown: 10..1`).
+- If no further touch interaction occurs for 10 seconds while the phone remains flat, the AMOLED blackout curtain smoothly re-engages.
+- Physically lifting or tilting the phone immediately cancels the countdown and keeps the display awake until placed down flat.
+
+---
+
 ## 3. Concurrency & Threading Architecture
 
 | Component | Scope / Execution Context | Dispatcher | Architectural Rationale |
@@ -295,6 +346,7 @@ To eliminate vertical clutter and decouple dynamic session parameters from persi
 | `HabitBellCastManager` | Main Thread / Google Play Services | `Dispatchers.Main` | Integrates with Cast Framework callbacks, UI updates, and async Cast session events. |
 | `AirPlayCastManager` | `CoroutineScope(SupervisorJob())` + NSD | `Dispatchers.IO` | Dispatches Apple TV mDNS discovery events and handles RTSP / HTTP streaming asynchronously. |
 | `DialTvDiscoverer` | `CoroutineScope(SupervisorJob())` | `Dispatchers.IO` | Manages SSDP UDP multicast socket probes and HTTP device descriptor XML parsing off the main thread. |
+| `DisplayAutomationManager` | `CoroutineScope(SupervisorJob())` + Sensor Thread | `Dispatchers.Default` | Processes multi-sensor fusion (proximity, lux, gravity, significant motion), orchestrates 10s flat countdowns, and emits atomic `DisplayCurtainState`. |
 | `BackgroundMusicManager` | Main Thread + Background Decode | `Dispatchers.Main` / Media | Coordinates headless WebView audio rendering, MediaPlayer playback, and audio focus ducking. |
 
 ---
@@ -306,6 +358,7 @@ To eliminate vertical clutter and decouple dynamic session parameters from persi
 3. **Proximity Sensor Monitoring**: Monitors device proximity in active sessions to automatically toggle Pocket Mode and the `#000000` AMOLED power curtain.
 4. **Automotive Audio Focus**: Requests transient audio focus ducking (`AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK`) with `USAGE_MEDIA` to ensure clean audio routing to car audio systems without disrupting navigation directions.
 5. **Pedometer & Activity Recognition Management**: Registers hardware step counter sensors with `SENSOR_DELAY_UI` only during active walking timer sessions; unregisters immediately upon pause, stop, or completion to prevent battery drain. Dynamically checks and requests `Manifest.permission.ACTIVITY_RECOGNITION` on Android 10+ (API 29+).
+6. **Multi-Sensor Display Automation**: Powers off OLED pixels using `#000000` blackout curtain across Pocket Mode, Android Auto Car HUD, Smart TV casting, and Wear OS companion states. Employs hardware `TYPE_SIGNIFICANT_MOTION` trigger and Z-axis gravity vector analysis for battery-efficient, zero-latency Lift-to-Wake and 10-second flat inactivity timeout.
 
 ---
 
