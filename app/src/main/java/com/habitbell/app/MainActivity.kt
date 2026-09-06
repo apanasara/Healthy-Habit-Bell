@@ -2,7 +2,7 @@ package com.habitbell.app
 
 import android.content.Intent
 import android.os.Bundle
-import androidx.activity.ComponentActivity
+import androidx.fragment.app.FragmentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
@@ -32,12 +32,14 @@ import com.habitbell.app.ui.viewmodel.HabitBellViewModel
  * Responsibilities:
  * 1. **Window Insets**: Enables edge-to-edge immersive rendering.
  * 2. **Compose Root**: Hosts screen navigation transitions between Home, Session, TV Dashboard, and Create Timer.
- * 3. **Hardware Display Coordination**: Dynamically binds `FLAG_KEEP_SCREEN_ON` via [HabitBellViewModel.batteryOptimizer].
- * 4. **Hardware Pocket Blanking**: Renders the pure black [PocketOverlay] when proximity sensors detect pocketing.
- * 5. **Voice & Assistant Intents**: Decodes Google Assistant voice commands (`ACTION_SET_TIMER`, deep links).
- * 6. **SAF Audio Picking**: Launches system file picker for custom ambient audio tracks and requests persistent URI permissions.
+ * 3. **Google Cast Framework Integration**: Extends [FragmentActivity] to supply [androidx.fragment.app.FragmentManager]
+ *    required by [androidx.mediarouter.app.MediaRouteButton] for native Cast device discovery dialogs.
+ * 4. **Hardware Display Coordination**: Dynamically binds `FLAG_KEEP_SCREEN_ON` via [HabitBellViewModel.batteryOptimizer].
+ * 5. **Hardware Pocket Blanking**: Renders the pure black [PocketOverlay] when proximity sensors detect pocketing.
+ * 6. **Voice & Assistant Intents**: Decodes Google Assistant voice commands (`ACTION_SET_TIMER`, deep links).
+ * 7. **SAF Audio Picking**: Launches system file picker for custom ambient audio tracks and requests persistent URI permissions.
  */
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
 
     /** Shared ViewModel instance scoped to this Activity. */
     private val viewModel: HabitBellViewModel by viewModels()
