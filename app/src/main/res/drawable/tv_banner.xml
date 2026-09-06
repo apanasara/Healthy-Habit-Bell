@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android TV 16:9 Leanback Launcher Banner (320dp x 180dp).
+  Displayed on Android TV / Google TV home screens and app trays.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="320dp"
+    android:height="180dp"
+    android:viewportWidth="320"
+    android:viewportHeight="180">
+
+    <!-- Deep Obsidian / Dark Slate Background -->
+    <path
+        android:fillColor="#0A0B0E"
+        android:pathData="M0,0h320v180h-320z" />
+
+    <!-- Subtle Radial Zen Energy Ring (Outer) -->
+    <path
+        android:strokeColor="#14E5A93C"
+        android:strokeWidth="1.5"
+        android:pathData="M 160,75 m -68,0 a 68,68 0 1,0 136,0 a 68,68 0 1,0 -136,0" />
+
+    <!-- Subtle Radial Zen Energy Ring (Inner) -->
+    <path
+        android:strokeColor="#2EE5A93C"
+        android:strokeWidth="1.5"
+        android:pathData="M 160,75 m -48,0 a 48,48 0 1,0 96,0 a 48,48 0 1,0 -96,0" />
+
+    <!-- Soundwave Resonance Accents (Left & Right) -->
+    <path
+        android:strokeColor="#4DE5A93C"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:pathData="M98,75 A25,25 0 0,0 98,60 M90,80 A35,35 0 0,0 90,55 M222,75 A25,25 0 0,1 222,60 M230,80 A35,35 0 0,1 230,55" />
+
+    <!-- Tibetan Golden Bell Icon (Centered at X=160, Y=75) -->
+    <group
+        android:pivotX="54"
+        android:pivotY="50"
+        android:scaleX="1.25"
+        android:scaleY="1.25"
+        android:translateX="106"
+        android:translateY="25">
+        <path
+            android:fillColor="#E5A93C"
+            android:pathData="M54,20c-11.05,0 -20,8.95 -20,20v22l-6,6v4h52v-4l-6,-6v-22c0,-11.05 -8.95,-20 -20,-20zM48,76c0,3.31 2.69,6 6,6s6,-2.69 6,-6h-12z" />
+    </group>
+
+    <!-- Sleek Golden Baseline Accent -->
+    <path
+        android:strokeColor="#66E5A93C"
+        android:strokeWidth="1.5"
+        android:strokeLineCap="round"
+        android:pathData="M110,140 L210,140" />
+
+    <!-- Mindful Center Dot -->
+    <path
+        android:fillColor="#E5A93C"
+        android:pathData="M160,140 m -3,0 a 3,3 0 1,0 6,0 a 3,3 0 1,0 -6,0" />
+
+    <!-- Corner Ambient Accents -->
+    <path
+        android:fillColor="#1AF5B041"
+        android:pathData="M150,152 h20 v2 h-20 z" />
+</vector>

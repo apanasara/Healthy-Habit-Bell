@@ -8,11 +8,16 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -28,6 +33,7 @@ import com.habitbell.app.engine.TimerSessionState
  *
  * @param sessionState Reactive timer state snapshot ([TimerSessionState]).
  * @param onTogglePlayPause Callback to alternate between running and paused timer execution.
+ * @param onReset Callback to reset timer countdown back to initial profile duration.
  * @param onExitTVMode Callback to exit leanback mode and return to standard mobile view.
  * @param modifier Composable layout modifier.
  */
@@ -35,9 +41,18 @@ import com.habitbell.app.engine.TimerSessionState
 fun TVDashboardScreen(
     sessionState: TimerSessionState,
     onTogglePlayPause: () -> Unit,
+    onReset: () -> Unit = {},
     onExitTVMode: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val playPauseFocusRequester = remember { FocusRequester() }
+
+    // Automatically focus the primary transport button on TV screens so remote D-pad click works immediately
+    LaunchedEffect(Unit) {
+        try {
+            playPauseFocusRequester.requestFocus()
+        } catch (_: Exception) {}
+    }
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -131,21 +146,44 @@ fun TVDashboardScreen(
 
             Spacer(modifier = Modifier.height(48.dp))
 
-            // Living Room TV Remote Control Play / Pause
+            // Living Room TV Remote Controls: Reset & Play/Pause
             val isRunning = sessionState.status == SessionStatus.RUNNING
-            FilledIconButton(
-                onClick = onTogglePlayPause,
-                modifier = Modifier.size(72.dp),
-                colors = IconButtonDefaults.filledIconButtonColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    contentColor = MaterialTheme.colorScheme.onPrimary
-                )
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(28.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = if (isRunning) Icons.Default.Pause else Icons.Default.PlayArrow,
-                    contentDescription = if (isRunning) "Pause" else "Play",
-                    modifier = Modifier.size(36.dp)
-                )
+                // Secondary TV Remote Action: Reset
+                IconButton(
+                    onClick = onReset,
+                    modifier = Modifier
+                        .size(56.dp)
+                        .background(Color(0xFF1E1E1E), CircleShape)
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Refresh,
+                        contentDescription = "Reset Timer",
+                        tint = Color.White,
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
+
+                // Primary TV Remote Action: Play / Pause (Auto-focused on TV launch)
+                FilledIconButton(
+                    onClick = onTogglePlayPause,
+                    modifier = Modifier
+                        .size(80.dp)
+                        .focusRequester(playPauseFocusRequester),
+                    colors = IconButtonDefaults.filledIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary
+                    )
+                ) {
+                    Icon(
+                        imageVector = if (isRunning) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        contentDescription = if (isRunning) "Pause" else "Play",
+                        modifier = Modifier.size(40.dp)
+                    )
+                }
             }
         }
     }
