@@ -330,6 +330,31 @@ Managed directly by `CentralSessionHandler`, `DisplayAutomationManager` coordina
 - If no further touch interaction occurs for 10 seconds while the phone remains flat, the AMOLED blackout curtain smoothly re-engages.
 - Physically lifting or tilting the phone immediately cancels the countdown and keeps the display awake until placed down flat.
 
+#### 5. Lift-to-Wake State Machine & Pocket Mode Dismissal
+- **Zero-Friction Physical Lift**: When the phone is lifted from a flat surface or taken out of a pocket/bag, `onDeviceMovedOrLifted()` is triggered via 3-axis gravity vector analysis ($z < 7.5\text{ m/s}^2, |y| > 3.5\text{ m/s}^2$) or acceleration jerk delta ($\Delta a > 1.2\text{ m/s}^2$).
+- **Multi-Mode Curtain Clearance**: In `DisplayAutomationManager.combine(_isPickedUp)`, all active curtain modes—including `DisplayCurtainMode.POCKET`, `TV_CAST`, `WATCH`, and `CAR_HUD`—are immediately deactivated (`isActive = false`), restoring full mobile visibility without requiring unlock or pin gestures.
+- **Manual Override Clearing**: Physical movement or lift automatically resets `_isManualPocket = false`, preventing persistent blackouts.
+- **Temporary Wake Grace Period**: User touch or lift sets `_isTemporarilyAwake = true`, ensuring that `evaluatePocketMode()` does not re-blank the display even if optical sensors remain transiently shaded.
+
+---
+
+### 2.6. Central Theme Architecture & Dialog Stability
+
+#### 1. Unified Central Theme Engine
+Habit Bell enforces a consistent, centralized visual theme hierarchy governed exclusively by `HabitBellViewModel.selectedTheme`:
+- **Single Source of Truth**: The user's active theme selection (`ThemeMode.AMOLED`, `ThemeMode.DARK`, `ThemeMode.EYE_COMFORT`, `ThemeMode.LIGHT`) governs the entire application container (`HabitBellTheme`).
+- **Profile Decoupling**: Individual wellness timer profiles (`TimerProfile`) define timing parameters, pacing bells, and sensor triggers, but do NOT override the user's central theme preference when starting a session.
+- **MaterialTheme Dynamic Binding**: All UI surfaces (`HomeScreen`, `SessionScreen`, `ModernHomeScreenSample`, `SettingsDrawer`) dynamically bind container, card, border, and typography colors to `MaterialTheme.colorScheme` tokens, guaranteeing flawless contrast across dark and light palettes.
+- **Symmetrical Sun ☀️ / Moon 🌙 Toggle**: Top action bars on both Home and Session screens feature a high-legibility theme action:
+  - Renders `ic_ph_sun` in dark modes to switch to Light (Day / Warm Parchment).
+  - Renders `ic_ph_moon` in Light mode to switch to Dark (AMOLED / Pure Black).
+
+#### 2. Google Cast MediaRoute Dialog Factory & Background Stability
+Native `MediaRouteButton` interactions in Jetpack Compose require strict background opacity to comply with AndroidX `MediaRouterThemeHelper` contrast calculations:
+- **Crash Prevention**: Inheriting translucent window backgrounds causes `androidx.core.graphics.ColorUtils.calculateContrast` to throw `IllegalArgumentException: background can not be translucent: #0`.
+- **HabitBellMediaRouteDialogFactory**: Wraps `MediaRouteChooserDialog` and `MediaRouteControllerDialog` instantiation within an explicit, non-translucent `ContextThemeWrapper` applying `R.style.HabitBellMediaRouteTheme_Dark` or `R.style.HabitBellMediaRouteTheme_Light`.
+- **Solid Window Backgrounds**: Base application theme (`Theme.HabitBell`) inherits from `Theme.AppCompat.DayNight.NoActionBar` with explicit, solid `android:colorBackground` and `colorBackgroundFloating`.
+
 ---
 
 ## 3. Concurrency & Threading Architecture
