@@ -531,14 +531,15 @@ class TimerEngine(
                 return
             }
 
-            // Milestone interval chime check! (chimes every 5 completed rounds)
-            if (completedFullCycle) {
+            // Milestone interval chime check! (chimes every N completed rounds if enabled)
+            if (completedFullCycle && config.isIntervalBellEnabled) {
                 val cadence = config.intervalBellRoundCadence.takeIf { it > 0 } ?: 5
                 if ((pranayamaRound - 1) % cadence == 0) {
                     if (isPocketModeActive()) {
                         hapticManager.triggerIntervalHaptic()
                     } else {
-                        audioManager.playIntervalBell()
+                        // Play dedicated gentle, non-startling 432 Hz meditative singing bowl
+                        audioManager.playPranayamaIntervalBell()
                         visualAlertRemainingTicks = 5
                     }
                 }

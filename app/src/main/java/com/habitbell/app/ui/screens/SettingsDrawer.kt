@@ -3,13 +3,16 @@ package com.habitbell.app.ui.screens
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.DirectionsWalk
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Brightness2
 import androidx.compose.material.icons.filled.Nightlight
 import androidx.compose.material.icons.filled.WbSunny
@@ -21,6 +24,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.habitbell.app.data.model.*
@@ -140,8 +145,9 @@ fun SettingsDrawer(
     onHealthProviderSelected: (HealthProviderType) -> Unit = {},
     onTestStep: () -> Unit = {},
     onUpdateSteps: (goal: Int?, interval: Int?, mode: StepTriggerMode) -> Unit = { _, _, _ -> },
-    onUpdatePranayama: (purak: Int, antar: Int, rechak: Int, bahya: Int, rounds: Int, voiceEnabled: Boolean, voiceStyle: VoiceCueStyle) -> Unit = { _, _, _, _, _, _, _ -> },
-    onTestVoiceCue: () -> Unit = {},
+    onUpdatePranayama: (purak: Int, antar: Int, rechak: Int, bahya: Int, rounds: Int, intervalBellEnabled: Boolean, intervalCadence: Int, voiceEnabled: Boolean, voiceStyle: VoiceCueStyle) -> Unit = { _, _, _, _, _, _, _, _, _ -> },
+    onTestVoiceCue: (VoiceCueStyle) -> Unit = {},
+    onTestPranayamaIntervalBell: () -> Unit = {},
     hasActivityPermission: Boolean = true,
     onRequestActivityPermission: () -> Unit = {},
     activeTab: SettingsDrawerTab = SettingsDrawerTab.TIMER,
@@ -258,6 +264,7 @@ fun SettingsDrawer(
                             onUpdateSteps = onUpdateSteps,
                             onUpdatePranayama = onUpdatePranayama,
                             onTestVoiceCue = onTestVoiceCue,
+                            onTestPranayamaIntervalBell = onTestPranayamaIntervalBell,
                             onTestOptionC = onTestOptionC,
                             onTestGong = onTestGong,
                             onStartQuickDemo = onStartQuickDemo,
@@ -322,8 +329,9 @@ private fun TimerSettingsContent(
     profile: TimerProfile,
     onUpdateTime: (totalSec: Int, intervalSec: Int) -> Unit,
     onUpdateSteps: (goal: Int?, interval: Int?, mode: StepTriggerMode) -> Unit,
-    onUpdatePranayama: (purak: Int, antar: Int, rechak: Int, bahya: Int, rounds: Int, voiceEnabled: Boolean, voiceStyle: VoiceCueStyle) -> Unit,
-    onTestVoiceCue: () -> Unit,
+    onUpdatePranayama: (purak: Int, antar: Int, rechak: Int, bahya: Int, rounds: Int, intervalBellEnabled: Boolean, intervalCadence: Int, voiceEnabled: Boolean, voiceStyle: VoiceCueStyle) -> Unit,
+    onTestVoiceCue: (VoiceCueStyle) -> Unit,
+    onTestPranayamaIntervalBell: () -> Unit,
     onTestOptionC: () -> Unit,
     onTestGong: () -> Unit,
     onStartQuickDemo: () -> Unit,
@@ -441,11 +449,24 @@ private fun TimerSettingsContent(
             }
         } else if (profile.type == TimerType.MULTI_INTERVAL || profile.pranayamaConfig != null) {
             // Dedicated Classical Pranayama Breathwork Configuration
-            PranayamaSettingsSection(
+            PranayamaSettingsSheet(
                 profile = profile,
                 onUpdatePranayama = onUpdatePranayama,
-                onTestVoiceCue = onTestVoiceCue
+                onTestVoiceCue = onTestVoiceCue,
+                onTestPranayamaIntervalBell = onTestPranayamaIntervalBell,
+                isBgMusicEnabled = isBgMusicEnabled,
+                bgMusicType = bgMusicType,
+                bgMusicCustomName = bgMusicCustomName,
+                bgMusicYouTubeUrl = bgMusicYouTubeUrl,
+                bgMusicVolume = bgMusicVolume,
+                onBgMusicToggle = onBgMusicToggle,
+                onBgMusicTypeSelected = onBgMusicTypeSelected,
+                onPickCustomAudio = onPickCustomAudio,
+                onBgMusicYouTubeUrlChange = onBgMusicYouTubeUrlChange,
+                onBgMusicVolumeChange = onBgMusicVolumeChange,
+                onPreviewBgMusic = onPreviewBgMusic
             )
+            return
         } else {
             // Standard Linear Countdown Timing
             var totalMinutes by remember(profile.id, profile.totalDurationSeconds) {
@@ -1341,31 +1362,137 @@ private fun SmallAdjustButton(text: String, onClick: () -> Unit) {
     }
 }
 
+
 /**
- * # PranayamaSettingsSection
+ * # PranayamaPhaseInputFieldRow
  *
- * Dedicated configuration controls for classical Hatha Yoga Pranayama breathwork.
+ * Interactive numerical input row for a single timed Pranayama breathwork phase portion.
+ * Combines direct text entry with fine -1s, +1s, +4s stepper buttons and unit labels.
  *
- * Grounded in *Hatha Yoga Pradipika* and *Gheranda Samhita*, this view provides:
- * 1. The four classical breath setting potions with default values:
- *    - Purak (Inhale) = 4 sec
- *    - Kumbhak (Hold In) = 16 sec
- *    - Rechak (Exhale) = 8 sec
- *    - Kumbhak (Hold Out) = 16 sec
- * 2. Instant +/- fine steppers and sliders allowing users to customize seconds.
- * 3. Quick 1-tap ratio presets (Hatha 4:16:8:16, Nadi 4:16:8:0, Box 4:4:4:4, Relax 4:7:8:2).
- * 4. Target practice rounds stepper and presets.
- * 5. Gentle lady voice guidance toggle, voice style (Sanskrit/English/Bilingual), and audition button.
- *
- * @param profile Active timer profile.
- * @param onUpdatePranayama Callback dispatching mutated breath parameters to repository and engine.
- * @param onTestVoiceCue Callback triggering audition of gentle lady voice.
+ * @param phaseTitle User-facing title (e.g., "1. Purak (Inhale)").
+ * @param sanskritSubtitle Sanskrit script and meditative meaning.
+ * @param seconds Current duration in seconds.
+ * @param minSeconds Minimum allowable duration.
+ * @param maxSeconds Maximum allowable duration.
+ * @param onSecondsChange Callback invoked when duration changes.
  */
 @Composable
-private fun PranayamaSettingsSection(
+private fun PranayamaPhaseInputFieldRow(
+    phaseTitle: String,
+    sanskritSubtitle: String,
+    seconds: Int,
+    minSeconds: Int,
+    maxSeconds: Int,
+    onSecondsChange: (Int) -> Unit
+) {
+    var textValue by remember(seconds) { mutableStateOf(seconds.toString()) }
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = phaseTitle,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = sanskritSubtitle,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            SmallAdjustButton(text = "-1") {
+                val next = (seconds - 1).coerceIn(minSeconds, maxSeconds)
+                textValue = next.toString()
+                onSecondsChange(next)
+            }
+
+            OutlinedTextField(
+                value = textValue,
+                onValueChange = { input ->
+                    val filtered = input.filter { it.isDigit() }.take(3)
+                    textValue = filtered
+                    val num = filtered.toIntOrNull()
+                    if (num != null) {
+                        onSecondsChange(num.coerceIn(minSeconds, maxSeconds))
+                    }
+                },
+                singleLine = true,
+                textStyle = MaterialTheme.typography.bodyMedium.copy(
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                ),
+                suffix = { Text("s", style = MaterialTheme.typography.labelSmall) },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.width(78.dp),
+                shape = RoundedCornerShape(8.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    unfocusedBorderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                )
+            )
+
+            SmallAdjustButton(text = "+1") {
+                val next = (seconds + 1).coerceIn(minSeconds, maxSeconds)
+                textValue = next.toString()
+                onSecondsChange(next)
+            }
+
+            SmallAdjustButton(text = "+4") {
+                val next = (seconds + 4).coerceIn(minSeconds, maxSeconds)
+                textValue = next.toString()
+                onSecondsChange(next)
+            }
+        }
+    }
+}
+
+/**
+ * # PranayamaSettingsSheet
+ *
+ * Dedicated, complete configuration sheet for classical Hatha Yoga Pranayama breathwork.
+ *
+ * Grounded in ancient Hatha Yoga literature (*Hatha Yoga Pradipika* & *Gheranda Samhita*),
+ * this view provides a clean, focused, deeply spiritual settings interface:
+ * 1. **Proportional Ratio Stages Dropdown**: Select ratios (Sama Vritti 1:1:1:1, Madhya 1:2:2:1, Visama Vritti 1:4:2:4, etc.)
+ *    populating base seconds into the four phase input fields.
+ * 2. **Four Phase Setting Portions (Input Fields)**: Dedicated numeric entry fields and steppers:
+ *    - 1. Purak (Inhale) = 4 sec default
+ *    - 2. Kumbhak (Hold In) = 16 sec default
+ *    - 3. Rechak (Exhale) = 8 sec default
+ *    - 4. Kumbhak (Hold Out) = 16 sec default
+ * 3. **Target Practice Rounds**: 12 rounds default (Classical Adhama standard, 8m 48s), with custom entry.
+ * 4. **Gentle Lady Voice Guidance**: Option A (Traditional Sanskrit) default, Option B (Bilingual) switch,
+ *    and live audition button with automatic background audio ducking.
+ * 5. **Milestone Interval Bell**: Default OFF to preserve meditative absorption; when enabled, chimes a soft 432 Hz warm Tibetan bowl.
+ * 6. **Session Completion Bell**: Deep resonant Temple Gong (130.8 Hz).
+ * 7. **Subtle Background Music**: Ambient sound toggle, Aum drone / YouTube / Custom file, and subtle volume slider.
+ */
+@Composable
+private fun PranayamaSettingsSheet(
     profile: TimerProfile,
-    onUpdatePranayama: (purak: Int, antar: Int, rechak: Int, bahya: Int, rounds: Int, voiceEnabled: Boolean, voiceStyle: VoiceCueStyle) -> Unit,
-    onTestVoiceCue: () -> Unit
+    onUpdatePranayama: (purak: Int, antar: Int, rechak: Int, bahya: Int, rounds: Int, intervalBellEnabled: Boolean, intervalCadence: Int, voiceEnabled: Boolean, voiceStyle: VoiceCueStyle) -> Unit,
+    onTestVoiceCue: (VoiceCueStyle) -> Unit,
+    onTestPranayamaIntervalBell: () -> Unit,
+    isBgMusicEnabled: Boolean,
+    bgMusicType: BackgroundSoundType,
+    bgMusicCustomName: String?,
+    bgMusicYouTubeUrl: String,
+    bgMusicVolume: Float,
+    onBgMusicToggle: (Boolean) -> Unit,
+    onBgMusicTypeSelected: (BackgroundSoundType) -> Unit,
+    onPickCustomAudio: () -> Unit,
+    onBgMusicYouTubeUrlChange: (String) -> Unit,
+    onBgMusicVolumeChange: (Float) -> Unit,
+    onPreviewBgMusic: (Boolean) -> Unit
 ) {
     val initialConfig = profile.pranayamaConfig ?: PranayamaConfig(
         steps = listOf(
@@ -1374,7 +1501,11 @@ private fun PranayamaSettingsSection(
             PranayamaStep(PranayamaPhase.EXHALE, 8),
             PranayamaStep(PranayamaPhase.HOLD_OUT, 16)
         ),
-        targetRounds = 20
+        targetRounds = 12,
+        isIntervalBellEnabled = false,
+        intervalBellRoundCadence = 5,
+        isVoiceGuidanceEnabled = true,
+        voiceCueStyle = VoiceCueStyle.SANSKRIT
     )
 
     var purak by remember(profile.id, initialConfig.purakSeconds) { mutableStateOf(initialConfig.purakSeconds) }
@@ -1382,6 +1513,8 @@ private fun PranayamaSettingsSection(
     var rechak by remember(profile.id, initialConfig.rechakSeconds) { mutableStateOf(initialConfig.rechakSeconds) }
     var bahya by remember(profile.id, initialConfig.bahyaKumbhakSeconds) { mutableStateOf(initialConfig.bahyaKumbhakSeconds) }
     var rounds by remember(profile.id, initialConfig.targetRounds) { mutableStateOf(initialConfig.targetRounds) }
+    var intervalBellEnabled by remember(profile.id, initialConfig.isIntervalBellEnabled) { mutableStateOf(initialConfig.isIntervalBellEnabled) }
+    var intervalCadence by remember(profile.id, initialConfig.intervalBellRoundCadence) { mutableStateOf(initialConfig.intervalBellRoundCadence) }
     var voiceEnabled by remember(profile.id, initialConfig.isVoiceGuidanceEnabled) { mutableStateOf(initialConfig.isVoiceGuidanceEnabled) }
     var voiceStyle by remember(profile.id, initialConfig.voiceCueStyle) { mutableStateOf(initialConfig.voiceCueStyle) }
 
@@ -1391,6 +1524,8 @@ private fun PranayamaSettingsSection(
         newRechak: Int = rechak,
         newBahya: Int = bahya,
         newRounds: Int = rounds,
+        newIntervalBellEnabled: Boolean = intervalBellEnabled,
+        newIntervalCadence: Int = intervalCadence,
         newVoiceEnabled: Boolean = voiceEnabled,
         newVoiceStyle: VoiceCueStyle = voiceStyle
     ) {
@@ -1399,254 +1534,300 @@ private fun PranayamaSettingsSection(
         rechak = newRechak
         bahya = newBahya
         rounds = newRounds
+        intervalBellEnabled = newIntervalBellEnabled
+        intervalCadence = newIntervalCadence
         voiceEnabled = newVoiceEnabled
         voiceStyle = newVoiceStyle
-        onUpdatePranayama(newPurak, newAntar, newRechak, newBahya, newRounds, newVoiceEnabled, newVoiceStyle)
+        onUpdatePranayama(newPurak, newAntar, newRechak, newBahya, newRounds, newIntervalBellEnabled, newIntervalCadence, newVoiceEnabled, newVoiceStyle)
     }
 
-    // -------------------------------------------------------------
-    // Card 1: Classical Hatha Yoga Ratio Presets
-    // -------------------------------------------------------------
-    Card(
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = "Classical Ratio Presets",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "Classical breath ratios from Hatha Yoga literature (*Hatha Yoga Pradipika*):",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(modifier = Modifier.height(10.dp))
+    var dropdownExpanded by remember { mutableStateOf(false) }
+    val currentRatioStage = remember(purak, antar, rechak, bahya) {
+        PranayamaRatioStage.matchRatio(purak, antar, rechak, bahya)
+    }
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                val presets = listOf(
-                    "Hatha (4:16:8:16)" to listOf(4, 16, 8, 16),
-                    "Nadi (4:16:8:0)" to listOf(4, 16, 8, 0),
-                    "Box (4:4:4:4)" to listOf(4, 4, 4, 4),
-                    "Relax (4:7:8:2)" to listOf(4, 7, 8, 2)
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        // -------------------------------------------------------------
+        // Card 1: Proportional Ratio Stages (Dropdown to Select Ratios)
+        // -------------------------------------------------------------
+        Card(
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = "Proportional Ratio Stages",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
                 )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Classical practitioner progression when Bahya Kumbhaka (external void) is included:",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(10.dp))
 
-                presets.forEach { (label, times) ->
-                    val isSelected = purak == times[0] && antar == times[1] && rechak == times[2] && bahya == times[3]
+                // Interactive Dropdown Trigger Box
+                Box(modifier = Modifier.fillMaxWidth()) {
                     Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+                        shape = RoundedCornerShape(10.dp),
+                        color = MaterialTheme.colorScheme.surface,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)),
                         modifier = Modifier
-                            .weight(1f)
-                            .clickable {
-                                dispatchUpdate(
-                                    newPurak = times[0],
-                                    newAntar = times[1],
-                                    newRechak = times[2],
-                                    newBahya = times[3]
+                            .fillMaxWidth()
+                            .clickable { dropdownExpanded = true }
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = currentRatioStage.title,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Text(
+                                    text = currentRatioStage.ratioText,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
+                            Icon(
+                                imageVector = Icons.Filled.ArrowDropDown,
+                                contentDescription = "Select Ratio Stage",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+
+                    DropdownMenu(
+                        expanded = dropdownExpanded,
+                        onDismissRequest = { dropdownExpanded = false },
+                        modifier = Modifier.fillMaxWidth(0.88f)
                     ) {
-                        Text(
-                            text = label,
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                            color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onBackground,
-                            modifier = Modifier.padding(vertical = 8.dp).wrapContentWidth(Alignment.CenterHorizontally)
-                        )
+                        PranayamaRatioStage.values().filter { it != PranayamaRatioStage.CUSTOM }.forEach { stage ->
+                            val isSelected = currentRatioStage == stage
+                            DropdownMenuItem(
+                                text = {
+                                    Column {
+                                        Text(
+                                            text = stage.title,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Text(
+                                            text = stage.ratioText,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                },
+                                onClick = {
+                                    dropdownExpanded = false
+                                    val base = purak.coerceAtLeast(1)
+                                    dispatchUpdate(
+                                        newPurak = base * stage.purakRatio,
+                                        newAntar = base * stage.antarRatio,
+                                        newRechak = base * stage.rechakRatio,
+                                        newBahya = base * stage.bahyaRatio
+                                    )
+                                }
+                            )
+                        }
                     }
                 }
-            }
-        }
-    }
 
-    // -------------------------------------------------------------
-    // Card 2: Four Phase Setting Potions (with default values & custom seconds)
-    // -------------------------------------------------------------
-    Card(
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Text(
-                text = "Four Phase Durations (Custom Seconds)",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold
-            )
+                Spacer(modifier = Modifier.height(10.dp))
 
-            // 1. Purak (Inhale) - default 4s
-            PranayamaPhaseSliderRow(
-                phaseTitle = "1. Purak (Inhale)",
-                sanskritSubtitle = "पूरक • Diaphragmatic filling",
-                seconds = purak,
-                minSeconds = 1,
-                maxSeconds = 60,
-                onSecondsChange = { dispatchUpdate(newPurak = it) }
-            )
-
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
-
-            // 2. Kumbhak (Hold In) - default 16s
-            PranayamaPhaseSliderRow(
-                phaseTitle = "2. Kumbhak (Hold In)",
-                sanskritSubtitle = "अभ्यन्तर कुम्भक • Internal prana retention",
-                seconds = antar,
-                minSeconds = 0,
-                maxSeconds = 60,
-                onSecondsChange = { dispatchUpdate(newAntar = it) }
-            )
-
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
-
-            // 3. Rechak (Exhale) - default 8s
-            PranayamaPhaseSliderRow(
-                phaseTitle = "3. Rechak (Exhale)",
-                sanskritSubtitle = "रेचक • Vagus nerve calming release",
-                seconds = rechak,
-                minSeconds = 1,
-                maxSeconds = 60,
-                onSecondsChange = { dispatchUpdate(newRechak = it) }
-            )
-
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
-
-            // 4. Kumbhak (Hold Out) - default 16s
-            PranayamaPhaseSliderRow(
-                phaseTitle = "4. Kumbhak (Hold Out)",
-                sanskritSubtitle = "बाह्य कुम्भक • Resting in Shunya void",
-                seconds = bahya,
-                minSeconds = 0,
-                maxSeconds = 60,
-                onSecondsChange = { dispatchUpdate(newBahya = it) }
-            )
-        }
-    }
-
-    // -------------------------------------------------------------
-    // Card 3: Target Practice Rounds
-    // -------------------------------------------------------------
-    Card(
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text("Target Practice Rounds", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    val cycleSec = purak + antar + rechak + bahya
-                    val totalSec = cycleSec * rounds
-                    val totalMin = totalSec / 60
-                    val totalRemSec = totalSec % 60
+                // Base Inhale Scaling Row
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
                     Text(
-                        text = "$rounds rounds (~${totalMin}m ${totalRemSec}s)",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
-
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    SmallAdjustButton(text = "-1") {
-                        dispatchUpdate(newRounds = (rounds - 1).coerceAtLeast(1))
-                    }
-                    SmallAdjustButton(text = "+1") {
-                        dispatchUpdate(newRounds = (rounds + 1).coerceAtMost(108))
-                    }
-                    SmallAdjustButton(text = "+5") {
-                        dispatchUpdate(newRounds = (rounds + 5).coerceAtMost(108))
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                listOf(5, 10, 15, 20, 30).forEach { rCount ->
-                    val isSelected = rounds == rCount
-                    Surface(
-                        shape = RoundedCornerShape(8.dp),
-                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
-                        modifier = Modifier
-                            .weight(1f)
-                            .clickable { dispatchUpdate(newRounds = rCount) }
-                    ) {
-                        Text(
-                            text = "$rCount",
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                            color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onBackground,
-                            modifier = Modifier.padding(vertical = 8.dp).wrapContentWidth(Alignment.CenterHorizontally)
-                        )
-                    }
-                }
-            }
-        }
-    }
-
-    // -------------------------------------------------------------
-    // Card 4: Gentle Lady Voice Guidance
-    // -------------------------------------------------------------
-    Card(
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("Gentle Lady Voice Guide", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Text(
-                        text = "Whispers 'Purak, Kumbhak, Rechak' at phase starts. Ambient music softens automatically.",
+                        text = "Scale Base Inhale",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        fontWeight = FontWeight.SemiBold
                     )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        listOf(2, 3, 4, 5, 6).forEach { bSec ->
+                            val isSelected = purak == bSec && currentRatioStage != PranayamaRatioStage.CUSTOM
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+                                modifier = Modifier.clickable {
+                                    if (currentRatioStage != PranayamaRatioStage.CUSTOM) {
+                                        dispatchUpdate(
+                                            newPurak = bSec * currentRatioStage.purakRatio,
+                                            newAntar = bSec * currentRatioStage.antarRatio,
+                                            newRechak = bSec * currentRatioStage.rechakRatio,
+                                            newBahya = bSec * currentRatioStage.bahyaRatio
+                                        )
+                                    } else {
+                                        dispatchUpdate(newPurak = bSec)
+                                    }
+                                }
+                            ) {
+                                Text(
+                                    text = "${bSec}s",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onBackground,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
+                        }
+                    }
                 }
-                Switch(
-                    checked = voiceEnabled,
-                    onCheckedChange = { dispatchUpdate(newVoiceEnabled = it) },
-                    colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.primary)
+            }
+        }
+
+        // -------------------------------------------------------------
+        // Card 2: Four Phase Setting Portions (Input Fields with Custom Seconds)
+        // -------------------------------------------------------------
+        Card(
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                Text(
+                    text = "Four Phase Portions (Custom Seconds)",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+
+                // 1. Purak (Inhale) - default 4s
+                PranayamaPhaseInputFieldRow(
+                    phaseTitle = "1. Purak (Inhale)",
+                    sanskritSubtitle = "पूरक • Inhalation",
+                    seconds = purak,
+                    minSeconds = 1,
+                    maxSeconds = 60,
+                    onSecondsChange = { dispatchUpdate(newPurak = it) }
+                )
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
+
+                // 2. Kumbhak (Hold In) - default 16s
+                PranayamaPhaseInputFieldRow(
+                    phaseTitle = "2. Kumbhak (Hold In)",
+                    sanskritSubtitle = "अभ्यन्तर कुम्भक • Internal retention",
+                    seconds = antar,
+                    minSeconds = 0,
+                    maxSeconds = 60,
+                    onSecondsChange = { dispatchUpdate(newAntar = it) }
+                )
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
+
+                // 3. Rechak (Exhale) - default 8s
+                PranayamaPhaseInputFieldRow(
+                    phaseTitle = "3. Rechak (Exhale)",
+                    sanskritSubtitle = "रेचक • Exhalation",
+                    seconds = rechak,
+                    minSeconds = 1,
+                    maxSeconds = 60,
+                    onSecondsChange = { dispatchUpdate(newRechak = it) }
+                )
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
+
+                // 4. Kumbhak (Hold Out) - default 16s
+                PranayamaPhaseInputFieldRow(
+                    phaseTitle = "4. Kumbhak (Hold Out)",
+                    sanskritSubtitle = "बाह्य कुम्भक • External void retention",
+                    seconds = bahya,
+                    minSeconds = 0,
+                    maxSeconds = 60,
+                    onSecondsChange = { dispatchUpdate(newBahya = it) }
                 )
             }
+        }
 
-            if (voiceEnabled) {
-                Spacer(modifier = Modifier.height(12.dp))
-                Text("Voice Prompt Style", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+        // -------------------------------------------------------------
+        // Card 3: Target Practice Rounds (Yogic Literature Grounding)
+        // -------------------------------------------------------------
+        Card(
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Target Practice Rounds", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        val cycleSec = purak + antar + rechak + bahya
+                        val totalSec = cycleSec * rounds
+                        val totalMin = totalSec / 60
+                        val totalRemSec = totalSec % 60
+                        Text(
+                            text = "$rounds rounds (~${totalMin}m ${totalRemSec}s)",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        SmallAdjustButton(text = "-1") {
+                            dispatchUpdate(newRounds = (rounds - 1).coerceAtLeast(1))
+                        }
+                        SmallAdjustButton(text = "+1") {
+                            dispatchUpdate(newRounds = (rounds + 1).coerceAtMost(108))
+                        }
+                        SmallAdjustButton(text = "+6") {
+                            dispatchUpdate(newRounds = (rounds + 6).coerceAtMost(108))
+                        }
+                    }
+                }
+
                 Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = "Classical Yogic Stages (Hatha Yoga Pradipika 2.12 & Gheranda Samhita 5.49): 12 rounds is the Adhama standard, 24 rounds is Madhyama, and 36 rounds is Uttama. Adjust as your capacity blossoms.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    VoiceCueStyle.values().forEach { style ->
-                        val isSelected = voiceStyle == style
+                    listOf(
+                        "6 (Intro)" to 6,
+                        "12 (Adhama)" to 12,
+                        "18" to 18,
+                        "24 (Madhyama)" to 24,
+                        "36 (Uttama)" to 36
+                    ).forEach { (label, rCount) ->
+                        val isSelected = rounds == rCount
                         Surface(
                             shape = RoundedCornerShape(8.dp),
                             color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
                             modifier = Modifier
                                 .weight(1f)
-                                .clickable { dispatchUpdate(newVoiceStyle = style) }
+                                .clickable { dispatchUpdate(newRounds = rCount) }
                         ) {
                             Text(
-                                text = style.displayName,
+                                text = label,
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                                 color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onBackground,
@@ -1655,99 +1836,362 @@ private fun PranayamaSettingsSection(
                         }
                     }
                 }
+            }
+        }
+
+        // -------------------------------------------------------------
+        // Card 4: Gentle Lady Voice Guidance (Option A Default vs Option B)
+        // -------------------------------------------------------------
+        Card(
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Gentle Lady Voice Guide", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text(
+                            text = "Meditative voice whispers cues at phase starts. Ambient music ducks automatically.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = voiceEnabled,
+                        onCheckedChange = { dispatchUpdate(newVoiceEnabled = it) },
+                        colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.primary)
+                    )
+                }
+
+                if (voiceEnabled) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text("Voice Cue Selection", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        listOf(
+                            VoiceCueStyle.SANSKRIT to "Option A: Sanskrit ('Purak', 'Kumbhak', 'Rechak') [Default]",
+                            VoiceCueStyle.BILINGUAL to "Option B: Bilingual ('Purak... Inhale', 'Kumbhak... Hold')"
+                        ).forEach { (style, description) ->
+                            val isSelected = voiceStyle == style
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { dispatchUpdate(newVoiceStyle = style) }
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        text = description,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onBackground,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    if (isSelected) {
+                                        Text(
+                                            text = "✓ Active",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onPrimary
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    OutlinedButton(
+                        onClick = { onTestVoiceCue(voiceStyle) },
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        val label = when (voiceStyle) {
+                            VoiceCueStyle.BILINGUAL -> "▶ Audition Option B Voice ('Purak... Inhale')"
+                            else -> "▶ Audition Option A Voice ('Purak')"
+                        }
+                        Text(label)
+                    }
+                }
+            }
+        }
+
+        // -------------------------------------------------------------
+        // Card 5: Meditative Milestone & Session Ending Bells
+        // -------------------------------------------------------------
+        Card(
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Milestone Interval Bell", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text(
+                            text = "Periodic bell chime to track completed cycles without opening eyes.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = intervalBellEnabled,
+                        onCheckedChange = { dispatchUpdate(newIntervalBellEnabled = it) },
+                        colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.primary)
+                    )
+                }
+
+                if (intervalBellEnabled) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = "🔔 Calibrated to a soft 432 Hz warm Tibetan singing bowl with gradual attack to preserve meditative absorption without triggering the startle reflex.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text("Bell Cadence (Every N Rounds)", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        listOf(3, 5, 6, 10).forEach { cad ->
+                            val isSelected = intervalCadence == cad
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable { dispatchUpdate(newIntervalCadence = cad) }
+                            ) {
+                                Text(
+                                    text = "Every $cad",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onBackground,
+                                    modifier = Modifier.padding(vertical = 8.dp).wrapContentWidth(Alignment.CenterHorizontally)
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    OutlinedButton(
+                        onClick = onTestPranayamaIntervalBell,
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("▶ Audition Gentle 432Hz Meditative Chime")
+                    }
+                } else {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "Default: OFF (Complete silence between rounds to honor deep Dhyana meditation).",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(12.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
+                Spacer(modifier = Modifier.height(8.dp))
 
-                OutlinedButton(
-                    onClick = onTestVoiceCue,
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("▶ Audition Gentle Lady Voice Cue")
-                }
-            }
-        }
-    }
-
-    // -------------------------------------------------------------
-    // Card 5: Milestone Bell Notification
-    // -------------------------------------------------------------
-    Card(
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text("Milestone & Session Ending Bells", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "🔔 Option C 3-bell sequence strikes every 5 completed rounds as a gentle pacing milestone.\n🔔 Deep resonant Temple Gong strikes upon session completion.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
-}
-
-/**
- * Reusable row providing title, Sanskrit subtitle, live duration, fine +/- stepper buttons, and continuous slider.
- *
- * @param phaseTitle User-facing title (e.g., "1. Purak (Inhale)").
- * @param sanskritSubtitle Sanskrit script and meditative meaning.
- * @param seconds Current phase duration in seconds.
- * @param minSeconds Minimum allowable seconds.
- * @param maxSeconds Maximum allowable seconds.
- * @param onSecondsChange Callback invoked when duration is adjusted.
- */
-@Composable
-private fun PranayamaPhaseSliderRow(
-    phaseTitle: String,
-    sanskritSubtitle: String,
-    seconds: Int,
-    minSeconds: Int,
-    maxSeconds: Int,
-    onSecondsChange: (Int) -> Unit
-) {
-    Column {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column {
-                Text(phaseTitle, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
-                Text(sanskritSubtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(
-                    text = "$seconds sec",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = MaterialTheme.colorScheme.primary
+                    text = "🔔 Session Ending Bell: Deep resonant Temple Gong strikes gracefully upon completing all rounds.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                SmallAdjustButton(text = "-1s") {
-                    onSecondsChange((seconds - 1).coerceAtLeast(minSeconds))
-                }
-                SmallAdjustButton(text = "+1s") {
-                    onSecondsChange((seconds + 1).coerceAtMost(maxSeconds))
-                }
-                SmallAdjustButton(text = "+5s") {
-                    onSecondsChange((seconds + 5).coerceAtMost(maxSeconds))
-                }
             }
         }
 
-        Spacer(modifier = Modifier.height(4.dp))
+        // -------------------------------------------------------------
+        // Card 6: Subtle Ambient Background Soundscape
+        // -------------------------------------------------------------
+        Card(
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                SettingsToggleRow(
+                    title = "Background Ambient Sound",
+                    subtitle = "Subtle continuous drone (ducks during voice instructions)",
+                    checked = isBgMusicEnabled,
+                    onCheckedChange = onBgMusicToggle
+                )
 
-        Slider(
-            value = seconds.toFloat(),
-            onValueChange = { onSecondsChange(it.toInt().coerceIn(minSeconds, maxSeconds)) },
-            valueRange = minSeconds.toFloat()..maxSeconds.toFloat(),
-            steps = (maxSeconds - minSeconds - 1).coerceAtLeast(0),
-            colors = SliderDefaults.colors(
-                thumbColor = MaterialTheme.colorScheme.primary,
-                activeTrackColor = MaterialTheme.colorScheme.primary
-            )
-        )
+                if (isBgMusicEnabled) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "SOUND SOURCE",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        val isAumSelected = bgMusicType == BackgroundSoundType.DEFAULT_AUM
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (isAumSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable { onBgMusicTypeSelected(BackgroundSoundType.DEFAULT_AUM) }
+                        ) {
+                            Text(
+                                text = "ॐ Aum",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = if (isAumSelected) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isAumSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onBackground,
+                                modifier = Modifier.padding(vertical = 10.dp).wrapContentWidth(Alignment.CenterHorizontally)
+                            )
+                        }
+
+                        val isYtSelected = bgMusicType == BackgroundSoundType.YOUTUBE_LINK
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (isYtSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+                            modifier = Modifier
+                                .weight(1.2f)
+                                .clickable { onBgMusicTypeSelected(BackgroundSoundType.YOUTUBE_LINK) }
+                        ) {
+                            Text(
+                                text = "YouTube Audio",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = if (isYtSelected) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isYtSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onBackground,
+                                modifier = Modifier.padding(vertical = 10.dp).wrapContentWidth(Alignment.CenterHorizontally)
+                            )
+                        }
+
+                        val isCustomSelected = bgMusicType == BackgroundSoundType.CUSTOM_FILE
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (isCustomSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable { onBgMusicTypeSelected(BackgroundSoundType.CUSTOM_FILE) }
+                        ) {
+                            Text(
+                                text = "Custom File",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = if (isCustomSelected) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isCustomSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onBackground,
+                                modifier = Modifier.padding(vertical = 10.dp).wrapContentWidth(Alignment.CenterHorizontally)
+                            )
+                        }
+                    }
+
+                    if (bgMusicType == BackgroundSoundType.YOUTUBE_LINK) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        var ytInput by remember(bgMusicYouTubeUrl) { mutableStateOf(bgMusicYouTubeUrl) }
+                        OutlinedTextField(
+                            value = ytInput,
+                            onValueChange = {
+                                ytInput = it
+                                onBgMusicYouTubeUrlChange(it)
+                            },
+                            label = { Text("YouTube URL (Audio Stream)") },
+                            singleLine = true,
+                            textStyle = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "✓ Ad-free background playback",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            var isTestingYt by remember { mutableStateOf(false) }
+                            TextButton(
+                                onClick = {
+                                    isTestingYt = !isTestingYt
+                                    onPreviewBgMusic(isTestingYt)
+                                }
+                            ) {
+                                Text(
+                                    if (isTestingYt) "⏹ Stop" else "▶ Test Stream",
+                                    style = MaterialTheme.typography.labelSmall
+                                )
+                            }
+                        }
+                    }
+
+                    if (bgMusicType == BackgroundSoundType.CUSTOM_FILE) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = bgMusicCustomName ?: "No custom file chosen",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Button(
+                                onClick = onPickCustomAudio,
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                            ) {
+                                Text("Choose File", style = MaterialTheme.typography.labelSmall)
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Subtle Ambient Sound Volume Slider
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Subtle Ambient Volume", style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            text = "${(bgMusicVolume * 100).toInt()}%",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    Slider(
+                        value = bgMusicVolume,
+                        onValueChange = onBgMusicVolumeChange,
+                        valueRange = 0f..1f,
+                        colors = SliderDefaults.colors(
+                            thumbColor = MaterialTheme.colorScheme.primary,
+                            activeTrackColor = MaterialTheme.colorScheme.primary
+                        )
+                    )
+                }
+            }
+        }
     }
 }

@@ -74,10 +74,11 @@ object DefaultProfiles {
                 PranayamaStep(PranayamaPhase.EXHALE, 8),
                 PranayamaStep(PranayamaPhase.HOLD_OUT, 16)
             ),
-            targetRounds = 20,
+            targetRounds = 12, // Classical Adhama standard (Hatha Yoga Pradipika 2.12 / Gheranda Samhita 5.49)
+            isIntervalBellEnabled = false, // Default off to protect meditative absorption; user can enable in settings
             intervalBellRoundCadence = 5,
             isVoiceGuidanceEnabled = true,
-            voiceCueStyle = VoiceCueStyle.SANSKRIT
+            voiceCueStyle = VoiceCueStyle.SANSKRIT // Option A (Default)
         )
     )
 
