@@ -33,13 +33,22 @@ val DarkText = Color(0xFFEDEDED)
 val DarkMuted = Color(0xFF888888)
 
 /**
- * Standard Light Palette.
- * High-contrast daylight theme for outdoor practices.
+ * Sun (Day) Eye Comfort Light Palette.
+ * Warm parchment and gentle amber tones engineered with blue-light reduction for daytime mindfulness.
+ * Prevents ocular fatigue and harsh daylight glare.
  */
-val LightBg = Color(0xFFF7F8FA)
-val LightSurface = Color(0xFFFFFFFF)
-val LightText = Color(0xFF1C1C1E)
-val LightMuted = Color(0xFF8E8E93)
+val SunDayWarmBg = Color(0xFFFAF6EE)
+val SunDayWarmSurface = Color(0xFFFFFDF9)
+val SunDayWarmCard = Color(0xFFF2ECE1)
+val SunDayWarmText = Color(0xFF2E261F)
+val SunDayWarmMuted = Color(0xFF7A6F64)
+val SunDayAmber = Color(0xFFD97706)
+
+// Backwards-compatible aliases mapping to Sun Day warm palette
+val LightBg = SunDayWarmBg
+val LightSurface = SunDayWarmSurface
+val LightText = SunDayWarmText
+val LightMuted = SunDayWarmMuted
 
 /**
  * Brand & Bell Accent Tones.
@@ -48,3 +57,4 @@ val LightMuted = Color(0xFF8E8E93)
 val BellGold = Color(0xFFD4AF37)
 val ZenGreen = Color(0xFF81C784)
 val ZenBlue = Color(0xFF64B5F6)
+

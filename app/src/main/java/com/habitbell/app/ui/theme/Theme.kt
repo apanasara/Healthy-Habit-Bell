@@ -44,17 +44,20 @@ private val StandardDarkColorScheme = darkColorScheme(
     onSurfaceVariant = DarkMuted
 )
 
-/** Standard crisp daytime light theme. */
+/**
+ * Sun (Day) Eye Comfort Light Color Scheme.
+ * Warm parchment and gentle amber tones with blue-light reduction for daylight sessions.
+ */
 private val StandardLightColorScheme = lightColorScheme(
-    primary = EyeComfortAmber,
-    secondary = ZenGreen,
-    background = LightBg,
-    surface = LightSurface,
-    surfaceVariant = Color(0xFFE5E5EA),
-    onPrimary = LightSurface,
-    onBackground = LightText,
-    onSurface = LightText,
-    onSurfaceVariant = LightMuted
+    primary = SunDayAmber,
+    secondary = EyeComfortWarmGold,
+    background = SunDayWarmBg,
+    surface = SunDayWarmSurface,
+    surfaceVariant = SunDayWarmCard,
+    onPrimary = SunDayWarmSurface,
+    onBackground = SunDayWarmText,
+    onSurface = SunDayWarmText,
+    onSurfaceVariant = SunDayWarmMuted
 )
 
 /**
