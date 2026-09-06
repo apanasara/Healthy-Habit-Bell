@@ -259,6 +259,7 @@ To eliminate vertical clutter and decouple dynamic session parameters from persi
 - **Per-Timer Ambient Soundscape Selection**:
   - Contextual toggle enabling/disabling continuous soundscapes per profile.
   - Source selection between bundled 432Hz Aum loop, sandboxed ad-free YouTube audio stream, or local audio file via Storage Access Framework (SAF).
+  - Immediate contextual **Ambient Volume Slider** ($0\%..100\%$) for instant gain leveling without requiring navigation away from the timer tab.
 
 #### 2. Domain 2: Persistent Global Configuration (`SettingsDrawerTab.GLOBAL`)
 - **Zen Focus (Do Not Disturb)**: Suppresses distracting system notifications during active mindfulness sessions.
@@ -266,7 +267,7 @@ To eliminate vertical clutter and decouple dynamic session parameters from persi
   - **Sun (Day Mode)**: Blue-light-reduced warm parchment palette (`#FAF6EE` background, gentle amber `#D97706` accents) engineered to prevent ocular fatigue and daylight glare without harsh cool blue emissions.
   - **Moon (Night Mode)**: Circadian wind-down palette featuring warm amber tones on deep charcoal (`#16130F`) or pure `#000000` AMOLED to power off OLED pixels entirely.
   - 1-tap Sun ☀️ ⇄ Moon 🌙 toggle plus granular theme selection (`AMOLED`, `EYE_COMFORT`, `DARK`, `LIGHT`).
-- **Master Audio Gain Controls**: Side-by-side volume sliders for Bell Master Gain and Ambient Background Gain.
+- **Master Audio Gain Controls**: Side-by-side volume sliders for both **Bell Master Gain** and **Background Ambient Gain** ($0\%..100\%$).
 - **Pedometer & Health Platform Connectivity**: Centralized selection of active step providers (`Hardware Sensor`, `Health Connect`, `Apple Health Bridge`, `Step Simulator`), sensor permission status indicators, and synthetic step injection tools.
 - **Living Room & TV Casting**: Embedded Google Cast route controls (`CastButton`), TV Dashboard mode launcher, and Smart TV browser link copy.
 - **Hardware Battery Protections**: Proximity-driven AMOLED Pocket Mode blanking, Auto-Dimming, and Display Awake management.

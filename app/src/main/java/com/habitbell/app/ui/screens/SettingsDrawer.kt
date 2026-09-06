@@ -284,12 +284,14 @@ fun SettingsDrawer(
                             isDisplayMode = isDisplayMode,
                             isAutoDim = isAutoDim,
                             bellVolume = bellVolume,
+                            bgMusicVolume = bgMusicVolume,
                             onThemeSelected = onThemeSelected,
                             onZenModeToggle = onZenModeToggle,
                             onPocketModeToggle = onPocketModeToggle,
                             onDisplayModeToggle = onDisplayModeToggle,
                             onAutoDimToggle = onAutoDimToggle,
                             onVolumeChange = onVolumeChange,
+                            onBgMusicVolumeChange = onBgMusicVolumeChange,
                             onToggleSunMoonTheme = onToggleSunMoonTheme,
                             selectedHealthProvider = selectedHealthProvider,
                             onHealthProviderSelected = onHealthProviderSelected,
@@ -716,6 +718,31 @@ private fun TimerSettingsContent(
                             }
                         }
                     }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Ambient Sound Volume Slider
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Ambient Volume", style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            text = "${(bgMusicVolume * 100).toInt()}%",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    Slider(
+                        value = bgMusicVolume,
+                        onValueChange = onBgMusicVolumeChange,
+                        valueRange = 0f..1f,
+                        colors = SliderDefaults.colors(
+                            thumbColor = MaterialTheme.colorScheme.primary,
+                            activeTrackColor = MaterialTheme.colorScheme.primary
+                        )
+                    )
                 }
             }
         }
@@ -788,8 +815,34 @@ private fun TimerSettingsContent(
 
 /**
  * Renders the persistent Global App Configuration tab content.
- * Houses Zen mode, Sun-Moon eye-comfort themes, master audio gain, pedometer connectivity,
- * TV casting, and battery blanking.
+ * Houses Zen mode, Sun-Moon eye-comfort themes, master audio gain (bells and ambient music),
+ * pedometer connectivity, TV casting, and battery blanking.
+ *
+ * @param currentTheme Active theme profile ([ThemeMode]).
+ * @param isZenMode Whether Zen focus mode (DND) is active.
+ * @param isPocketMode Whether proximity battery-blanking is active.
+ * @param isDisplayMode Whether keep-screen-on wake-lock is engaged.
+ * @param isAutoDim Whether auto-dimming during countdown is enabled.
+ * @param bellVolume Master bell gain level (0.0f..1.0f).
+ * @param bgMusicVolume Ambient background music gain level (0.0f..1.0f).
+ * @param onThemeSelected Callback when theme profile is picked.
+ * @param onZenModeToggle Callback to toggle DND.
+ * @param onPocketModeToggle Callback to toggle pocket mode.
+ * @param onDisplayModeToggle Callback to toggle display wake lock.
+ * @param onAutoDimToggle Callback to toggle auto dim.
+ * @param onVolumeChange Callback when bell master volume is adjusted (0.0f..1.0f).
+ * @param onBgMusicVolumeChange Callback when ambient music volume slider is adjusted (0.0f..1.0f).
+ * @param onToggleSunMoonTheme Callback to toggle between Sun Day and Moon Night eye-comfort modes.
+ * @param selectedHealthProvider Currently active step provider bridge.
+ * @param onHealthProviderSelected Callback when provider changes.
+ * @param hasActivityPermission Whether runtime sensor permission is granted.
+ * @param onRequestActivityPermission Callback to request permission.
+ * @param onTestStep Callback to inject synthetic test steps.
+ * @param isCasting Whether active TV casting is underway.
+ * @param castDeviceName Target Cast receiver device name.
+ * @param onDisconnectCast Callback to disconnect Cast session.
+ * @param onOpenTVMode Callback to navigate to TV dashboard screen.
+ * @param tvCastUrl Local HTTP playback URL for Smart TVs.
  */
 @Composable
 private fun GlobalConfigContent(
@@ -799,12 +852,14 @@ private fun GlobalConfigContent(
     isDisplayMode: Boolean,
     isAutoDim: Boolean,
     bellVolume: Float,
+    bgMusicVolume: Float,
     onThemeSelected: (ThemeMode) -> Unit,
     onZenModeToggle: (Boolean) -> Unit,
     onPocketModeToggle: (Boolean) -> Unit,
     onDisplayModeToggle: (Boolean) -> Unit,
     onAutoDimToggle: (Boolean) -> Unit,
     onVolumeChange: (Float) -> Unit,
+    onBgMusicVolumeChange: (Float) -> Unit,
     onToggleSunMoonTheme: () -> Unit,
     selectedHealthProvider: HealthProviderType,
     onHealthProviderSelected: (HealthProviderType) -> Unit,
@@ -925,6 +980,7 @@ private fun GlobalConfigContent(
                 SettingsSectionHeader(title = "Master Audio Gain")
                 Spacer(modifier = Modifier.height(8.dp))
 
+                // 1. Bell Master Volume
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -936,6 +992,27 @@ private fun GlobalConfigContent(
                 Slider(
                     value = bellVolume,
                     onValueChange = onVolumeChange,
+                    valueRange = 0f..1f,
+                    colors = SliderDefaults.colors(
+                        thumbColor = MaterialTheme.colorScheme.primary,
+                        activeTrackColor = MaterialTheme.colorScheme.primary
+                    )
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // 2. Background / Ambient Music Volume
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text("Background Ambient Volume", style = MaterialTheme.typography.bodyMedium)
+                    Text("${(bgMusicVolume * 100).toInt()}%", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                }
+                Slider(
+                    value = bgMusicVolume,
+                    onValueChange = onBgMusicVolumeChange,
                     valueRange = 0f..1f,
                     colors = SliderDefaults.colors(
                         thumbColor = MaterialTheme.colorScheme.primary,
