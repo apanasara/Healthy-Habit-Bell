@@ -160,6 +160,8 @@ fun SettingsDrawer(
                 .padding(horizontal = 20.dp)
                 .padding(bottom = 32.dp)
         ) {
+            var currentTab by remember(activeTab) { mutableStateOf(activeTab) }
+
             // Header with App Identity & Navigation Context
             Row(
                 modifier = Modifier
@@ -178,7 +180,7 @@ fun SettingsDrawer(
                         tint = MaterialTheme.colorScheme.primary
                     )
                     Text(
-                        text = if (activeTab == SettingsDrawerTab.TIMER) "Timer • ${profile.name}" else "Global Settings",
+                        text = if (currentTab == SettingsDrawerTab.TIMER) "Timer • ${profile.name}" else "Global Settings",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onBackground
@@ -197,7 +199,7 @@ fun SettingsDrawer(
 
             // Primary Domain Tab Row: [ ⏱ Timer Settings ] | [ ⚙️ Global Config ]
             TabRow(
-                selectedTabIndex = activeTab.ordinal,
+                selectedTabIndex = currentTab.ordinal,
                 containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
                 contentColor = MaterialTheme.colorScheme.primary,
                 modifier = Modifier
@@ -205,28 +207,34 @@ fun SettingsDrawer(
                     .clip(RoundedCornerShape(12.dp))
             ) {
                 Tab(
-                    selected = activeTab == SettingsDrawerTab.TIMER,
-                    onClick = { onTabSelected(SettingsDrawerTab.TIMER) },
+                    selected = currentTab == SettingsDrawerTab.TIMER,
+                    onClick = {
+                        currentTab = SettingsDrawerTab.TIMER
+                        onTabSelected(SettingsDrawerTab.TIMER)
+                    },
                     text = {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             Icon(Icons.Outlined.Timer, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Text("Timer Settings", fontWeight = if (activeTab == SettingsDrawerTab.TIMER) FontWeight.Bold else FontWeight.Normal)
+                            Text("Timer Settings", fontWeight = if (currentTab == SettingsDrawerTab.TIMER) FontWeight.Bold else FontWeight.Normal)
                         }
                     }
                 )
                 Tab(
-                    selected = activeTab == SettingsDrawerTab.GLOBAL,
-                    onClick = { onTabSelected(SettingsDrawerTab.GLOBAL) },
+                    selected = currentTab == SettingsDrawerTab.GLOBAL,
+                    onClick = {
+                        currentTab = SettingsDrawerTab.GLOBAL
+                        onTabSelected(SettingsDrawerTab.GLOBAL)
+                    },
                     text = {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             Icon(Icons.Outlined.Settings, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Text("Global Config", fontWeight = if (activeTab == SettingsDrawerTab.GLOBAL) FontWeight.Bold else FontWeight.Normal)
+                            Text("Global Config", fontWeight = if (currentTab == SettingsDrawerTab.GLOBAL) FontWeight.Bold else FontWeight.Normal)
                         }
                     }
                 )
@@ -239,7 +247,7 @@ fun SettingsDrawer(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(20.dp)
             ) {
-                if (activeTab == SettingsDrawerTab.TIMER) {
+                if (currentTab == SettingsDrawerTab.TIMER) {
                     // ==========================================
                     // DOMAIN 1: DYNAMIC TIMER-BASED SETTINGS
                     // ==========================================
@@ -846,7 +854,7 @@ private fun GlobalConfigContent(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column {
+                    Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
                         SettingsSectionHeader(title = "Sun-Moon & Themes")
                         Text(
                             text = "Blue-light reduced in both Day & Night modes",
@@ -858,7 +866,8 @@ private fun GlobalConfigContent(
                     // 1-Tap Sun / Moon Circadian Switcher Button
                     FilledTonalButton(
                         onClick = onToggleSunMoonTheme,
-                        shape = RoundedCornerShape(10.dp)
+                        shape = RoundedCornerShape(10.dp),
+                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
                     ) {
                         val icon = if (currentTheme.isSunDayTheme) Icons.Default.WbSunny else Icons.Default.Nightlight
                         val label = if (currentTheme.isSunDayTheme) "☀️ Day" else "🌙 Night"
