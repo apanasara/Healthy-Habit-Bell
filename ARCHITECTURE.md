@@ -235,6 +235,51 @@ The health subsystem elevates Habit Bell into an embodied, distraction-free walk
 
 ---
 
+### 2.7. Dual-Domain Settings Architecture & Acoustic Identity (`SettingsDrawer.kt`)
+
+To eliminate vertical clutter and decouple dynamic session parameters from persistent system hardware settings, the configuration drawer is structured into two strict architectural domains mediated by a top segmented `TabRow` (`SettingsDrawerTab`):
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│   [ ⏱ Timer Settings ({profile.name}) ]  |  [ ⚙️ Global Config ] │
+├─────────────────────────────────────────────────────────────┤
+│ • Dynamic Target (Time slider or Step Goal)                  │
+│ • Dynamic Interval Cue (Time interval or Step cadence)      │
+│ • Ambient Soundscape (Aum / YouTube / Custom audio)         │
+│ • Signature Acoustic Audition (Option C Chime & Gong)        │
+└─────────────────────────────────────────────────────────────┘
+```
+
+#### 1. Domain 1: Dynamic Timer Settings (`SettingsDrawerTab.TIMER`)
+- **Adaptive Session Targets**:
+  - **Walking & Movement Profiles** (`isStepTrackingEnabled == true`): Displays target Step Goal chips (`None`, `1,000`, `2,000`, `3,000`, `5,000` steps) with automated completion evaluation.
+  - **Linear Timers** (`TimerType.LINEAR`): Displays continuous session duration slider ($1\text{m}..60\text{m}$), fine stepper buttons (`-1m`, `+1m`, `+5m`), and instant preset chips (`10m`, `15m`, `20m`, etc.).
+- **Adaptive Interval Pacing Cues**:
+  - Automatically switches between Step Interval cadence (`None`, `250`, `500`, `1,000` steps) for physical locomotion vs. Periodic Interval bell chips (`None`, `15s`, `30s`, `1m`, `2m`, `3m`) for linear countdowns.
+- **Per-Timer Ambient Soundscape Selection**:
+  - Contextual toggle enabling/disabling continuous soundscapes per profile.
+  - Source selection between bundled 432Hz Aum loop, sandboxed ad-free YouTube audio stream, or local audio file via Storage Access Framework (SAF).
+
+#### 2. Domain 2: Persistent Global Configuration (`SettingsDrawerTab.GLOBAL`)
+- **Zen Focus (Do Not Disturb)**: Suppresses distracting system notifications during active mindfulness sessions.
+- **Sun-Moon Circadian Mode with Blue-Light Attenuation**:
+  - **Sun (Day Mode)**: Blue-light-reduced warm parchment palette (`#FAF6EE` background, gentle amber `#D97706` accents) engineered to prevent ocular fatigue and daylight glare without harsh cool blue emissions.
+  - **Moon (Night Mode)**: Circadian wind-down palette featuring warm amber tones on deep charcoal (`#16130F`) or pure `#000000` AMOLED to power off OLED pixels entirely.
+  - 1-tap Sun ☀️ ⇄ Moon 🌙 toggle plus granular theme selection (`AMOLED`, `EYE_COMFORT`, `DARK`, `LIGHT`).
+- **Master Audio Gain Controls**: Side-by-side volume sliders for Bell Master Gain and Ambient Background Gain.
+- **Pedometer & Health Platform Connectivity**: Centralized selection of active step providers (`Hardware Sensor`, `Health Connect`, `Apple Health Bridge`, `Step Simulator`), sensor permission status indicators, and synthetic step injection tools.
+- **Living Room & TV Casting**: Embedded Google Cast route controls (`CastButton`), TV Dashboard mode launcher, and Smart TV browser link copy.
+- **Hardware Battery Protections**: Proximity-driven AMOLED Pocket Mode blanking, Auto-Dimming, and Display Awake management.
+
+#### 3. Permanent Signature Acoustic Identity (Zero Timbre Configuration)
+- **Brand Sound Integrity**: All user-facing chime timbre selection dropdowns/chips (`Tingsha`, `Singing Bowl`, `Temple Gong`, `Crystal Quartz`) are intentionally removed.
+- **Acoustic Enforcement**:
+  - **Separator (Interval) Bell**: Exclusively configured to the **Option C Triple Bell** ($2048\text{ Hz} \rightarrow 1536\text{ Hz} \rightarrow 1024\text{ Hz}$) — an acoustically distinct, non-startling mindful pacing cue.
+  - **Session Completion**: Exclusively configured to the deep resonant **Temple Gong** ($130.8\text{ Hz}$) — grounding, full-bodied resolution.
+- **Dedicated Audition Card**: Provides zero-configuration sample buttons (`[▶ Separator Bell]`, `[▶ End Gong]`, `[⏱ 10s Demo]`) allowing users to familiarize themselves with the separator cue before commencing practice.
+
+---
+
 ## 3. Concurrency & Threading Architecture
 
 | Component | Scope / Execution Context | Dispatcher | Architectural Rationale |

@@ -53,6 +53,23 @@ enum class AppScreen {
  * @property bgMusicYouTubeUrl Web link to YouTube meditation track for streaming playback.
  * @property bgMusicVolume Master gain level for ambient background audio (0.0f..1.0f).
  */
+/**
+ * # SettingsDrawerTab
+ *
+ * Tab classification within the dual-domain Settings Drawer.
+ *
+ * ## Architectural Role & Relationships
+ * Disaggregates configuration into dynamic profile-specific parameters ([TIMER])
+ * vs persistent system-wide environment & hardware parameters ([GLOBAL]).
+ */
+enum class SettingsDrawerTab {
+    /** Dynamic, profile-specific timing, target goals, and ambient sound controls. */
+    TIMER,
+
+    /** Persistent system-wide environment, theme, volume, and connectivity settings. */
+    GLOBAL
+}
+
 data class AppUiState(
     val currentScreen: AppScreen = AppScreen.HOME,
     val selectedTheme: ThemeMode = ThemeMode.AMOLED,
@@ -63,6 +80,7 @@ data class AppUiState(
     val bellVolume: Float = 0.9f,
     val bellStyle: com.habitbell.app.engine.BellSoundStyle = com.habitbell.app.engine.BellSoundStyle.ZEN_TINGSHA,
     val isSettingsDrawerOpen: Boolean = false,
+    val settingsDrawerTab: SettingsDrawerTab = SettingsDrawerTab.TIMER,
     val isBgMusicEnabled: Boolean = true,
     val bgMusicType: BackgroundSoundType = BackgroundSoundType.DEFAULT_AUM,
     val bgMusicCustomUri: String? = null,
@@ -444,12 +462,37 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     /**
-     * Opens or closes the settings configuration side drawer.
+     * Opens or closes the settings configuration side drawer with optional initial tab targeting.
      *
      * @param open True to display drawer, false to dismiss.
+     * @param tab Initial tab to select ([SettingsDrawerTab.TIMER] or [SettingsDrawerTab.GLOBAL]).
      */
-    fun openSettingsDrawer(open: Boolean) {
-        _uiState.update { it.copy(isSettingsDrawerOpen = open) }
+    fun openSettingsDrawer(open: Boolean, tab: SettingsDrawerTab = SettingsDrawerTab.TIMER) {
+        _uiState.update { it.copy(isSettingsDrawerOpen = open, settingsDrawerTab = tab) }
+    }
+
+    /**
+     * Switches the active tab inside the open settings drawer.
+     *
+     * @param tab Target [SettingsDrawerTab] to display.
+     */
+    fun setSettingsDrawerTab(tab: SettingsDrawerTab) {
+        _uiState.update { it.copy(settingsDrawerTab = tab) }
+    }
+
+    /**
+     * Toggles between Sun (Day / Eye Comfort Light) and Moon (Night / Eye Comfort Dark or AMOLED) themes.
+     * Both circadian states feature engineered blue-light reduction for visual comfort.
+     */
+    fun toggleSunMoonTheme() {
+        _uiState.update { current ->
+            val nextTheme = if (current.selectedTheme.isSunDayTheme) {
+                ThemeMode.EYE_COMFORT
+            } else {
+                ThemeMode.LIGHT
+            }
+            current.copy(selectedTheme = nextTheme)
+        }
     }
 
     /**

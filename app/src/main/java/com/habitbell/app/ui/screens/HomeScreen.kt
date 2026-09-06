@@ -41,6 +41,7 @@ import com.habitbell.app.ui.theme.EyeComfortAmber
  * @param onCycleTheme Callback to cycle between AMOLED, Eye Comfort, Dark, and Light themes.
  * @param onCreateNewClick Callback invoked when the FAB is tapped to create a custom profile.
  * @param onOpenTVMode Callback invoked to launch a profile directly in TV Dashboard mode.
+ * @param onOpenGlobalSettings Callback invoked to open the global settings configuration drawer.
  * @param modifier Composable layout modifier.
  */
 @Composable
@@ -58,6 +59,7 @@ fun HomeScreen(
     onCycleTheme: () -> Unit,
     onCreateNewClick: () -> Unit,
     onOpenTVMode: (TimerProfile) -> Unit,
+    onOpenGlobalSettings: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Scaffold(
@@ -66,7 +68,8 @@ fun HomeScreen(
                 currentTheme = currentTheme,
                 isZenMode = isZenMode,
                 onToggleZenMode = onToggleZenMode,
-                onCycleTheme = onCycleTheme
+                onCycleTheme = onCycleTheme,
+                onOpenGlobalSettings = onOpenGlobalSettings
             )
         },
         floatingActionButton = {
@@ -194,7 +197,8 @@ private fun HomeTopBar(
     currentTheme: ThemeMode,
     isZenMode: Boolean,
     onToggleZenMode: () -> Unit,
-    onCycleTheme: () -> Unit
+    onCycleTheme: () -> Unit,
+    onOpenGlobalSettings: () -> Unit
 ) {
     Row(
         modifier = Modifier
@@ -219,7 +223,7 @@ private fun HomeTopBar(
             )
         }
 
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             // Zen Mode Indicator / Toggle
             IconButton(
                 onClick = onToggleZenMode,
@@ -251,6 +255,18 @@ private fun HomeTopBar(
                 Icon(
                     imageVector = icon,
                     contentDescription = "Theme: ${currentTheme.name}",
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+
+            // Global App Settings Button
+            IconButton(
+                onClick = onOpenGlobalSettings,
+                modifier = Modifier.size(40.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Settings,
+                    contentDescription = "Global Settings",
                     tint = MaterialTheme.colorScheme.primary
                 )
             }

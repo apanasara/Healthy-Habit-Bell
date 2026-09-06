@@ -163,7 +163,7 @@ class MainActivity : FragmentActivity() {
                                         viewModel.startProfileSession(profile, openTVMode = true)
                                     } else {
                                         viewModel.startProfileSession(profile)
-                                        viewModel.openSettingsDrawer(true)
+                                        viewModel.openSettingsDrawer(true, com.habitbell.app.ui.viewmodel.SettingsDrawerTab.TIMER)
                                     }
                                 },
                                 onToggleFavorite = { id ->
@@ -186,6 +186,9 @@ class MainActivity : FragmentActivity() {
                                 },
                                 onOpenTVMode = { profile ->
                                     viewModel.startProfileSession(profile, openTVMode = true)
+                                },
+                                onOpenGlobalSettings = {
+                                    viewModel.openSettingsDrawer(true, com.habitbell.app.ui.viewmodel.SettingsDrawerTab.GLOBAL)
                                 }
                             )
                         }
@@ -195,7 +198,9 @@ class MainActivity : FragmentActivity() {
                                 sessionState = sessionState,
                                 onTogglePlayPause = { viewModel.togglePlayPause() },
                                 onReset = { viewModel.resetSession() },
-                                onOpenSettings = { viewModel.openSettingsDrawer(true) },
+                                onOpenSettings = {
+                                    viewModel.openSettingsDrawer(true, com.habitbell.app.ui.viewmodel.SettingsDrawerTab.TIMER)
+                                },
                                 onExit = { viewModel.exitSessionToHome() },
                                 onTriggerPocketMode = {
                                     viewModel.setPocketMode(!uiState.isPocketModeManual)
@@ -284,7 +289,10 @@ class MainActivity : FragmentActivity() {
                                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
                                     activityRecognitionLauncher.launch(android.Manifest.permission.ACTIVITY_RECOGNITION)
                                 }
-                            }
+                            },
+                            activeTab = uiState.settingsDrawerTab,
+                            onTabSelected = { viewModel.setSettingsDrawerTab(it) },
+                            onToggleSunMoonTheme = { viewModel.toggleSunMoonTheme() }
                         )
                     }
 
