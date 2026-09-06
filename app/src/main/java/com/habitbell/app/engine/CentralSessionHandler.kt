@@ -92,8 +92,13 @@ class CentralSessionHandler(private val application: Application) {
     /** Health and step tracking orchestrator connecting Google Fit, Health Connect, Apple bridge & sensors. */
     val healthStepManager: com.habitbell.app.health.HealthStepManager = com.habitbell.app.health.HealthStepManager(application)
 
+    /** Gentle lady voice guidance coordinator for Pranayama breathwork. */
+    val voiceGuide: PranayamaVoiceGuide = PranayamaVoiceGuide(application, bgMusicManager)
+
     /** Core 1Hz heartbeat finite state machine governing timer countdowns. */
-    val engine: TimerEngine = TimerEngine(audioManager, hapticManager)
+    val engine: TimerEngine = TimerEngine(audioManager, hapticManager).apply {
+        voiceGuide = this@CentralSessionHandler.voiceGuide
+    }
 
     /** Unified screen display automation orchestrator (Pocket, Car, TV, and Watch modes). */
     val displayAutomationManager: DisplayAutomationManager = DisplayAutomationManager(

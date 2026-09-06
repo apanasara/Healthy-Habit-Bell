@@ -122,6 +122,7 @@ The heartbeat of the mindfulness runtime is a deterministic finite state machine
 - **`HabitBellCastManager.kt`**: Singleton session manager coordinating discovery, device connection, and media metadata transmission to Chromecast, Sony Bravia, and Google Cast-enabled TVs.
 - **`CastButton.kt`**: Jetpack Compose-native Cast button wrapping AndroidX MediaRouter's `MediaRouteButton` to display discovery states and trigger device selection dialogs.
 - **Host Activity Architecture**: `MainActivity` inherits from `androidx.fragment.app.FragmentActivity` to provide the `FragmentManager` required by `MediaRouteButton` to display native Google Cast route picker dialogs across all Android platforms without runtime crashes.
+- **`HabitBellChooserDialogFragment` & `HabitBellControllerDialogFragment`**: Public top-level subclasses of `MediaRouteChooserDialogFragment` and `MediaRouteControllerDialogFragment` implementing zero-arg public constructors and theme bundle arguments (`HabitBellMediaRouteTheme_Dark` / `Light`). This strictly complies with Android's `FragmentManager` contract and prevents `IllegalStateException: Fragment ... must be a public static class` crashes upon Cast icon taps.
 
 #### 3. Local TV WebCast (`LocalCastWebServer.kt`)
 - **Zero-Cloud Local Casting**: Embedded lightweight multi-threaded HTTP server running on port `8888`.
@@ -353,7 +354,61 @@ Habit Bell enforces a consistent, centralized visual theme hierarchy governed ex
 Native `MediaRouteButton` interactions in Jetpack Compose require strict background opacity to comply with AndroidX `MediaRouterThemeHelper` contrast calculations:
 - **Crash Prevention**: Inheriting translucent window backgrounds causes `androidx.core.graphics.ColorUtils.calculateContrast` to throw `IllegalArgumentException: background can not be translucent: #0`.
 - **HabitBellMediaRouteDialogFactory**: Wraps `MediaRouteChooserDialog` and `MediaRouteControllerDialog` instantiation within an explicit, non-translucent `ContextThemeWrapper` applying `R.style.HabitBellMediaRouteTheme_Dark` or `R.style.HabitBellMediaRouteTheme_Light`.
-- **Solid Window Backgrounds**: Base application theme (`Theme.HabitBell`) inherits from `Theme.AppCompat.DayNight.NoActionBar` with explicit, solid `android:colorBackground` and `colorBackgroundFloating`.
+---
+
+### 2.12. Classical Hatha Yoga Pranayama Subsystem (`com.habitbell.app.engine`, `com.habitbell.app.ui.components.BreathIndicator`)
+
+The Pranayama subsystem implements classical yogic breath control (*Chaturanga Pranayama*) as documented in traditional Hatha Yoga literature (*Hatha Yoga Pradipika* by Swami Svatmarama, *Gheranda Samhita*, and *Patanjali Yoga Sutras*).
+
+#### 1. Classical Literature & Respiratory Physiology
+In *Hatha Yoga Pradipika* (HYP 2.2), Svatmarama establishes the inseparable link between breath and consciousness:
+> *"When breath is still, the mind is still; the yogi achieves firmness, therefore one should restrain the breath."*
+
+The practice regulates the four sacred limbs of the breath cycle:
+1. **Puraka (पूरक - Inhalation)**: Conscious diaphragmatic intake drawing cosmic life force (*Prana*) into the torso.
+2. **Antar Kumbhaka (अभ्यन्तर कुम्भक - Internal Retention)**: Preserving breath in full lungs, awakening the *Sushumna Nadi*, building internal pressure, and maximizing cellular oxygen diffusion.
+3. **Rechaka (रेचक - Exhalation)**: Slow, prolonged exhalation expelling *Apana*, physical toxins, and mental tension.
+4. **Bahya Kumbhaka (बाह्य कुम्भक - External Retention / Shunya Void)**: Resting in primordial emptiness between breaths, stimulating hypercapnic adaptation (CO₂ tolerance) and cerebral vasodilation (Bohr effect).
+
+#### 2. The 4:16:8:16 Ratio & Visama Vritti Dynamics
+The default profile (`PRANAYAMA_HATHA`) establishes the classical **1 : 4 : 2 : 4** ratio:
+- **Purak (Inhale)**: 4 seconds
+- **Kumbhak (Hold In)**: 16 seconds (4× Puraka)
+- **Rechak (Exhale)**: 8 seconds (2× Puraka)
+- **Kumbhak (Hold Out)**: 16 seconds (4× Puraka)
+- **Total Cycle**: 44 seconds per round across 20 target rounds (~14m 40s).
+- **Physiological Impact**: The 2× exhalation activates the parasympathetic vagus nerve, lowering heart rate, while the prolonged retentions build baroreflex sensitivity and mental equanimity.
+
+#### 3. Gentle Lady Voice Guidance Engine (`PranayamaVoiceGuide.kt`)
+- **System Integration**: Wraps Android's native offline `TextToSpeech` engine, guaranteeing 100% offline reliability without network latency or APK bloat.
+- **Gentle Female Voice Profile**: Scans system TTS voices for female attributes with `Locale("en", "IN")` or `Locale.US`, setting a slow, mindful speech rate (`0.85f`) and warm pitch (`0.95f`).
+- **Phase Transition Cues**:
+  - `SANSKRIT`: Whispers `"Purak"`, `"Kumbhak"`, `"Rechak"`, `"Kumbhak"`.
+  - `ENGLISH`: Speaks `"Inhale"`, `"Hold breath"`, `"Exhale"`, `"Hold empty"`.
+  - `BILINGUAL`: Speaks `"Purak... Inhale"`, `"Kumbhak... Hold"`, etc.
+- **Dynamic Background Audio Ducking**:
+  - Synchronously commands `BackgroundMusicManager.duckVolume(0.20f)` to smoothly attenuate ambient meditation drones down to ~15%–20% gain during speech.
+  - Automatically restores normal volume upon `UtteranceProgressListener.onDone` or error.
+
+#### 4. Milestone & Completion Bells
+- **5-Round Milestone Chime**: When all 4 phases complete and `(pranayamaRound - 1) % 5 == 0`, `TimerEngine` triggers the approved signature **Option C 3-bell sequence** (`2048Hz -> 1536Hz -> 1024Hz`) to pace the practitioner's session without opening their eyes.
+- **Session Completion**: Upon completing the configured target rounds, strikes the deep resonant **Temple Gong** (`130.8Hz`).
+- **Pocket Mode Safeguard**: In Pocket Mode, audible chimes and voice guidance are replaced with distinct multi-pulse tactile haptic vibrations.
+
+#### 5. Sacred Blooming Lotus & Dynamic Prana Aura (`BreathIndicator.kt`)
+- **8-Petal Blooming Sacred Lotus**: Canvas-drawn organic geometry using cubic bezier paths.
+- **Purak (Inhale - 4s)**: Petals gracefully bloom outward from `0.42` to full expansion `1.0` with `FastOutSlowInEasing` and radiant dawn turquoise prana aura (`#2DD4BF`).
+- **Antar Kumbhak (Hold - 16s)**: Full lotus hovers with a living sinusoidal micro-pulse (`±2.5%` at ~0.5Hz) and rotating prana particles, creating a living breathing visual that never feels frozen.
+- **Rechak (Exhale - 8s)**: Petals gently rotate and fold inward towards center as the palette deepens into calming twilight amethyst (`#818CF8`).
+- **Bahya Kumbhak (Hold Out - 16s)**: Petals rest closed into a quiet dormant golden seed in the center, framed by a serene outer circular guideline representing *Shunya* (the void).
+- **Phase HUD**: Renders Romanized Sanskrit title, classical Devanagari script, English subtitle, large seconds countdown, and circular phase completion arc.
+
+#### 6. Dual-Domain Customization (`SettingsDrawer.kt`)
+- When a Pranayama profile is active, `SettingsDrawer` renders the dedicated **Pranayama Breathwork Settings**:
+  1. Quick 1-tap Ratio Presets: *Hatha (4:16:8:16)*, *Nadi (4:16:8:0)*, *Box (4:4:4:4)*, *Relax (4:7:8:2)*.
+  2. Four Phase Custom Steppers & Sliders: Independent +/- steppers and sliders for Purak, Kumbhak (In), Rechak, Kumbhak (Out).
+  3. Target Rounds Stepper & Chips: `5`, `10`, `15`, `20`, `30` rounds.
+  4. Gentle Lady Voice Guidance Toggle, Style Picker, and Live Audition Button.
 
 ---
 
@@ -373,6 +428,7 @@ Native `MediaRouteButton` interactions in Jetpack Compose require strict backgro
 | `DialTvDiscoverer` | `CoroutineScope(SupervisorJob())` | `Dispatchers.IO` | Manages SSDP UDP multicast socket probes and HTTP device descriptor XML parsing off the main thread. |
 | `DisplayAutomationManager` | `CoroutineScope(SupervisorJob())` + Sensor Thread | `Dispatchers.Default` | Processes multi-sensor fusion (proximity, lux, gravity, significant motion), orchestrates 10s flat countdowns, and emits atomic `DisplayCurtainState`. |
 | `BackgroundMusicManager` | Main Thread + Background Decode | `Dispatchers.Main` / Media | Coordinates headless WebView audio rendering, MediaPlayer playback, and audio focus ducking. |
+| `PranayamaVoiceGuide` | System TTS Engine Callback Thread | `Dispatchers.Main` / AudioTrack | Coordinates offline Android TextToSpeech synthesis, gentle female voice selection, and dynamic background music ducking. |
 
 ---
 

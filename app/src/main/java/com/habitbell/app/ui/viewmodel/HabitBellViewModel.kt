@@ -570,6 +570,65 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
         )
     }
 
+    /** Gentle lady voice guidance coordinator handle from process singleton. */
+    val voiceGuide: com.habitbell.app.engine.PranayamaVoiceGuide = sessionHandler.voiceGuide
+
+    /**
+     * Updates active Pranayama breath timing parameters, target rounds, and voice guidance settings.
+     *
+     * @param purakSeconds Duration for Puraka (Inhale) in seconds.
+     * @param antarKumbhakSeconds Duration for Antar Kumbhaka (Hold In) in seconds.
+     * @param rechakSeconds Duration for Rechaka (Exhale) in seconds.
+     * @param bahyaKumbhakSeconds Duration for Bahya Kumbhaka (Hold Out) in seconds.
+     * @param targetRounds Total cycles/repetitions configured for the session.
+     * @param isVoiceEnabled Whether gentle lady voice prompts are triggered on phase transitions.
+     * @param voiceStyle Linguistic cue style ([com.habitbell.app.data.model.VoiceCueStyle]).
+     */
+    fun updateActivePranayamaSettings(
+        purakSeconds: Int,
+        antarKumbhakSeconds: Int,
+        rechakSeconds: Int,
+        bahyaKumbhakSeconds: Int,
+        targetRounds: Int,
+        isVoiceEnabled: Boolean = true,
+        voiceStyle: com.habitbell.app.data.model.VoiceCueStyle = com.habitbell.app.data.model.VoiceCueStyle.SANSKRIT
+    ) {
+        val currentProfile = sessionState.value.profile
+        repository.updatePranayamaSettings(
+            profileId = currentProfile.id,
+            purakSeconds = purakSeconds,
+            antarKumbhakSeconds = antarKumbhakSeconds,
+            rechakSeconds = rechakSeconds,
+            bahyaKumbhakSeconds = bahyaKumbhakSeconds,
+            targetRounds = targetRounds,
+            isVoiceEnabled = isVoiceEnabled,
+            voiceStyle = voiceStyle
+        )
+        val updatedConfig = (currentProfile.pranayamaConfig ?: com.habitbell.app.data.model.PranayamaConfig(emptyList(), targetRounds))
+            .withStepDurations(
+                purak = purakSeconds,
+                antar = antarKumbhakSeconds,
+                rechak = rechakSeconds,
+                bahya = bahyaKumbhakSeconds,
+                rounds = targetRounds,
+                voiceEnabled = isVoiceEnabled,
+                voiceStyle = voiceStyle
+            )
+        engine.loadProfile(
+            currentProfile.copy(
+                pranayamaConfig = updatedConfig,
+                totalDurationSeconds = updatedConfig.totalSessionSeconds
+            )
+        )
+    }
+
+    /**
+     * Auditions a sample gentle lady voice cue ("Purak") for settings preview.
+     */
+    fun testPranayamaVoiceCue() {
+        voiceGuide.auditionCue("Purak")
+    }
+
     /**
      * Switches the active health platform provider (e.g. Device Pedometer, Health Connect, Apple Health).
      *

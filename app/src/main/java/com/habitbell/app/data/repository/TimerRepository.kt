@@ -6,8 +6,7 @@ import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
 import com.habitbell.app.data.default.DefaultProfiles
 import com.habitbell.app.data.default.DefaultReminders
-import com.habitbell.app.data.model.RoutineReminder
-import com.habitbell.app.data.model.TimerProfile
+import com.habitbell.app.data.model.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
@@ -67,9 +66,43 @@ class TimerRepository(private val context: Context) {
                 defaultProfile.intervalDurationSeconds
             }
 
+            // Restore any persistent Pranayama customizations
+            val restoredPranayama = defaultProfile.pranayamaConfig?.let { baseConfig ->
+                val pPurak = prefs.getInt("profile_pranayama_purak_${defaultProfile.id}", -1)
+                val pAntar = prefs.getInt("profile_pranayama_antar_${defaultProfile.id}", -1)
+                val pRechak = prefs.getInt("profile_pranayama_rechak_${defaultProfile.id}", -1)
+                val pBahya = prefs.getInt("profile_pranayama_bahya_${defaultProfile.id}", -1)
+                val pRounds = prefs.getInt("profile_pranayama_rounds_${defaultProfile.id}", -1)
+                val pVoiceEnabled = prefs.getBoolean("profile_pranayama_voice_${defaultProfile.id}", baseConfig.isVoiceGuidanceEnabled)
+                val pVoiceStyleStr = prefs.getString("profile_pranayama_voice_style_${defaultProfile.id}", baseConfig.voiceCueStyle.name)
+                val pVoiceStyle = try {
+                    VoiceCueStyle.valueOf(pVoiceStyleStr ?: baseConfig.voiceCueStyle.name)
+                } catch (_: Exception) {
+                    baseConfig.voiceCueStyle
+                }
+
+                if (pPurak > 0 || pAntar >= 0 || pRechak > 0 || pBahya >= 0 || pRounds > 0) {
+                    baseConfig.withStepDurations(
+                        purak = if (pPurak > 0) pPurak else baseConfig.purakSeconds,
+                        antar = if (pAntar >= 0) pAntar else baseConfig.antarKumbhakSeconds,
+                        rechak = if (pRechak > 0) pRechak else baseConfig.rechakSeconds,
+                        bahya = if (pBahya >= 0) pBahya else baseConfig.bahyaKumbhakSeconds,
+                        rounds = if (pRounds > 0) pRounds else baseConfig.targetRounds,
+                        voiceEnabled = pVoiceEnabled,
+                        voiceStyle = pVoiceStyle
+                    )
+                } else {
+                    baseConfig.copy(
+                        isVoiceGuidanceEnabled = pVoiceEnabled,
+                        voiceCueStyle = pVoiceStyle
+                    )
+                }
+            }
+
             defaultProfile.copy(
                 totalDurationSeconds = dur,
-                intervalDurationSeconds = inter
+                intervalDurationSeconds = inter,
+                pranayamaConfig = restoredPranayama
             )
         }
     }
@@ -208,6 +241,69 @@ class TimerRepository(private val context: Context) {
                         stepGoal = stepGoal ?: profile.stepGoal,
                         stepInterval = stepInterval ?: profile.stepInterval,
                         stepTriggerMode = stepTriggerMode ?: profile.stepTriggerMode
+                    )
+                } else {
+                    profile
+                }
+            }
+        }
+    }
+
+    /**
+     * Persists and updates Pranayama breathwork timing parameters and voice guidance configuration.
+     *
+     * @param profileId Unique ID of the target Pranayama profile.
+     * @param purakSeconds Duration for Puraka (Inhale) in seconds.
+     * @param antarKumbhakSeconds Duration for Antar Kumbhaka (Hold In) in seconds.
+     * @param rechakSeconds Duration for Rechaka (Exhale) in seconds.
+     * @param bahyaKumbhakSeconds Duration for Bahya Kumbhaka (Hold Out) in seconds.
+     * @param targetRounds Total cycles/repetitions configured for the session.
+     * @param isVoiceEnabled Whether gentle lady voice prompts are triggered on phase transitions.
+     * @param voiceStyle Linguistic cue style ([VoiceCueStyle]).
+     */
+    fun updatePranayamaSettings(
+        profileId: String,
+        purakSeconds: Int,
+        antarKumbhakSeconds: Int,
+        rechakSeconds: Int,
+        bahyaKumbhakSeconds: Int,
+        targetRounds: Int,
+        isVoiceEnabled: Boolean = true,
+        voiceStyle: VoiceCueStyle = VoiceCueStyle.SANSKRIT
+    ) {
+        prefs.edit()
+            .putInt("profile_pranayama_purak_$profileId", purakSeconds)
+            .putInt("profile_pranayama_antar_$profileId", antarKumbhakSeconds)
+            .putInt("profile_pranayama_rechak_$profileId", rechakSeconds)
+            .putInt("profile_pranayama_bahya_$profileId", bahyaKumbhakSeconds)
+            .putInt("profile_pranayama_rounds_$profileId", targetRounds)
+            .putBoolean("profile_pranayama_voice_$profileId", isVoiceEnabled)
+            .putString("profile_pranayama_voice_style_$profileId", voiceStyle.name)
+            .apply()
+
+        _profiles.update { list ->
+            list.map { profile ->
+                if (profile.id == profileId) {
+                    val updatedConfig = (profile.pranayamaConfig ?: PranayamaConfig(
+                        steps = listOf(
+                            PranayamaStep(PranayamaPhase.INHALE, purakSeconds),
+                            PranayamaStep(PranayamaPhase.HOLD_IN, antarKumbhakSeconds),
+                            PranayamaStep(PranayamaPhase.EXHALE, rechakSeconds),
+                            PranayamaStep(PranayamaPhase.HOLD_OUT, bahyaKumbhakSeconds)
+                        ),
+                        targetRounds = targetRounds
+                    )).withStepDurations(
+                        purak = purakSeconds,
+                        antar = antarKumbhakSeconds,
+                        rechak = rechakSeconds,
+                        bahya = bahyaKumbhakSeconds,
+                        rounds = targetRounds,
+                        voiceEnabled = isVoiceEnabled,
+                        voiceStyle = voiceStyle
+                    )
+                    profile.copy(
+                        pranayamaConfig = updatedConfig,
+                        totalDurationSeconds = updatedConfig.totalSessionSeconds
                     )
                 } else {
                     profile

@@ -156,6 +156,9 @@ class TimerEngine(
      */
     var isPocketModeActive: () -> Boolean = { false }
 
+    /** Voice guidance coordinator articulating gentle vocal cues for Pranayama phase transitions. */
+    var voiceGuide: PranayamaVoiceGuide? = null
+
     /** Coroutine scope bound to Default dispatcher with a SupervisorJob to prevent cancellation cascading. */
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
@@ -287,12 +290,22 @@ class TimerEngine(
      */
     fun startOrResume() {
         if (_state.value.status == SessionStatus.RUNNING) return
+        val wasIdle = _state.value.status == SessionStatus.IDLE
         if (_state.value.status == SessionStatus.COMPLETED) {
             reset()
         }
 
         _state.update { it.copy(status = SessionStatus.RUNNING) }
         sessionStartRealtime = SystemClock.elapsedRealtime()
+
+        // If initiating a Pranayama session from start, articulate the initial phase cue
+        if (wasIdle && _state.value.profile.type == TimerType.MULTI_INTERVAL) {
+            val config = _state.value.profile.pranayamaConfig
+            val firstPhase = _state.value.currentPranayamaPhase
+            if (config != null && config.isVoiceGuidanceEnabled && firstPhase != null && !isPocketModeActive()) {
+                voiceGuide?.speakPhaseCue(firstPhase, config.voiceCueStyle)
+            }
+        }
 
         timerJob = scope.launch {
             // Heartbeat loop optimized for battery conservation: 1Hz tick rate
@@ -312,6 +325,7 @@ class TimerEngine(
             timerJob = null
             visualAlertRemainingTicks = 0
             hapticManager.cancel()
+            voiceGuide?.stop()
             _state.update { it.copy(status = SessionStatus.PAUSED, isDimmed = false, isVisualAlertActive = false) }
         }
     }
@@ -324,6 +338,7 @@ class TimerEngine(
         timerJob = null
         visualAlertRemainingTicks = 0
         hapticManager.cancel()
+        voiceGuide?.stop()
         _state.update { it.copy(status = SessionStatus.IDLE, isDimmed = false, isVisualAlertActive = false) }
     }
 
@@ -502,10 +517,12 @@ class TimerEngine(
         if (newPhaseSec <= 0) {
             // Advance to the subsequent breathwork phase
             pranayamaStepIndex++
+            var completedFullCycle = false
             if (pranayamaStepIndex >= config.steps.size) {
                 // Completed one full breath cycle (all 4 phases)
                 pranayamaStepIndex = 0
                 pranayamaRound++
+                completedFullCycle = true
             }
 
             // Verify if target repetition rounds have been reached
@@ -514,9 +531,27 @@ class TimerEngine(
                 return
             }
 
+            // Milestone interval chime check! (chimes every 5 completed rounds)
+            if (completedFullCycle) {
+                val cadence = config.intervalBellRoundCadence.takeIf { it > 0 } ?: 5
+                if ((pranayamaRound - 1) % cadence == 0) {
+                    if (isPocketModeActive()) {
+                        hapticManager.triggerIntervalHaptic()
+                    } else {
+                        audioManager.playIntervalBell()
+                        visualAlertRemainingTicks = 5
+                    }
+                }
+            }
+
             val nextStep = config.steps[pranayamaStepIndex]
             if (isPocketModeActive()) {
                 hapticManager.triggerBreathPhaseHaptic()
+            } else {
+                // Articulate gentle lady voice instruction for the upcoming phase
+                if (config.isVoiceGuidanceEnabled) {
+                    voiceGuide?.speakPhaseCue(nextStep.phase, config.voiceCueStyle)
+                }
             }
 
             _state.update {

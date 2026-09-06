@@ -80,11 +80,47 @@ class BackgroundMusicManager(private val context: Context) {
     var volume: Float = 0.35f
         set(value) {
             field = value.coerceIn(0f, 1f)
-            try {
-                mediaPlayer?.setVolume(field, field)
-            } catch (_: Exception) {}
-            setYouTubeVolume(field)
+            if (!isDucked) {
+                applyVolumeToOutputs(field)
+            }
         }
+
+    /** State flag indicating whether background ambient soundscape is currently ducked. */
+    private var isDucked: Boolean = false
+
+    /**
+     * Applies normalized volume gain directly to active audio player handles.
+     *
+     * @param target Normalized gain from 0.0f to 1.0f.
+     */
+    private fun applyVolumeToOutputs(target: Float) {
+        val safeGain = target.coerceIn(0f, 1f)
+        try {
+            mediaPlayer?.setVolume(safeGain, safeGain)
+        } catch (_: Exception) {}
+        setYouTubeVolume(safeGain)
+    }
+
+    /**
+     * Smoothly attenuates ambient background music volume to a subtle level during voice cues.
+     *
+     * @param duckedRatio Ratio of regular volume to retain (default 0.25f, e.g. 25% of configured gain).
+     */
+    fun duckVolume(duckedRatio: Float = 0.25f) {
+        if (!isEnabled || !isPlaying) return
+        isDucked = true
+        val target = (volume * duckedRatio).coerceIn(0.04f, 0.15f)
+        applyVolumeToOutputs(target)
+    }
+
+    /**
+     * Restores ambient background music gain back to the user's configured volume level.
+     */
+    fun restoreVolume() {
+        if (!isDucked) return
+        isDucked = false
+        applyVolumeToOutputs(volume)
+    }
 
     /**
      * Returns or instantiates the WebView. Attaching it to the Activity view hierarchy

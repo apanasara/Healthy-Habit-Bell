@@ -20,30 +20,104 @@ import com.google.android.gms.cast.framework.CastButtonFactory
 import com.habitbell.app.R
 
 /**
- * Custom [MediaRouteDialogFactory] ensuring that [MediaRouteChooserDialog] and
- * [MediaRouteControllerDialog] are always instantiated with an explicit non-translucent
- * Theme context, preventing [IllegalArgumentException: background can not be translucent: #0]
- * crashes during Cast discovery dialog inflation.
+ * # HabitBellChooserDialogFragment
  *
- * @property isDark True when current theme background luminance is dark (< 0.5f).
+ * Public top-level [MediaRouteChooserDialogFragment] providing a dedicated, non-translucent
+ * theme context wrapper for Google Cast device discovery sheets.
+ *
+ * ## Architectural Role & Component Relationships
+ * Instantiated by [HabitBellMediaRouteDialogFactory] and managed by Android's [androidx.fragment.app.FragmentManager].
+ * Must remain a public, top-level class with an empty public constructor to guarantee safe
+ * state recreation across configuration changes without triggering
+ * `IllegalStateException: Fragment ... must be a public static class`.
+ *
+ * ## Concurrency & Lifecycle
+ * Runs on the Android Main UI Thread bound to the host Activity's Fragment lifecycle.
  */
-class HabitBellMediaRouteDialogFactory(private val isDark: Boolean) : MediaRouteDialogFactory() {
-    override fun onCreateChooserDialogFragment(): MediaRouteChooserDialogFragment {
-        return object : MediaRouteChooserDialogFragment() {
-            override fun onCreateChooserDialog(context: Context, savedInstanceState: Bundle?): MediaRouteChooserDialog {
-                val themeResId = if (isDark) R.style.HabitBellMediaRouteTheme_Dark else R.style.HabitBellMediaRouteTheme_Light
-                return MediaRouteChooserDialog(ContextThemeWrapper(context, themeResId))
+class HabitBellChooserDialogFragment : MediaRouteChooserDialogFragment() {
+
+    override fun onCreateChooserDialog(context: Context, savedInstanceState: Bundle?): MediaRouteChooserDialog {
+        val themeResId = arguments?.getInt(ARG_THEME_RES_ID, R.style.HabitBellMediaRouteTheme_Dark)
+            ?: R.style.HabitBellMediaRouteTheme_Dark
+        return MediaRouteChooserDialog(ContextThemeWrapper(context, themeResId))
+    }
+
+    companion object {
+        private const val ARG_THEME_RES_ID = "arg_theme_res_id"
+
+        /**
+         * Creates a new instance of [HabitBellChooserDialogFragment] configured with the specified theme.
+         *
+         * @param themeResId Android style resource ID for the dialog window background.
+         * @return New configured [HabitBellChooserDialogFragment] instance.
+         */
+        fun newInstance(themeResId: Int): HabitBellChooserDialogFragment {
+            return HabitBellChooserDialogFragment().apply {
+                arguments = Bundle().apply {
+                    putInt(ARG_THEME_RES_ID, themeResId)
+                }
             }
         }
     }
+}
 
-    override fun onCreateControllerDialogFragment(): MediaRouteControllerDialogFragment {
-        return object : MediaRouteControllerDialogFragment() {
-            override fun onCreateControllerDialog(context: Context, savedInstanceState: Bundle?): MediaRouteControllerDialog {
-                val themeResId = if (isDark) R.style.HabitBellMediaRouteTheme_Dark else R.style.HabitBellMediaRouteTheme_Light
-                return MediaRouteControllerDialog(ContextThemeWrapper(context, themeResId))
+/**
+ * # HabitBellControllerDialogFragment
+ *
+ * Public top-level [MediaRouteControllerDialogFragment] providing a dedicated, non-translucent
+ * theme context wrapper for active Google Cast session playback controller sheets.
+ *
+ * ## Architectural Role & Component Relationships
+ * Instantiated by [HabitBellMediaRouteDialogFactory] and managed by Android's [androidx.fragment.app.FragmentManager].
+ * Must remain a public, top-level class with an empty public constructor to guarantee safe
+ * state recreation across configuration changes without triggering `IllegalStateException`.
+ *
+ * ## Concurrency & Lifecycle
+ * Runs on the Android Main UI Thread bound to the host Activity's Fragment lifecycle.
+ */
+class HabitBellControllerDialogFragment : MediaRouteControllerDialogFragment() {
+
+    override fun onCreateControllerDialog(context: Context, savedInstanceState: Bundle?): MediaRouteControllerDialog {
+        val themeResId = arguments?.getInt(ARG_THEME_RES_ID, R.style.HabitBellMediaRouteTheme_Dark)
+            ?: R.style.HabitBellMediaRouteTheme_Dark
+        return MediaRouteControllerDialog(ContextThemeWrapper(context, themeResId))
+    }
+
+    companion object {
+        private const val ARG_THEME_RES_ID = "arg_theme_res_id"
+
+        /**
+         * Creates a new instance of [HabitBellControllerDialogFragment] configured with the specified theme.
+         *
+         * @param themeResId Android style resource ID for the dialog window background.
+         * @return New configured [HabitBellControllerDialogFragment] instance.
+         */
+        fun newInstance(themeResId: Int): HabitBellControllerDialogFragment {
+            return HabitBellControllerDialogFragment().apply {
+                arguments = Bundle().apply {
+                    putInt(ARG_THEME_RES_ID, themeResId)
+                }
             }
         }
+    }
+}
+
+/**
+ * Custom [MediaRouteDialogFactory] ensuring that [MediaRouteChooserDialog] and
+ * [MediaRouteControllerDialog] are instantiated using public, static [HabitBellChooserDialogFragment]
+ * and [HabitBellControllerDialogFragment] with explicit non-translucent theme contexts.
+ *
+ * @property isDark True when current theme background luminance is dark (< 0.5f).
+ */
+class HabitBellMediaRouteDialogFactory(private val isDark: Boolean = true) : MediaRouteDialogFactory() {
+    override fun onCreateChooserDialogFragment(): MediaRouteChooserDialogFragment {
+        val themeResId = if (isDark) R.style.HabitBellMediaRouteTheme_Dark else R.style.HabitBellMediaRouteTheme_Light
+        return HabitBellChooserDialogFragment.newInstance(themeResId)
+    }
+
+    override fun onCreateControllerDialogFragment(): MediaRouteControllerDialogFragment {
+        val themeResId = if (isDark) R.style.HabitBellMediaRouteTheme_Dark else R.style.HabitBellMediaRouteTheme_Light
+        return HabitBellControllerDialogFragment.newInstance(themeResId)
     }
 }
 
