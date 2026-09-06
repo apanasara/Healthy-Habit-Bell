@@ -29,6 +29,7 @@ import com.habitbell.app.data.model.TimerType
 import com.habitbell.app.engine.SessionStatus
 import com.habitbell.app.engine.TimerSessionState
 import com.habitbell.app.ui.components.BreathIndicator
+import com.habitbell.app.ui.components.CastButton
 import com.habitbell.app.ui.components.CircularProgressRing
 import com.habitbell.app.ui.components.CompoundPoseCard
 
@@ -230,13 +231,7 @@ private fun LandscapeSessionLayout(
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (sessionState.profile.isCastSupported) {
-                        IconButton(onClick = onOpenTVMode, modifier = Modifier.size(36.dp)) {
-                            Icon(
-                                Icons.Outlined.Cast,
-                                contentDescription = "Cast to TV",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
+                        CastButton(modifier = Modifier.size(36.dp))
                     }
                     IconButton(onClick = onTriggerPocketMode, modifier = Modifier.size(36.dp)) {
                         Icon(
@@ -392,14 +387,7 @@ private fun PortraitSessionLayout(
 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (sessionState.profile.isCastSupported) {
-                    IconButton(onClick = onOpenTVMode) {
-                        Icon(
-                            Icons.Outlined.Cast,
-                            contentDescription = "Cast / TV Mode",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
+                    CastButton(modifier = Modifier.size(36.dp))
                 }
                 IconButton(onClick = onTriggerPocketMode) {
                     Icon(

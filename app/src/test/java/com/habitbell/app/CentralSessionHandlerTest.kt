@@ -130,4 +130,17 @@ class CentralSessionHandlerTest {
         assertTrue(json.contains("\"formattedTime\":\"20:00\""))
         assertTrue(json.contains("\"nextBellSeconds\":45"))
     }
+
+    /**
+     * Verifies that Google Cast Default Media Receiver Application ID
+     * adheres to standard Play Services Cast specifications ("CC1AD845").
+     */
+    @Test
+    fun testCastOptionsProviderDefaultAppId() {
+        assertEquals(
+            "Default Cast Receiver must be Google Universal Media Receiver CC1AD845",
+            "CC1AD845",
+            com.habitbell.app.cast.CastOptionsProvider.DEFAULT_RECEIVER_APP_ID
+        )
+    }
 }
