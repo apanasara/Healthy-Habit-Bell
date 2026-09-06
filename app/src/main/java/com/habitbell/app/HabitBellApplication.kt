@@ -1,6 +1,7 @@
 package com.habitbell.app
 
 import android.app.Application
+import com.habitbell.app.engine.CentralSessionHandler
 
 /**
  * Global application entry point for the Habit Bell wellness operating system.
@@ -10,8 +11,19 @@ import android.app.Application
  */
 class HabitBellApplication : Application() {
 
+    /** Process-level single session handler and media session orchestrator. */
+    lateinit var sessionHandler: CentralSessionHandler
+        private set
+
+    companion object {
+        /** Global application instance handle. */
+        lateinit var instance: HabitBellApplication
+            private set
+    }
+
     override fun onCreate() {
         super.onCreate()
-        // Process-level initialization hooks
+        instance = this
+        sessionHandler = CentralSessionHandler.getInstance(this)
     }
 }

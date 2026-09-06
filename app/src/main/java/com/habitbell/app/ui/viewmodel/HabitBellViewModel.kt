@@ -9,6 +9,7 @@ import com.habitbell.app.engine.AudioBellManager
 import com.habitbell.app.engine.BackgroundMusicManager
 import com.habitbell.app.engine.BackgroundSoundType
 import com.habitbell.app.engine.BatteryOptimizer
+import com.habitbell.app.engine.CentralSessionHandler
 import com.habitbell.app.engine.HapticManager
 import com.habitbell.app.engine.SessionStatus
 import com.habitbell.app.engine.TimerEngine
@@ -85,23 +86,26 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
     /** SharedPreferences handle for persisting background music and bell preferences. */
     private val prefs = application.getSharedPreferences("habit_bell_settings", android.content.Context.MODE_PRIVATE)
 
+    /** Authoritative process-level session handler orchestrating media controls and timer state. */
+    val sessionHandler: CentralSessionHandler = CentralSessionHandler.getInstance(application)
+
     /** Repository managing persistent profiles, favorites, and routine reminders. */
-    private val repository = TimerRepository(application)
+    val repository: TimerRepository = sessionHandler.repository
 
     /** Audio engine for Tibetan bell chimes and procedural synthesis. */
-    private val audioManager = AudioBellManager(application)
+    val audioManager: AudioBellManager = sessionHandler.audioManager
 
     /** Haptic manager for sensory vibration pulses in Pocket Mode. */
-    private val hapticManager = HapticManager(application)
+    val hapticManager: HapticManager = sessionHandler.hapticManager
 
     /** Power management and hardware proximity sensor coordinator. */
-    val batteryOptimizer = BatteryOptimizer(application)
+    val batteryOptimizer: BatteryOptimizer = sessionHandler.batteryOptimizer
 
     /** Ambient audio engine for continuous meditation drones and YouTube audio. */
-    val bgMusicManager = BackgroundMusicManager(application)
+    val bgMusicManager: BackgroundMusicManager = sessionHandler.bgMusicManager
 
     /** Core 1Hz finite state machine governing timer countdowns and phase cycles. */
-    private val engine = TimerEngine(audioManager, hapticManager)
+    val engine: TimerEngine = sessionHandler.engine
 
     /** Embedded local HTTP daemon and NSD service for broadcasting to Smart TVs. */
     val castServer = com.habitbell.app.cast.LocalCastWebServer(application)
@@ -113,7 +117,7 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
     val uiState: StateFlow<AppUiState> = _uiState.asStateFlow()
 
     /** Live stream of the active timer engine countdown and phase progress. */
-    val sessionState: StateFlow<TimerSessionState> = engine.state
+    val sessionState: StateFlow<TimerSessionState> = sessionHandler.sessionState
 
     /** Catalog of all available preset and user-created timer profiles. */
     val profiles: StateFlow<List<TimerProfile>> = repository.profiles
@@ -174,12 +178,6 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
         // Restore persisted user background music and bell chime preferences
         loadSettings()
 
-        // Initialize engine with user-persisted or default Eating profile (45m duration, 1m interval)
-        val initialProfile = repository.getProfileById("eating-mindful-20") ?: repository.profiles.value.firstOrNull()
-        if (initialProfile != null) {
-            engine.loadProfile(initialProfile)
-        }
-
         // Mute or resume ambient background music when entering or exiting Pocket Mode in public
         viewModelScope.launch {
             isPocketBlankingActive.collect { inPocket ->
@@ -193,55 +191,13 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
             }
         }
 
-        // Observe session status transitions to orchestrate foreground services and battery optimization
+        // Coordinate proximity monitoring when Display Mode is active
         viewModelScope.launch {
-            var lastStatus: SessionStatus? = null
             sessionState.collect { state ->
-                val statusChanged = state.status != lastStatus
-                if (statusChanged) {
-                    lastStatus = state.status
-                    when (state.status) {
-                        SessionStatus.RUNNING -> {
-                            TimerService.startService(
-                                getApplication(),
-                                state.profile.name,
-                                state.formattedRemainingTime
-                            )
-                            batteryOptimizer.acquireWakeLock()
-                            if (_uiState.value.isDisplayMode) {
-                                batteryOptimizer.startProximityMonitoring()
-                            }
-                            bgMusicManager.start()
-                        }
-                        SessionStatus.PAUSED -> {
-                            TimerService.startService(
-                                getApplication(),
-                                state.profile.name,
-                                "${state.formattedRemainingTime} (Paused)"
-                            )
-                            bgMusicManager.pause()
-                        }
-                        SessionStatus.COMPLETED -> {
-                            TimerService.stopService(getApplication())
-                            batteryOptimizer.releaseWakeLock()
-                            batteryOptimizer.stopProximityMonitoring()
-                            bgMusicManager.stop()
-                            repository.recordSessionCompleted(state.profile.id)
-                        }
-                        SessionStatus.IDLE -> {
-                            TimerService.stopService(getApplication())
-                            batteryOptimizer.releaseWakeLock()
-                            batteryOptimizer.stopProximityMonitoring()
-                            bgMusicManager.stop()
-                        }
-                    }
-                } else if (state.status == SessionStatus.RUNNING) {
-                    // Ongoing 1-second ticks: only update notification, DO NOT restart music
-                    TimerService.startService(
-                        getApplication(),
-                        state.profile.name,
-                        state.formattedRemainingTime
-                    )
+                if (state.status == SessionStatus.RUNNING && _uiState.value.isDisplayMode) {
+                    batteryOptimizer.startProximityMonitoring()
+                } else if (state.status != SessionStatus.RUNNING) {
+                    batteryOptimizer.stopProximityMonitoring()
                 }
             }
         }
@@ -254,7 +210,7 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
      * @param openTVMode If true, opens the leanback TV dashboard screen instead of standard mobile screen.
      */
     fun startProfileSession(profile: TimerProfile, openTVMode: Boolean = false) {
-        engine.loadProfile(profile)
+        sessionHandler.startProfile(profile)
         _uiState.update {
             it.copy(
                 currentScreen = if (openTVMode) AppScreen.TV_DASHBOARD else AppScreen.SESSION,
@@ -263,39 +219,34 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
                 isPocketModeManual = profile.pocketMode
             )
         }
-        engine.startOrResume()
     }
 
     /**
-     * Toggles between running and paused states for the active session.
+     * Toggles between running and paused states for the active session across all surfaces.
      */
     fun togglePlayPause() {
-        if (sessionState.value.status == SessionStatus.RUNNING) {
-            engine.pause()
-        } else {
-            engine.startOrResume()
-        }
+        sessionHandler.togglePlayPause()
     }
 
     /**
-     * Pauses the active timer countdown.
+     * Pauses the active timer countdown across all connected devices and vehicle HUD.
      */
     fun pauseTimer() {
-        engine.pause()
+        sessionHandler.pause()
     }
 
     /**
-     * Resumes the paused timer countdown.
+     * Resumes the paused timer countdown across all connected devices and vehicle HUD.
      */
     fun resumeTimer() {
-        engine.startOrResume()
+        sessionHandler.resume()
     }
 
     /**
      * Stops the timer and navigates back to the Home screen.
      */
     fun stopTimer() {
-        engine.reset()
+        sessionHandler.stop()
         exitSessionToHome()
     }
 
@@ -306,42 +257,22 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
      * @param message Voice transcription text (e.g., "start mindful eating timer").
      */
     fun startVoiceTimer(durationSec: Int, message: String) {
-        val allProfiles = profiles.value
-        val lowerMessage = message.lowercase().trim()
-        val matched = allProfiles.find {
-            lowerMessage.isNotEmpty() && (
-                lowerMessage.contains(it.name.lowercase()) ||
-                it.name.lowercase().contains(lowerMessage) ||
-                (lowerMessage.contains("eat") && it.id.contains("eating")) ||
-                (lowerMessage.contains("posture") && it.id == "posture") ||
-                (lowerMessage.contains("read") && it.id == "reading") ||
-                (lowerMessage.contains("walk") && it.id == "walking")
-            )
-        } ?: allProfiles.firstOrNull()
-
-        if (matched != null) {
-            val finalProfile = if (durationSec > 0) {
-                matched.copy(
-                    totalDurationSeconds = durationSec,
-                    intervalDurationSeconds = (durationSec / 5).coerceIn(30, 300)
-                )
-            } else matched
-            startProfileSession(finalProfile)
-        }
+        sessionHandler.startVoiceTimer(durationSec, message)
+        _uiState.update { it.copy(currentScreen = AppScreen.SESSION) }
     }
 
     /**
      * Resets the active session back to initial values without leaving the session screen.
      */
     fun resetSession() {
-        engine.reset()
+        sessionHandler.reset()
     }
 
     /**
      * Halts the active session and returns to the home screen.
      */
     fun exitSessionToHome() {
-        engine.pause()
+        sessionHandler.pause()
         _uiState.update { it.copy(currentScreen = AppScreen.HOME, isSettingsDrawerOpen = false) }
     }
 
@@ -703,18 +634,12 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     /**
-     * Cleanly tears down all background services, web servers, audio buffers, and hardware locks
-     * when the ViewModel lifecycle terminates.
+     * Cleans up local UI resources when the ViewModel lifecycle terminates.
+     * Note: [CentralSessionHandler] remains active in the process to guarantee uninterrupted
+     * audio playback and synchronization with Android Auto, car HUD, and wearable controllers.
      */
     override fun onCleared() {
         super.onCleared()
-        engine.destroy()
-        hapticManager.cancel()
-        bgMusicManager.release()
         castServer.stop()
-        TimerService.stopService(getApplication())
-        audioManager.release()
-        batteryOptimizer.releaseWakeLock()
-        batteryOptimizer.stopProximityMonitoring()
     }
 }

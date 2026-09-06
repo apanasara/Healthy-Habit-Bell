@@ -55,7 +55,15 @@ Habit Bell is designed as an offline-first, distraction-free wellness operating 
   - `PocketOverlay`: `#000000` AMOLED power-saving curtain with double-tap/long-press protection activated by proximity sensor.
   - `CompoundPoseCard`: Step indicator for multi-step sequences (e.g., Yoga postures, Reiki hand positions).
 
-### 2.2. Engine Layer (`com.habitbell.app.engine`)
+### 2.2. Central Session & Engine Layer (`com.habitbell.app.engine`)
+- **`CentralSessionHandler`**:
+  - The process-level single source of truth and session orchestrator.
+  - Owns the authoritative `MediaSessionCompat` ("HabitBellMediaSession") and coordinates bidirectional synchronization across all 5 control surfaces:
+    1. **Car HUD (Android Auto)**: Transport controls and metadata via MediaSession.
+    2. **Mobile Display (`SessionScreen`)**: Real-time Compose animations and playback toggles.
+    3. **Car App Library Screen (`HabitBellCarScreen`)**: In-vehicle list templates and progress tracking.
+    4. **Wear OS / Smartwatch**: Mirrored Android media session transport controls.
+    5. **Smart TV Dashboard (`LocalCastWebServer`)**: LAN web broadcast with synchronized play/pause actions.
 - **`TimerEngine`**:
   - The central heartbeat of the app. Implements a finite state machine (`IDLE`, `RUNNING`, `PAUSED`, `COMPLETED`).
   - Supports three distinct timer topologies:
@@ -63,9 +71,12 @@ Habit Bell is designed as an offline-first, distraction-free wellness operating 
     2. **`MULTI_INTERVAL`**: Multi-round, 4-phase Pranayama breathwork (`INHALE`, `HOLD_IN`, `EXHALE`, `HOLD_OUT`).
     3. **`COMPOUND`**: Multi-pose sequencer iterating through distinct named steps with specific durations.
   - Time drift prevention: Relies on `SystemClock.elapsedRealtime()` to avoid system sleep skew and clock manipulation.
-- **`AudioBellManager`**: Dual-mode audio engine supporting low-latency procedural frequency synthesis (`ToneGenerator`) and pre-rendered harmonic Tibetan singing bowl / chime samples (`SoundPool`).
+- **`AudioBellManager`**:
+  - Dual-mode audio engine supporting low-latency procedural frequency synthesis and pre-rendered harmonic Tibetan singing bowl / chime samples (`SoundPool`).
+  - **Automotive Audio Routing**: Configured with `AudioAttributes.USAGE_MEDIA` and `CONTENT_TYPE_MUSIC`. This guarantees bell chimes route over the vehicle audio system (Android Auto / Bluetooth A2DP) rather than isolating to the mobile handset speaker, while transient ducking smoothly lowers background music during the chime.
+- **`BackgroundMusicManager`**: Ambient soundscape coordinator supporting bundled Aum drones, local SAF storage audio files, and ad-free sandboxed YouTube streaming.
 - **`HapticManager`**: Tactile feedback generation using modern `VibrationEffect` with legacy fallback. **Constraint**: Haptics are strictly reserved for Pocket Mode to keep regular meditation silent.
-- **`TimerService`**: Foreground service maintaining CPU execution (`PARTIAL_WAKE_LOCK`) and updating persistent notification during active sessions when the UI is backgrounded.
+- **`TimerService` / `HabitBellMediaService`**: Foreground service maintaining CPU execution (`PARTIAL_WAKE_LOCK`) and updating persistent `MediaStyle` notification linked to `CentralSessionHandler.sessionToken`.
 
 ### 2.3. Data & Domain Layer (`com.habitbell.app.data`)
 - **Models**:
@@ -79,12 +90,11 @@ Habit Bell is designed as an offline-first, distraction-free wellness operating 
 
 ### 2.4. Cross-Platform & Peripheral Subsystems
 - **Android Auto (`com.habitbell.app.auto`)**:
-  - Integrates with Android for Cars App Library.
-  - Provides driver-safe screen templates (`HabitBellCarScreen`) and MediaBrowser integration (`HabitBellMediaService`).
+  - Integrates with Android for Cars App Library (`HabitBellCarScreen`) and `MediaBrowserServiceCompat` (`HabitBellMediaService`).
+  - Directly binds to `CentralSessionHandler.sessionToken`. Ensures that actions from car steering wheel buttons, Car HUD, or mobile display remain 100% synchronized with 0 lag.
 - **Local TV WebCast (`com.habitbell.app.cast`)**:
   - Zero-cloud local casting via embedded lightweight HTTP server (`LocalCastWebServer`) running on port `8888`.
-  - Discovered automatically by Smart TVs and web browsers on the local LAN via Network Service Discovery (NSD / mDNS / Bonjour).
-  - Pushes live countdown state via Server-Sent Events (SSE) to a bundled web dashboard (`assets/tv/index.html`).
+  - Exposes `/api/state` and `/api/action/toggle` endpoints to keep Smart TV web browsers synchronized with the central session handler.
 
 ---
 
