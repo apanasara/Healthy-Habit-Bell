@@ -657,17 +657,26 @@ private fun PortraitSessionLayout(
                                 phase = phase,
                                 remainingSeconds = sessionState.phaseRemainingSeconds,
                                 phaseDuration = sessionState.phaseDurationSeconds,
-                                size = 260.dp
+                                size = 280.dp,
+                                modifier = Modifier.clickable { onOpenSettings() }
                             )
                         }
 
-                        Spacer(modifier = Modifier.height(28.dp))
+                        Spacer(modifier = Modifier.height(24.dp))
 
                         Text(
                             text = "Round ${sessionState.currentRound} of ${sessionState.totalRounds}",
                             style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Medium,
+                            fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.primary
+                        )
+                        val intervalCadence = sessionState.profile.pranayamaConfig?.intervalBellRoundCadence?.takeIf { it > 0 } ?: 5
+                        val roundsUntilBell = intervalCadence - ((sessionState.currentRound - 1) % intervalCadence)
+                        Text(
+                            text = "🔔 Interval bell in $roundsUntilBell ${if (roundsUntilBell == 1) "round" else "rounds"}",
+                            style = MaterialTheme.typography.labelSmall,
+                            letterSpacing = 1.sp,
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.85f)
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(

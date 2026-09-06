@@ -47,6 +47,41 @@ object DefaultProfiles {
     )
 
     /**
+     * Classical Hatha Yoga Pranayama (Visama Vritti): Golden 4:16:8:16 ratio across 20 cycles.
+     * Grounded in Hatha Yoga Pradipika (HYP 2.2-2.10):
+     * 1. Purak (Inhale deeply): 4 seconds
+     * 2. Antar Kumbhak (Hold In / Breath Retention): 16 seconds
+     * 3. Rechak (Exhale slowly): 8 seconds
+     * 4. Bahya Kumbhak (Hold Out / Shunya Void): 16 seconds
+     *
+     * Features gentle lady voice guidance, background audio ducking, milestone Option C interval
+     * chimes every 5 rounds, and sacred blooming lotus animation.
+     */
+    val PRANAYAMA_HATHA = TimerProfile(
+        id = "pranayama-hatha-classical",
+        name = "Pranayama (Hatha Yoga)",
+        type = TimerType.MULTI_INTERVAL,
+        category = "Hatha Breathwork",
+        iconName = "self_improvement",
+        theme = ThemeMode.AMOLED,
+        displayMode = true,
+        pocketMode = false,
+        isFavorite = true,
+        pranayamaConfig = PranayamaConfig(
+            steps = listOf(
+                PranayamaStep(PranayamaPhase.INHALE, 4),
+                PranayamaStep(PranayamaPhase.HOLD_IN, 16),
+                PranayamaStep(PranayamaPhase.EXHALE, 8),
+                PranayamaStep(PranayamaPhase.HOLD_OUT, 16)
+            ),
+            targetRounds = 20,
+            intervalBellRoundCadence = 5,
+            isVoiceGuidanceEnabled = true,
+            voiceCueStyle = VoiceCueStyle.SANSKRIT
+        )
+    )
+
+    /**
      * Box Breathing (Sama Vritti): Equalized 4-4-4-4 ratio across 20 cycles.
      * Inhale 4s, Hold In 4s, Exhale 4s, Rest Empty 4s.
      * Clinically proven to regulate the autonomic nervous system and lower cortisol.
@@ -237,6 +272,7 @@ object DefaultProfiles {
      * Complete list of all default preset wellness profiles.
      */
     val ALL_PRESETS = listOf(
+        PRANAYAMA_HATHA,
         EATING,
         REIKI,
         PRANAYAMA_BOX,

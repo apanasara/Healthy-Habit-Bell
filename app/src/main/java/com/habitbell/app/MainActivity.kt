@@ -259,6 +259,10 @@ class MainActivity : FragmentActivity() {
                             onUpdateTime = { total, interval ->
                                 viewModel.updateActiveProfileTimes(total, interval)
                             },
+                            onUpdatePranayama = { purak, antar, rechak, bahya, rounds, voiceEnabled, voiceStyle ->
+                                viewModel.updateActivePranayamaSettings(purak, antar, rechak, bahya, rounds, voiceEnabled, voiceStyle)
+                            },
+                            onTestVoiceCue = { viewModel.testPranayamaVoiceCue() },
                             onOpenTVMode = {
                                 viewModel.openSettingsDrawer(false)
                                 viewModel.navigateTo(AppScreen.TV_DASHBOARD)
