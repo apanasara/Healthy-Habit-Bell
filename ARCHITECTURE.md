@@ -370,32 +370,50 @@ The practice regulates the four sacred limbs of the breath cycle:
 3. **Rechaka (रेचक - Exhalation)**: Slow, prolonged exhalation expelling *Apana*, physical toxins, and mental tension.
 4. **Bahya Kumbhaka (बाह्य कुम्भक - External Retention / Shunya Void)**: Resting in primordial emptiness between breaths, stimulating hypercapnic adaptation (CO₂ tolerance) and cerebral vasodilation (Bohr effect).
 
-#### 2. The 4:16:8:16 Ratio & Visama Vritti Dynamics
-The default profile (`PRANAYAMA_HATHA`) establishes the classical **1 : 4 : 2 : 4** ratio:
-- **Purak (Inhale)**: 4 seconds
-- **Kumbhak (Hold In)**: 16 seconds (4× Puraka)
-- **Rechak (Exhale)**: 8 seconds (2× Puraka)
-- **Kumbhak (Hold Out)**: 16 seconds (4× Puraka)
-- **Total Cycle**: 44 seconds per round across 20 target rounds (~14m 40s).
-- **Physiological Impact**: The 2× exhalation activates the parasympathetic vagus nerve, lowering heart rate, while the prolonged retentions build baroreflex sensitivity and mental equanimity.
+#### 2. Proportional Ratio Stages & Visama Vritti Dynamics
+When Bahya Kumbhaka (external void) is included, practitioners advance through classical proportional stages selected via the **Proportional Ratio Stages Dropdown**:
+1. **Sama Vritti (Equalized / Box)**: `1 : 1 : 1 : 1` (e.g. 4s : 4s : 4s : 4s) — Balances the nervous system and develops breath discipline.
+2. **Madhya (Intermediate Stage)**: `1 : 2 : 2 : 1` (e.g. 4s : 8s : 8s : 4s) — Introduces retention with mild external void.
+3. **Visama Vritti (Classical Advanced)**: `1 : 4 : 2 : 4` (e.g. 4s : 16s : 8s : 16s) [Default] — Deep Hatha Yoga standard activating prana sublimation and hypercapnic adaptation.
+4. **Visama Vritti (Gentle Void)**: `1 : 4 : 2 : 1` (e.g. 4s : 16s : 8s : 4s) — Full internal retention with gentle void entry.
+5. **Visama Vritti (Half Void)**: `1 : 4 : 2 : 2` (e.g. 4s : 16s : 8s : 8s) — Intermediate external void challenge.
+6. **Custom User Ratios**: Manual seconds entry per phase portion.
 
-#### 3. Gentle Lady Voice Guidance Engine (`PranayamaVoiceGuide.kt`)
+- **Base Inhale Scaling**: Quick scalar multipliers (2s, 3s, 4s, 5s, 6s) instantly recalculate all four phase seconds according to the selected ratio.
+- **Four Phase Setting Portions (Direct Input Fields)**:
+  - 1. **Purak (Inhale)**: 4 seconds default (`min: 1s, max: 60s`)
+  - 2. **Kumbhak (Hold In)**: 16 seconds default (`min: 0s, max: 60s`)
+  - 3. **Rechak (Exhale)**: 8 seconds default (`min: 1s, max: 60s`)
+  - 4. **Kumbhak (Hold Out)**: 16 seconds default (`min: 0s, max: 60s`)
+  - Features direct numerical `OutlinedTextField` editing with fine `-1s`, `+1s`, and `+4s` adjustment buttons.
+
+#### 3. Target Practice Rounds & Classical Yogic Stages
+Grounded in *Hatha Yoga Pradipika* (2.12) & *Gheranda Samhita* (5.49):
+- **12 Rounds (Adhama / Foundation)**: Default setting (~8 minutes 48 seconds at 4:16:8:16). Establishes foundational nadi cleansing and respiratory stability.
+- **24 Rounds (Madhyama / Intermediate)**: Deepens metabolic down-regulation and prana circulation.
+- **36 Rounds (Uttama / Advanced)**: Awaking Sushumna nadi and contemplative stillness.
+- **Custom Steppers & Quick Chips**: Introduces 6, 12, 18, 24, 36 round presets with `-1`, `+1`, `+6` fine steppers (1 to 108 rounds).
+
+#### 4. Gentle Lady Voice Guidance Engine (`PranayamaVoiceGuide.kt`)
 - **System Integration**: Wraps Android's native offline `TextToSpeech` engine, guaranteeing 100% offline reliability without network latency or APK bloat.
 - **Gentle Female Voice Profile**: Scans system TTS voices for female attributes with `Locale("en", "IN")` or `Locale.US`, setting a slow, mindful speech rate (`0.85f`) and warm pitch (`0.95f`).
-- **Phase Transition Cues**:
-  - `SANSKRIT`: Whispers `"Purak"`, `"Kumbhak"`, `"Rechak"`, `"Kumbhak"`.
-  - `ENGLISH`: Speaks `"Inhale"`, `"Hold breath"`, `"Exhale"`, `"Hold empty"`.
-  - `BILINGUAL`: Speaks `"Purak... Inhale"`, `"Kumbhak... Hold"`, etc.
+- **Voice Cue Styles**:
+  - **Option A (Traditional Sanskrit) [Default]**: Whispers authentic cues (`"Purak"`, `"Kumbhak"`, `"Rechak"`, `"Kumbhak"`).
+  - **Option B (Bilingual Guided)**: Combines Sanskrit roots with English instructions (`"Purak... Inhale"`, `"Kumbhak... Hold"`, `"Rechak... Exhale"`, `"Kumbhak... Hold empty"`).
+  - Switchable in the dedicated Pranayama Settings Sheet with a live audition button.
 - **Dynamic Background Audio Ducking**:
   - Synchronously commands `BackgroundMusicManager.duckVolume(0.20f)` to smoothly attenuate ambient meditation drones down to ~15%–20% gain during speech.
   - Automatically restores normal volume upon `UtteranceProgressListener.onDone` or error.
 
-#### 4. Milestone & Completion Bells
-- **5-Round Milestone Chime**: When all 4 phases complete and `(pranayamaRound - 1) % 5 == 0`, `TimerEngine` triggers the approved signature **Option C 3-bell sequence** (`2048Hz -> 1536Hz -> 1024Hz`) to pace the practitioner's session without opening their eyes.
-- **Session Completion**: Upon completing the configured target rounds, strikes the deep resonant **Temple Gong** (`130.8Hz`).
+#### 5. Meditative Milestone & Session Ending Bells
+- **Milestone Interval Bell (Default: OFF)**:
+  - Preserves deep *Dhyana* meditative absorption where absolute silence between rounds is vital.
+  - Practitioner can toggle **ON** in settings with configurable cadence (Every 3, 5, 6, 10 rounds; default cadence: 5 rounds).
+  - **Acoustic Design**: Calibrated to a gentle 432 Hz warm Tibetan singing bowl (`R.raw.tibetan_bell_interval` at soft 0.38f volume) with gradual mallet attack curve, engineered specifically to preserve meditative absorption without triggering the sympathetic startle reflex.
+- **Session Completion Bell**: Deep resonant **Temple Gong** (`130.8 Hz`) strikes gracefully upon completing all rounds.
 - **Pocket Mode Safeguard**: In Pocket Mode, audible chimes and voice guidance are replaced with distinct multi-pulse tactile haptic vibrations.
 
-#### 5. Sacred Blooming Lotus & Dynamic Prana Aura (`BreathIndicator.kt`)
+#### 6. Sacred Blooming Lotus & Dynamic Prana Aura (`BreathIndicator.kt`)
 - **8-Petal Blooming Sacred Lotus**: Canvas-drawn organic geometry using cubic bezier paths.
 - **Purak (Inhale - 4s)**: Petals gracefully bloom outward from `0.42` to full expansion `1.0` with `FastOutSlowInEasing` and radiant dawn turquoise prana aura (`#2DD4BF`).
 - **Antar Kumbhak (Hold - 16s)**: Full lotus hovers with a living sinusoidal micro-pulse (`±2.5%` at ~0.5Hz) and rotating prana particles, creating a living breathing visual that never feels frozen.
@@ -403,12 +421,16 @@ The default profile (`PRANAYAMA_HATHA`) establishes the classical **1 : 4 : 2 : 
 - **Bahya Kumbhak (Hold Out - 16s)**: Petals rest closed into a quiet dormant golden seed in the center, framed by a serene outer circular guideline representing *Shunya* (the void).
 - **Phase HUD**: Renders Romanized Sanskrit title, classical Devanagari script, English subtitle, large seconds countdown, and circular phase completion arc.
 
-#### 6. Dual-Domain Customization (`SettingsDrawer.kt`)
-- When a Pranayama profile is active, `SettingsDrawer` renders the dedicated **Pranayama Breathwork Settings**:
-  1. Quick 1-tap Ratio Presets: *Hatha (4:16:8:16)*, *Nadi (4:16:8:0)*, *Box (4:4:4:4)*, *Relax (4:7:8:2)*.
-  2. Four Phase Custom Steppers & Sliders: Independent +/- steppers and sliders for Purak, Kumbhak (In), Rechak, Kumbhak (Out).
-  3. Target Rounds Stepper & Chips: `5`, `10`, `15`, `20`, `30` rounds.
-  4. Gentle Lady Voice Guidance Toggle, Style Picker, and Live Audition Button.
+#### 7. Dedicated Pranayama Settings Architecture (`SettingsDrawer.kt`)
+- When `profile.pranayamaConfig != null`, `SettingsDrawer` completely isolates the configuration surface into `PranayamaSettingsSheet`:
+  1. **Ratio Stages Dropdown**: Sama Vritti (1:1:1:1), Madhya (1:2:2:1), Visama Vritti (1:4:2:4), Gentle Void (1:4:2:1), Half Void (1:4:2:2), Custom.
+  2. **Base Inhale Scaling**: Quick 2s, 3s, 4s, 5s, 6s proportional recalculation chips.
+  3. **Four Phase Input Fields**: Direct numerical text entry and -1s, +1s, +4s steppers for Purak, Kumbhak (In), Rechak, Kumbhak (Out).
+  4. **Target Practice Rounds**: 12 rounds default (*Adhama* standard), with custom steppers and classic stage presets.
+  5. **Gentle Lady Voice Guide**: Option A (Sanskrit) default vs Option B (Bilingual) switch, with live audition.
+  6. **Meditative Interval Bell**: Default OFF toggle, cadence selector, and 432 Hz audition button.
+  7. **Subtle Background Music**: Ambient sound toggle, Aum drone / YouTube / Custom file, and subtle volume slider.
+- Bypasses generic timer countdown and signature 3-bell cards, maintaining a serene, focused user experience.
 
 ---
 

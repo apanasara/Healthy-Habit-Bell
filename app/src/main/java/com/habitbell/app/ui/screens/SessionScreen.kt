@@ -670,14 +670,17 @@ private fun PortraitSessionLayout(
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.primary
                         )
-                        val intervalCadence = sessionState.profile.pranayamaConfig?.intervalBellRoundCadence?.takeIf { it > 0 } ?: 5
-                        val roundsUntilBell = intervalCadence - ((sessionState.currentRound - 1) % intervalCadence)
-                        Text(
-                            text = "🔔 Interval bell in $roundsUntilBell ${if (roundsUntilBell == 1) "round" else "rounds"}",
-                            style = MaterialTheme.typography.labelSmall,
-                            letterSpacing = 1.sp,
-                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.85f)
-                        )
+                        val pConfig = sessionState.profile.pranayamaConfig
+                        if (pConfig?.isIntervalBellEnabled == true) {
+                            val intervalCadence = pConfig.intervalBellRoundCadence.takeIf { it > 0 } ?: 5
+                            val roundsUntilBell = intervalCadence - ((sessionState.currentRound - 1) % intervalCadence)
+                            Text(
+                                text = "🔔 Milestone bell in $roundsUntilBell ${if (roundsUntilBell == 1) "round" else "rounds"}",
+                                style = MaterialTheme.typography.labelSmall,
+                                letterSpacing = 1.sp,
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.85f)
+                            )
+                        }
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             text = "Total Remaining: ${sessionState.formattedRemainingTime}",

@@ -193,13 +193,18 @@ class PranayamaVoiceGuide(
     }
 
     /**
-     * Auditions a sample spoken cue for settings preview.
+     * Auditions a sample spoken cue for settings preview based on selected [VoiceCueStyle].
      *
-     * @param text Sample phrase to articulate.
+     * @param style Preferred voice cue style to sample. Defaults to active [cueStyle].
      */
-    fun auditionCue(text: String = "Purak") {
+    fun auditionCue(style: VoiceCueStyle = cueStyle) {
         if (!isInitialized || tts == null) return
-        speakUtterance(text)
+        val sampleText = when (style) {
+            VoiceCueStyle.SANSKRIT -> "Purak"
+            VoiceCueStyle.BILINGUAL -> "Purak... Inhale"
+            VoiceCueStyle.ENGLISH -> "Inhale"
+        }
+        speakUtterance(sampleText)
     }
 
     /**

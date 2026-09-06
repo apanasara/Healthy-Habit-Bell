@@ -80,6 +80,8 @@ class TimerRepository(private val context: Context) {
                 } catch (_: Exception) {
                     baseConfig.voiceCueStyle
                 }
+                val pIntervalBellEnabled = prefs.getBoolean("profile_pranayama_interval_bell_${defaultProfile.id}", baseConfig.isIntervalBellEnabled)
+                val pIntervalCadence = prefs.getInt("profile_pranayama_interval_cadence_${defaultProfile.id}", baseConfig.intervalBellRoundCadence)
 
                 if (pPurak > 0 || pAntar >= 0 || pRechak > 0 || pBahya >= 0 || pRounds > 0) {
                     baseConfig.withStepDurations(
@@ -88,11 +90,15 @@ class TimerRepository(private val context: Context) {
                         rechak = if (pRechak > 0) pRechak else baseConfig.rechakSeconds,
                         bahya = if (pBahya >= 0) pBahya else baseConfig.bahyaKumbhakSeconds,
                         rounds = if (pRounds > 0) pRounds else baseConfig.targetRounds,
+                        intervalEnabled = pIntervalBellEnabled,
+                        cadence = pIntervalCadence,
                         voiceEnabled = pVoiceEnabled,
                         voiceStyle = pVoiceStyle
                     )
                 } else {
                     baseConfig.copy(
+                        isIntervalBellEnabled = pIntervalBellEnabled,
+                        intervalBellRoundCadence = pIntervalCadence,
                         isVoiceGuidanceEnabled = pVoiceEnabled,
                         voiceCueStyle = pVoiceStyle
                     )
@@ -250,7 +256,7 @@ class TimerRepository(private val context: Context) {
     }
 
     /**
-     * Persists and updates Pranayama breathwork timing parameters and voice guidance configuration.
+     * Persists and updates Pranayama breathwork timing parameters, milestone interval chimes, and voice guidance.
      *
      * @param profileId Unique ID of the target Pranayama profile.
      * @param purakSeconds Duration for Puraka (Inhale) in seconds.
@@ -258,6 +264,8 @@ class TimerRepository(private val context: Context) {
      * @param rechakSeconds Duration for Rechaka (Exhale) in seconds.
      * @param bahyaKumbhakSeconds Duration for Bahya Kumbhaka (Hold Out) in seconds.
      * @param targetRounds Total cycles/repetitions configured for the session.
+     * @param isIntervalBellEnabled Whether periodic milestone bells sound during the session (default false).
+     * @param intervalBellCadence Number of rounds between milestone bells (e.g. 5).
      * @param isVoiceEnabled Whether gentle lady voice prompts are triggered on phase transitions.
      * @param voiceStyle Linguistic cue style ([VoiceCueStyle]).
      */
@@ -268,6 +276,8 @@ class TimerRepository(private val context: Context) {
         rechakSeconds: Int,
         bahyaKumbhakSeconds: Int,
         targetRounds: Int,
+        isIntervalBellEnabled: Boolean = false,
+        intervalBellCadence: Int = 5,
         isVoiceEnabled: Boolean = true,
         voiceStyle: VoiceCueStyle = VoiceCueStyle.SANSKRIT
     ) {
@@ -277,6 +287,8 @@ class TimerRepository(private val context: Context) {
             .putInt("profile_pranayama_rechak_$profileId", rechakSeconds)
             .putInt("profile_pranayama_bahya_$profileId", bahyaKumbhakSeconds)
             .putInt("profile_pranayama_rounds_$profileId", targetRounds)
+            .putBoolean("profile_pranayama_interval_bell_$profileId", isIntervalBellEnabled)
+            .putInt("profile_pranayama_interval_cadence_$profileId", intervalBellCadence)
             .putBoolean("profile_pranayama_voice_$profileId", isVoiceEnabled)
             .putString("profile_pranayama_voice_style_$profileId", voiceStyle.name)
             .apply()
@@ -291,13 +303,17 @@ class TimerRepository(private val context: Context) {
                             PranayamaStep(PranayamaPhase.EXHALE, rechakSeconds),
                             PranayamaStep(PranayamaPhase.HOLD_OUT, bahyaKumbhakSeconds)
                         ),
-                        targetRounds = targetRounds
+                        targetRounds = targetRounds,
+                        isIntervalBellEnabled = isIntervalBellEnabled,
+                        intervalBellRoundCadence = intervalBellCadence
                     )).withStepDurations(
                         purak = purakSeconds,
                         antar = antarKumbhakSeconds,
                         rechak = rechakSeconds,
                         bahya = bahyaKumbhakSeconds,
                         rounds = targetRounds,
+                        intervalEnabled = isIntervalBellEnabled,
+                        cadence = intervalBellCadence,
                         voiceEnabled = isVoiceEnabled,
                         voiceStyle = voiceStyle
                     )

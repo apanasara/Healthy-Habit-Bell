@@ -233,6 +233,38 @@ class AudioBellManager(private val context: Context) {
     }
 
     /**
+     * Triggers the dedicated meditative Pranayama milestone interval chime.
+     *
+     * ## Acoustic Design for Meditative Absorption
+     * Unlike standard interval bells or triple-chime sequences, this bell is engineered
+     * specifically to prevent breaking the practitioner's deep meditative (dhyana) state
+     * or triggering the autonomic startle reflex:
+     * - **Single Strike**: Only one gentle strike (no jarring triple repetition).
+     * - **Fundamental Pitch**: Warm 432 Hz Tibetan singing bowl resonance (Om harmonic frequency).
+     * - **Soft Mallet Attack**: Raised inverted cosine envelope over 60ms eliminating click transients.
+     * - **Subdued Volume**: Scaled to 38% of master volume to act as a subconscious milestone whisper.
+     * - **Transient Ducking**: Gently ducks background media for 6 seconds with gradual release.
+     */
+    fun playPranayamaIntervalBell() {
+        requestTransientAudioFocus(durationMs = 6000L)
+        val gentleVolume = bellVolume * 0.38f
+        if (isLoaded && intervalSoundId != 0) {
+            soundPool?.play(intervalSoundId, gentleVolume, gentleVolume, 1, 0, 1.0f)
+        } else {
+            scope.launch {
+                playSynthesizedChime(f0 = 432.0, durationSeconds = 7.0, volumeScale = 0.38f)
+            }
+        }
+    }
+
+    /**
+     * Auditions the dedicated gentle meditative milestone chime from settings.
+     */
+    fun playPranayamaIntervalPreview() {
+        playPranayamaIntervalBell()
+    }
+
+    /**
      * Requests temporary ducking audio focus on the primary media channel so background music
      * decreases in volume while the bell resonates over vehicle or device media speakers.
      * Automatically schedules abandonment of focus once the chime ringout completes to eliminate leaks.

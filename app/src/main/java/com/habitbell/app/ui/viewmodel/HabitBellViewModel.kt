@@ -581,6 +581,8 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
      * @param rechakSeconds Duration for Rechaka (Exhale) in seconds.
      * @param bahyaKumbhakSeconds Duration for Bahya Kumbhaka (Hold Out) in seconds.
      * @param targetRounds Total cycles/repetitions configured for the session.
+     * @param isIntervalBellEnabled Whether milestone interval bells sound during breathwork (default false).
+     * @param intervalBellCadence Number of rounds between milestone bells (e.g. 5).
      * @param isVoiceEnabled Whether gentle lady voice prompts are triggered on phase transitions.
      * @param voiceStyle Linguistic cue style ([com.habitbell.app.data.model.VoiceCueStyle]).
      */
@@ -590,6 +592,8 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
         rechakSeconds: Int,
         bahyaKumbhakSeconds: Int,
         targetRounds: Int,
+        isIntervalBellEnabled: Boolean = false,
+        intervalBellCadence: Int = 5,
         isVoiceEnabled: Boolean = true,
         voiceStyle: com.habitbell.app.data.model.VoiceCueStyle = com.habitbell.app.data.model.VoiceCueStyle.SANSKRIT
     ) {
@@ -601,6 +605,8 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
             rechakSeconds = rechakSeconds,
             bahyaKumbhakSeconds = bahyaKumbhakSeconds,
             targetRounds = targetRounds,
+            isIntervalBellEnabled = isIntervalBellEnabled,
+            intervalBellCadence = intervalBellCadence,
             isVoiceEnabled = isVoiceEnabled,
             voiceStyle = voiceStyle
         )
@@ -611,6 +617,8 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
                 rechak = rechakSeconds,
                 bahya = bahyaKumbhakSeconds,
                 rounds = targetRounds,
+                intervalEnabled = isIntervalBellEnabled,
+                cadence = intervalBellCadence,
                 voiceEnabled = isVoiceEnabled,
                 voiceStyle = voiceStyle
             )
@@ -623,10 +631,19 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     /**
-     * Auditions a sample gentle lady voice cue ("Purak") for settings preview.
+     * Auditions a sample gentle lady voice cue for settings preview according to [style].
+     *
+     * @param style Selected voice cue style (Option A Sanskrit vs Option B Bilingual).
      */
-    fun testPranayamaVoiceCue() {
-        voiceGuide.auditionCue("Purak")
+    fun testPranayamaVoiceCue(style: com.habitbell.app.data.model.VoiceCueStyle = com.habitbell.app.data.model.VoiceCueStyle.SANSKRIT) {
+        voiceGuide.auditionCue(style)
+    }
+
+    /**
+     * Auditions the dedicated gentle meditative milestone chime (432 Hz Tibetan bowl).
+     */
+    fun testPranayamaIntervalBell() {
+        audioManager.playPranayamaIntervalPreview()
     }
 
     /**

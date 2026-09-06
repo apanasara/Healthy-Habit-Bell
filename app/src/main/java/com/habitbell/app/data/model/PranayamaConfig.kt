@@ -3,15 +3,15 @@ package com.habitbell.app.data.model
 /**
  * Voice guidance prompt delivery style for Pranayama phase transitions.
  */
-enum class VoiceCueStyle(val displayName: String) {
-    /** Traditional Sanskrit cues spoken by gentle lady voice ("Purak", "Kumbhak", "Rechak"). */
-    SANSKRIT("Sanskrit (Purak)"),
+enum class VoiceCueStyle(val displayName: String, val shortLabel: String) {
+    /** Option A: Traditional Sanskrit cues spoken by gentle lady voice ("Purak", "Kumbhak", "Rechak"). Default. */
+    SANSKRIT("Option A: Sanskrit (Purak, Kumbhak, Rechak)", "Option A (Sanskrit)"),
 
-    /** English cues spoken by gentle lady voice ("Inhale", "Hold", "Exhale", "Hold empty"). */
-    ENGLISH("English (Inhale)"),
+    /** Option B: Bilingual Sanskrit and English cues ("Purak... Inhale", "Kumbhak... Hold", etc.). */
+    BILINGUAL("Option B: Bilingual (Purak... Inhale)", "Option B (Bilingual)"),
 
-    /** Bilingual Sanskrit and English cues ("Purak • Inhale", "Kumbhak • Hold", etc.). */
-    BILINGUAL("Bilingual")
+    /** Option C: English only cues spoken by gentle lady voice ("Inhale", "Hold", "Exhale", "Hold empty"). */
+    ENGLISH("Option C: English (Inhale, Hold, Exhale)", "English")
 }
 
 /**
@@ -62,15 +62,27 @@ data class PranayamaStep(
 /**
  * Configuration aggregate for multi-interval breathwork routines.
  *
+ * ## Yogic Literature Grounding
+ * - **Target Rounds**: Defaults to **12 rounds**, the foundational *Adhama* (Junior standard) prescribed
+ *   in *Hatha Yoga Pradipika* (2.12) and *Gheranda Samhita* (5.48-5.50). With the 4:16:8:16 ratio
+ *   (44s per cycle), 12 rounds totals 528 seconds (8m 48s), establishing an optimal daily sadhana session.
+ * - **Voice Guidance**: Defaults to **Option A (Traditional Sanskrit)** with spoken cues "Purak", "Kumbhak",
+ *   "Rechak", "Kumbhak".
+ * - **Interval Bell**: Defaults to **disabled (false)** so the practitioner's meditative state remains
+ *   undisturbed. When enabled by user preference, a gentle, non-startling 432 Hz warm Tibetan singing bowl
+ *   sounds every [intervalBellRoundCadence] rounds.
+ *
  * @property steps Ordered list of breath phases comprising one full breathing cycle.
- * @property targetRounds Number of cycles/repetitions to complete the full session (e.g. 20 rounds).
- * @property intervalBellRoundCadence Number of completed rounds between milestone interval chimes (default 5).
+ * @property targetRounds Number of cycles/repetitions to complete the full session (default 12 rounds per HYP 2.12).
+ * @property isIntervalBellEnabled Whether periodic milestone bells are active (default false per user meditative protection).
+ * @property intervalBellRoundCadence Number of completed rounds between milestone interval chimes (default 5 when enabled).
  * @property isVoiceGuidanceEnabled Whether the gentle lady voice guidance triggers at phase transitions.
  * @property voiceCueStyle Preferred linguistic style for spoken voice guidance ([VoiceCueStyle]).
  */
 data class PranayamaConfig(
     val steps: List<PranayamaStep>,
-    val targetRounds: Int,
+    val targetRounds: Int = 12,
+    val isIntervalBellEnabled: Boolean = false,
     val intervalBellRoundCadence: Int = 5,
     val isVoiceGuidanceEnabled: Boolean = true,
     val voiceCueStyle: VoiceCueStyle = VoiceCueStyle.SANSKRIT
@@ -107,6 +119,8 @@ data class PranayamaConfig(
      * @param rechak New duration for Rechaka (Exhale) in seconds.
      * @param bahya New duration for Bahya Kumbhaka (Hold Out) in seconds.
      * @param rounds Optional updated target rounds (keeps current if null).
+     * @param intervalEnabled Optional milestone interval bell enabled toggle.
+     * @param cadence Optional milestone round cadence.
      * @param voiceEnabled Optional voice guidance toggle.
      * @param voiceStyle Optional voice cue linguistic style.
      * @return Updated [PranayamaConfig] instance.
@@ -117,6 +131,8 @@ data class PranayamaConfig(
         rechak: Int = rechakSeconds,
         bahya: Int = bahyaKumbhakSeconds,
         rounds: Int? = null,
+        intervalEnabled: Boolean? = null,
+        cadence: Int? = null,
         voiceEnabled: Boolean? = null,
         voiceStyle: VoiceCueStyle? = null
     ): PranayamaConfig {
@@ -129,8 +145,114 @@ data class PranayamaConfig(
         return copy(
             steps = updatedSteps,
             targetRounds = rounds ?: targetRounds,
+            isIntervalBellEnabled = intervalEnabled ?: isIntervalBellEnabled,
+            intervalBellRoundCadence = cadence ?: intervalBellRoundCadence,
             isVoiceGuidanceEnabled = voiceEnabled ?: isVoiceGuidanceEnabled,
             voiceCueStyle = voiceStyle ?: this.voiceCueStyle
         )
     }
 }
+
+/**
+ * # PranayamaRatioStage
+ *
+ * Classical yogic breath ratio proportional stages.
+ *
+ * Grounded in classical Hatha Yoga literature (*Hatha Yoga Pradipika* & *Gheranda Samhita*),
+ * practitioners advance through proportional stages when Bahya Kumbhaka (external void) is included:
+ * - **Sama Vritti (Equalized/Box)**: 1 : 1 : 1 : 1 (e.g. 4s : 4s : 4s : 4s)
+ * - **Madhya (Intermediate)**: 1 : 2 : 2 : 1 (e.g. 4s : 8s : 8s : 4s)
+ * - **Visama Vritti (Classical Advanced)**: 1 : 4 : 2 : 4 (e.g. 4s : 16s : 8s : 16s) [Default]
+ * - **Visama Vritti (Gentle Void)**: 1 : 4 : 2 : 1 (e.g. 4s : 16s : 8s : 4s)
+ * - **Visama Vritti (Half Void)**: 1 : 4 : 2 : 2 (e.g. 4s : 16s : 8s : 8s)
+ * - **Custom**: User-defined independent seconds
+ *
+ * @property title Human-readable stage title for the ratio dropdown.
+ * @property ratioText Ratio formula description detailing proportional step counts.
+ * @property purakRatio Puraka (Inhale) proportional scalar.
+ * @property antarRatio Antar Kumbhaka (Hold In) proportional scalar.
+ * @property rechakRatio Rechaka (Exhale) proportional scalar.
+ * @property bahyaRatio Bahya Kumbhaka (Hold Out) proportional scalar.
+ */
+enum class PranayamaRatioStage(
+    val title: String,
+    val ratioText: String,
+    val purakRatio: Int,
+    val antarRatio: Int,
+    val rechakRatio: Int,
+    val bahyaRatio: Int
+) {
+    VISAMA_VRITTI_CLASSICAL(
+        title = "Visama Vritti (Classical Advanced)",
+        ratioText = "1 : 4 : 2 : 4 (Classical Hatha Yoga default)",
+        purakRatio = 1,
+        antarRatio = 4,
+        rechakRatio = 2,
+        bahyaRatio = 4
+    ),
+    MADHYA_INTERMEDIATE(
+        title = "Madhya (Intermediate Stage)",
+        ratioText = "1 : 2 : 2 : 1 (Balanced Void)",
+        purakRatio = 1,
+        antarRatio = 2,
+        rechakRatio = 2,
+        bahyaRatio = 1
+    ),
+    SAMA_VRITTI_BOX(
+        title = "Sama Vritti (Equalized / Box)",
+        ratioText = "1 : 1 : 1 : 1 (Equal Quadrants)",
+        purakRatio = 1,
+        antarRatio = 1,
+        rechakRatio = 1,
+        bahyaRatio = 1
+    ),
+    VISAMA_VRITTI_GENTLE(
+        title = "Visama Vritti (Gentle Void)",
+        ratioText = "1 : 4 : 2 : 1 (Mild Shunya Void)",
+        purakRatio = 1,
+        antarRatio = 4,
+        rechakRatio = 2,
+        bahyaRatio = 1
+    ),
+    VISAMA_VRITTI_HALF(
+        title = "Visama Vritti (Half Void)",
+        ratioText = "1 : 4 : 2 : 2 (Half-duration Shunya)",
+        purakRatio = 1,
+        antarRatio = 4,
+        rechakRatio = 2,
+        bahyaRatio = 2
+    ),
+    CUSTOM(
+        title = "Custom User Ratios",
+        ratioText = "Manual seconds entry",
+        purakRatio = 0,
+        antarRatio = 0,
+        rechakRatio = 0,
+        bahyaRatio = 0
+    );
+
+    companion object {
+        /**
+         * Detects the matching proportional ratio stage based on four given phase durations.
+         *
+         * @param purak Inhalation duration in seconds.
+         * @param antar Internal retention duration in seconds.
+         * @param rechak Exhalation duration in seconds.
+         * @param bahya External retention duration in seconds.
+         * @return Matching [PranayamaRatioStage] or [CUSTOM] if non-standard.
+         */
+        fun matchRatio(purak: Int, antar: Int, rechak: Int, bahya: Int): PranayamaRatioStage {
+            if (purak <= 0) return CUSTOM
+            val p = purak.toDouble()
+            return when {
+                antar == (p * 4).toInt() && rechak == (p * 2).toInt() && bahya == (p * 4).toInt() -> VISAMA_VRITTI_CLASSICAL
+                antar == (p * 2).toInt() && rechak == (p * 2).toInt() && bahya == (p * 1).toInt() -> MADHYA_INTERMEDIATE
+                antar == (p * 1).toInt() && rechak == (p * 1).toInt() && bahya == (p * 1).toInt() -> SAMA_VRITTI_BOX
+                antar == (p * 4).toInt() && rechak == (p * 2).toInt() && bahya == (p * 1).toInt() -> VISAMA_VRITTI_GENTLE
+                antar == (p * 4).toInt() && rechak == (p * 2).toInt() && bahya == (p * 2).toInt() -> VISAMA_VRITTI_HALF
+                else -> CUSTOM
+            }
+        }
+    }
+}
+
