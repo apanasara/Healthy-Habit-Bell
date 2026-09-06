@@ -1,0 +1,19 @@
+{
+  "id": "com.habitbell.tv.webos",
+  "version": "1.0.0",
+  "vendor": "Habit Bell Open Source",
+  "type": "web",
+  "main": "index.html",
+  "title": "Habit Bell",
+  "icon": "icon.png",
+  "largeIcon": "largeIcon.png",
+  "bgImage": "splash.png",
+  "splashBackground": "#060709",
+  "bgColor": "#060709",
+  "resolution": "1920x1080",
+  "requiredVersion": "4.0.0",
+  "supportGip": false,
+  "supportAirplay": false,
+  "disableBackHistoryFilter": true,
+  "networkRequirement": "lan"
+}

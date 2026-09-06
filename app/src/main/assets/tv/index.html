@@ -461,14 +461,57 @@
             updateUI();
         }
 
+        // --- Universal Smart TV Remote Control Support (Samsung Tizen & LG webOS) ---
+        if (window.tizen && window.tizen.tvinputdevice) {
+            try {
+                const tizenKeys = [
+                    'MediaPlay', 'MediaPause', 'MediaPlayPause', 'MediaStop',
+                    'MediaFastForward', 'MediaRewind',
+                    'ColorF0Red', 'ColorF1Green', 'ColorF2Yellow', 'ColorF3Blue'
+                ];
+                tizenKeys.forEach(key => {
+                    try { window.tizen.tvinputdevice.registerKey(key); } catch (_) {}
+                });
+            } catch (err) {
+                console.warn("Tizen key registration notice:", err);
+            }
+        }
+
         window.addEventListener('keydown', (e) => {
-            if (e.code === 'Space' || e.code === 'Enter') {
+            const keyCode = e.keyCode || e.which;
+
+            // 415: MediaPlay, 19: MediaPause, 10252: MediaPlayPause, 32: Space
+            if (keyCode === 415) {
+                e.preventDefault();
+                if (!isRunning) togglePlayPause();
+            } else if (keyCode === 19) {
+                e.preventDefault();
+                if (isRunning) togglePlayPause();
+            } else if (keyCode === 10252 || keyCode === 32 || (e.code === 'Space' && e.target.tagName !== 'BUTTON')) {
                 e.preventDefault();
                 togglePlayPause();
-            } else if (e.code === 'KeyR') {
+            } else if (keyCode === 413 || keyCode === 82 || e.code === 'KeyR') {
+                // 413: MediaStop, 82: 'R'
+                e.preventDefault();
                 resetTimer();
-            } else if (e.code === 'KeyM') {
+            } else if (keyCode === 77 || e.code === 'KeyM' || keyCode === 403) {
+                // 77: 'M', 403: Red Color Key
+                e.preventDefault();
                 toggleBgSound();
+            } else if (keyCode === 404) {
+                // 404: Green Color Key (-5 Min)
+                e.preventDefault();
+                adjustTime(-5);
+            } else if (keyCode === 405) {
+                // 405: Yellow Color Key (+5 Min)
+                e.preventDefault();
+                adjustTime(5);
+            } else if (keyCode === 10009 || keyCode === 461) {
+                // 10009: Samsung Tizen Return, 461: LG webOS Back
+                if (isRunning) {
+                    e.preventDefault();
+                    togglePlayPause();
+                }
             }
         });
 

@@ -83,6 +83,12 @@ class CentralSessionHandler(private val application: Application) {
     /** Native Google Cast manager enabling pure app casting to TV hardware without mirroring. */
     val castManager: com.habitbell.app.cast.HabitBellCastManager = com.habitbell.app.cast.HabitBellCastManager.getInstance(application)
 
+    /** AirPlay 2 discovery manager enabling direct casting to Apple TV hardware over Wi-Fi. */
+    val airPlayManager: com.habitbell.app.cast.AirPlayCastManager = com.habitbell.app.cast.AirPlayCastManager.getInstance(application)
+
+    /** DIAL & SSDP discoverer enabling zero-click launch on Samsung Tizen & LG webOS smart TVs. */
+    val dialTvDiscoverer: com.habitbell.app.cast.DialTvDiscoverer = com.habitbell.app.cast.DialTvDiscoverer.getInstance(application)
+
     /** Core 1Hz heartbeat finite state machine governing timer countdowns. */
     val engine: TimerEngine = TimerEngine(audioManager, hapticManager)
 

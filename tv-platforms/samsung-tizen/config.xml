@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Habit Bell — Samsung Tizen Web Application Manifest
+    Architectural Role:
+    Defines application metadata, required privileges, TV input device capabilities,
+    and runtime environment settings for deploying the 10-foot Habit Bell TV dashboard
+    onto Samsung Smart TVs (Tizen OS 5.0 through 8.0+).
+-->
+<widget xmlns="http://www.w3.org/ns/widgets" 
+        xmlns:tizen="http://tizen.org/ns/widgets" 
+        id="http://habitbell.com/tv/app" 
+        version="1.0.0" 
+        viewmodes="maximized">
+    <tizen:application id="XW1Y8Z9HAB.HabitBellTV" 
+                       exec="index.html" 
+                       package="XW1Y8Z9HAB" 
+                       type="webapp" 
+                       required_version="5.0"/>
+    
+    <name>Habit Bell • Mindful Living Room</name>
+    <description>Offline-first mindful timer, meditation clock, and ambient soundscape for Samsung Smart TVs.</description>
+    <author href="https://habitbell.com" email="support@habitbell.com">Habit Bell Open Source Team</author>
+    
+    <icon src="icon.png"/>
+    <content src="index.html"/>
+    
+    <!-- Samsung Smart TV Required Features -->
+    <feature name="http://tizen.org/feature/screen.size.all"/>
+    <feature name="http://tizen.org/feature/network.internet"/>
+    
+    <!-- Tizen Smart TV Remote Input Privileges -->
+    <tizen:privilege name="http://tizen.org/privilege/internet"/>
+    <tizen:privilege name="http://tizen.org/privilege/tv.inputdevice"/>
+    
+    <!-- Samsung TV Profile Specification -->
+    <tizen:profile name="tv-samsung"/>
+    
+    <!-- Screen Aspect Ratio and Resolution -->
+    <tizen:setting screen-orientation="landscape" 
+                   context-menu="enable" 
+                   background-support="disable" 
+                   encryption="disable" 
+                   install-location="auto"/>
+</widget>

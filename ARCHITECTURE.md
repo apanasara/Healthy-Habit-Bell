@@ -39,13 +39,12 @@ Habit Bell is an offline-first, distraction-free wellness operating system engin
 +-----+----------------------+    +-----+----------------------+    +-----+----------------------+
 |     Android Auto Layer     |    |    TV & Cast Subsystems    |    |  Assistant & Integration   |
 |  - HabitBellCarAppService  |    |  1. Google Cast Framework  |    |  - Google Assistant Intents|
-|  - HabitBellCarSession     |    |     (CastOptionsProvider,  |    |    (START_EXERCISE)        |
-|  - HabitBellCarScreen      |    |      HabitBellCastManager) |    |  - App Shortcuts           |
-|  - HabitBellMediaService   |    |  2. Local TV Webcast       |    |    (shortcuts.xml)         |
-|  - Automotive Media Routing|    |     (LocalCastWebServer,   |    |  - Deep Link Routing       |
-|    (USAGE_MEDIA -> Car HUD)|    |      NSD mDNS, SSE /api)   |    +----------------------------+
-+----------------------------+    |  3. Android TV Leanback    |
-                                  |     (LEANBACK_LAUNCHER)    |
+|  - HabitBellCarSession     |    |     (HabitBellCastManager) |    |    (START_EXERCISE)        |
+|  - HabitBellCarScreen      |    |  2. Local TV Webcast (SSE) |    |  - App Shortcuts           |
+|  - HabitBellMediaService   |    |  3. Android TV & Google TV |    |    (shortcuts.xml)         |
+|  - Automotive Media Routing|    |     (Sony, TCL, Leanback)  |    |  - Deep Link Routing       |
+|    (USAGE_MEDIA -> Car HUD)|    |  4. Samsung & LG (DIAL)    |    +----------------------------+
++----------------------------+    |  5. Apple TV (AirPlay 2)   |
                                   +----------------------------+
 ```
 
@@ -107,8 +106,9 @@ The heartbeat of the mindfulness runtime is a deterministic finite state machine
 
 ### 2.4. TV & Living Room Subsystems
 
-#### 1. Android TV & Google TV Leanback Support
+#### 1. Android TV & Google TV Leanback Support (Sony Bravia, TCL, Hisense, Chromecast)
 - **Universal Single APK**: A single binary deployment targets smartphones, tablets, foldables, automotive head units, and Android TV / Google TV.
+- **Sony Bravia Hardware Integration**: All modern Sony Bravia smart TVs run Google TV / Android TV with Chromecast built-in. Habit Bell provides first-class Sony compatibility out of the box via both native APK installation and Google Cast streaming.
 - **Manifest Architecture**:
   - Declares `<category android:name="android.intent.category.LEANBACK_LAUNCHER" />` for TV app drawers.
   - Declares `android:banner="@drawable/tv_banner"` for high-resolution 16:9 Android TV launcher cards.
@@ -118,13 +118,31 @@ The heartbeat of the mindfulness runtime is a deterministic finite state machine
 #### 2. Google Cast Framework (`com.habitbell.app.cast`)
 - **Native Cast Integration**: Pure application TV streaming without screen mirroring using Google Play Services Cast Framework (`play-services-cast-framework:22.0.0`).
 - **`CastOptionsProvider.kt`**: Registers the official Default Media Receiver application ID (`CastMediaControlIntent.DEFAULT_MEDIA_RECEIVER_APPLICATION_ID`).
-- **`HabitBellCastManager.kt`**: Singleton session manager coordinating discovery, device connection, and media metadata transmission to Chromecast and Google Cast-enabled TVs.
+- **`HabitBellCastManager.kt`**: Singleton session manager coordinating discovery, device connection, and media metadata transmission to Chromecast, Sony Bravia, and Google Cast-enabled TVs.
 - **`CastButton.kt`**: Jetpack Compose-native Cast button wrapping AndroidX MediaRouter's `MediaRouteButton` to display discovery states and trigger device selection dialogs.
 
 #### 3. Local TV WebCast (`LocalCastWebServer.kt`)
 - **Zero-Cloud Local Casting**: Embedded lightweight multi-threaded HTTP server running on port `8888`.
 - **Network Service Discovery (NSD)**: Registers an mDNS service (`_habitbell._tcp`) allowing any Smart TV browser on the same Wi-Fi network to discover and open the TV dashboard.
 - **Server-Sent Events & Real-Time Sync**: Exposes `/api/state` for real-time SSE broadcasts of timer progress and `/api/action/toggle` for bidirectional remote playback control from the TV browser.
+
+#### 4. Samsung Smart TV (Tizen OS) & LG Smart TV (webOS) Ecosystem
+- **Market Reach**: Samsung Tizen (~21%) and LG webOS (~12%) represent >33% of global connected smart TVs.
+- **Packaged Web TV Suite**:
+  - `tv-platforms/samsung-tizen/`: Packaged Tizen Web Application container (`.wgt`) with `config.xml` manifest and Samsung TV Remote key handling (`tizen.tvinputdevice.registerKey`).
+  - `tv-platforms/lg-webos/`: Packaged LG webOS application (`.ipk`) with `appinfo.json` descriptor and Magic Remote pointer/D-pad mappings.
+- **`DialTvDiscoverer.kt` Subsystem**:
+  - Dispatches SSDP (Simple Service Discovery Protocol) M-SEARCH UDP multicast probes (`239.255.255.250:1900`) for DIAL services (`urn:dial-multiscreen-org:service:dial:1`) and UPnP `MediaRenderer`.
+  - Auto-identifies Samsung and LG TVs on the local Wi-Fi and provides zero-click remote launching of the TV dashboard.
+
+#### 5. Apple TV & AirPlay 2 Subsystem (`com.habitbell.app.cast`)
+- **Market Context**: Apple TV (tvOS) dominates the premium streaming box sector. Because tvOS contains no web browser, Habit Bell deploys a dual-track strategy:
+- **Track 1 — Direct AirPlay 2 Sender Protocol (`AirPlayCastManager.kt`)**:
+  - Scans for nearby Apple TV devices on local Wi-Fi via mDNS / Bonjour (`_airplay._tcp.` and `_raop._tcp.`).
+  - Maintains reactive `discoveredDevices: StateFlow<List<AirPlayDevice>>` for casting session metadata and audio to Apple TV hardware.
+- **Track 2 — Native Apple TV Companion App (`tv-platforms/apple-tvos/`)**:
+  - Native Swift 5.10+ / SwiftUI application built for tvOS 17+.
+  - Features circular countdown stroke animation, Siri Remote Clickpad gestures, and real-time Bonjour mDNS discovery (`_http._tcp.`) auto-syncing with `LocalCastWebServer` on the Android device via Server-Sent Events.
 
 ---
 
@@ -176,6 +194,8 @@ Habit Bell provides deep automotive integration complying with Android for Cars 
 | `HabitBellViewModel` | `viewModelScope` | `Dispatchers.Main.immediate` | Dispatches UI actions and handles state updates bound to ViewModel lifecycle. |
 | `LocalCastWebServer` | Daemon Thread Pool | Dedicated Socket Threads | Handles non-blocking raw socket requests, SSE streams, and asset delivery. |
 | `HabitBellCastManager` | Main Thread / Google Play Services | `Dispatchers.Main` | Integrates with Cast Framework callbacks, UI updates, and async Cast session events. |
+| `AirPlayCastManager` | `CoroutineScope(SupervisorJob())` + NSD | `Dispatchers.IO` | Dispatches Apple TV mDNS discovery events and handles RTSP / HTTP streaming asynchronously. |
+| `DialTvDiscoverer` | `CoroutineScope(SupervisorJob())` | `Dispatchers.IO` | Manages SSDP UDP multicast socket probes and HTTP device descriptor XML parsing off the main thread. |
 | `BackgroundMusicManager` | Main Thread + Background Decode | `Dispatchers.Main` / Media | Coordinates headless WebView audio rendering, MediaPlayer playback, and audio focus ducking. |
 
 ---
