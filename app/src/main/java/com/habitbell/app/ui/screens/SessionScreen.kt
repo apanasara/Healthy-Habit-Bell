@@ -148,8 +148,14 @@ private fun LandscapeSessionLayout(
         ) {
             when (sessionState.profile.type) {
                 TimerType.LINEAR -> {
+                    val progress = if (sessionState.profile.stepTriggerMode == com.habitbell.app.data.model.StepTriggerMode.STEPS_ONLY) {
+                        sessionState.stepProgressFraction ?: sessionState.progressFraction
+                    } else {
+                        sessionState.progressFraction
+                    }
+
                     CircularProgressRing(
-                        progress = sessionState.progressFraction,
+                        progress = progress,
                         size = 195.dp,
                         strokeWidth = 5.dp
                     ) {
@@ -157,14 +163,44 @@ private fun LandscapeSessionLayout(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             modifier = Modifier.clickable { onOpenSettings() }
                         ) {
-                            Text(
-                                text = sessionState.formattedRemainingTime,
-                                fontSize = 46.sp,
-                                fontWeight = FontWeight.ExtraLight,
-                                letterSpacing = (-1).sp,
-                                color = MaterialTheme.colorScheme.onBackground
-                            )
-                            if (sessionState.profile.intervalDurationSeconds > 0) {
+                            if (sessionState.profile.stepTriggerMode == com.habitbell.app.data.model.StepTriggerMode.STEPS_ONLY) {
+                                Text(
+                                    text = "%,d".format(sessionState.currentSteps),
+                                    fontSize = 42.sp,
+                                    fontWeight = FontWeight.ExtraLight,
+                                    letterSpacing = (-1).sp,
+                                    color = MaterialTheme.colorScheme.onBackground
+                                )
+                                Text(
+                                    text = "steps",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            } else {
+                                Text(
+                                    text = sessionState.formattedRemainingTime,
+                                    fontSize = 44.sp,
+                                    fontWeight = FontWeight.ExtraLight,
+                                    letterSpacing = (-1).sp,
+                                    color = MaterialTheme.colorScheme.onBackground
+                                )
+                            }
+
+                            if (sessionState.isStepTrackingActive) {
+                                Text(
+                                    text = "🚶 ${sessionState.formattedStepCount}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                val nextStepBell = sessionState.nextStepBellSteps
+                                if (nextStepBell != null && nextStepBell > 0) {
+                                    Text(
+                                        text = "Bell in %,d steps".format(nextStepBell),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            } else if (sessionState.profile.intervalDurationSeconds > 0) {
                                 Text(
                                     text = "Bell in ${sessionState.formattedNextBellTime}",
                                     style = MaterialTheme.typography.labelSmall,
@@ -417,38 +453,126 @@ private fun PortraitSessionLayout(
         ) {
             when (sessionState.profile.type) {
                 TimerType.LINEAR -> {
-                    CircularProgressRing(
-                        progress = sessionState.progressFraction,
-                        size = 280.dp,
-                        strokeWidth = 6.dp
-                    ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier.clickable { onOpenSettings() }
+                    val progress = if (sessionState.profile.stepTriggerMode == com.habitbell.app.data.model.StepTriggerMode.STEPS_ONLY) {
+                        sessionState.stepProgressFraction ?: sessionState.progressFraction
+                    } else {
+                        sessionState.progressFraction
+                    }
+
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        CircularProgressRing(
+                            progress = progress,
+                            size = 280.dp,
+                            strokeWidth = 6.dp
                         ) {
-                            Text(
-                                text = sessionState.formattedRemainingTime,
-                                fontSize = 66.sp,
-                                fontWeight = FontWeight.ExtraLight,
-                                letterSpacing = (-1).sp,
-                                color = MaterialTheme.colorScheme.onBackground
-                            )
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier.clickable { onOpenSettings() }
+                            ) {
+                                if (sessionState.profile.stepTriggerMode == com.habitbell.app.data.model.StepTriggerMode.STEPS_ONLY) {
+                                    Text(
+                                        text = "%,d".format(sessionState.currentSteps),
+                                        fontSize = 58.sp,
+                                        fontWeight = FontWeight.ExtraLight,
+                                        letterSpacing = (-1).sp,
+                                        color = MaterialTheme.colorScheme.onBackground
+                                    )
+                                    Text(
+                                        text = "steps",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        letterSpacing = 2.sp
+                                    )
+                                } else {
+                                    Text(
+                                        text = sessionState.formattedRemainingTime,
+                                        fontSize = 66.sp,
+                                        fontWeight = FontWeight.ExtraLight,
+                                        letterSpacing = (-1).sp,
+                                        color = MaterialTheme.colorScheme.onBackground
+                                    )
+                                }
 
-                            Spacer(modifier = Modifier.height(10.dp))
+                                Spacer(modifier = Modifier.height(10.dp))
 
-                            if (sessionState.profile.intervalDurationSeconds > 0) {
-                                Text(
-                                    text = "Next Bell in ${sessionState.formattedNextBellTime}",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    letterSpacing = 1.sp,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                            } else {
-                                Text(
-                                    text = "Tap to adjust duration",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                                )
+                                if (sessionState.isStepTrackingActive) {
+                                    Surface(
+                                        shape = RoundedCornerShape(16.dp),
+                                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                                        modifier = Modifier.padding(horizontal = 8.dp)
+                                    ) {
+                                        Text(
+                                            text = "🚶 ${sessionState.formattedStepCount}",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.height(4.dp))
+
+                                    val nextStepBell = sessionState.nextStepBellSteps
+                                    if (nextStepBell != null && nextStepBell > 0) {
+                                        Text(
+                                            text = "🔔 Next bell in %,d steps".format(nextStepBell),
+                                            style = MaterialTheme.typography.labelSmall,
+                                            letterSpacing = 1.sp,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                    } else if (sessionState.profile.intervalDurationSeconds > 0) {
+                                        Text(
+                                            text = "Next Bell in ${sessionState.formattedNextBellTime}",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            letterSpacing = 1.sp,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
+                                } else if (sessionState.profile.intervalDurationSeconds > 0) {
+                                    Text(
+                                        text = "Next Bell in ${sessionState.formattedNextBellTime}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        letterSpacing = 1.sp,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                } else {
+                                    Text(
+                                        text = "Tap to adjust duration",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                    )
+                                }
+                            }
+                        }
+
+                        if (sessionState.isStepTrackingActive) {
+                            Spacer(modifier = Modifier.height(14.dp))
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                                ) {
+                                    Text(
+                                        text = "Cadence: ${sessionState.formattedCadence}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                                    )
+                                }
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                                ) {
+                                    Text(
+                                        text = sessionState.healthProvider.displayName,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                                    )
+                                }
                             }
                         }
                     }

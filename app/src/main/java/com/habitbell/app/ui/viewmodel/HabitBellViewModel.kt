@@ -107,6 +107,12 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
     /** Core 1Hz finite state machine governing timer countdowns and phase cycles. */
     val engine: TimerEngine = sessionHandler.engine
 
+    /** Health and step tracking manager coordinating pedometers and health platforms. */
+    val healthStepManager: com.habitbell.app.health.HealthStepManager = sessionHandler.healthStepManager
+
+    /** Currently selected health data provider stream. */
+    val selectedHealthProvider: StateFlow<com.habitbell.app.health.HealthProviderType> = healthStepManager.selectedProviderType
+
     /** Google Cast manager coordinating pure app streaming to TV hardware. */
     val castManager: com.habitbell.app.cast.HabitBellCastManager = sessionHandler.castManager
 
@@ -474,6 +480,53 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
                 intervalDurationSeconds = intervalDuration
             )
         )
+    }
+
+    /**
+     * Updates step goal and interval chime cadence for the active profile.
+     *
+     * @param stepGoal Target step count or null.
+     * @param stepInterval Step interval bell frequency or null.
+     * @param triggerMode Trigger policy determining completion ([StepTriggerMode.TIME_OR_STEPS], etc.).
+     */
+    fun updateActiveProfileSteps(
+        stepGoal: Int?,
+        stepInterval: Int?,
+        triggerMode: StepTriggerMode = StepTriggerMode.TIME_OR_STEPS
+    ) {
+        val currentProfile = sessionState.value.profile
+        repository.updateProfileSettings(
+            profileId = currentProfile.id,
+            stepGoal = stepGoal,
+            stepInterval = stepInterval,
+            stepTriggerMode = triggerMode
+        )
+        engine.loadProfile(
+            currentProfile.copy(
+                stepGoal = stepGoal,
+                stepInterval = stepInterval,
+                stepTriggerMode = triggerMode
+            )
+        )
+    }
+
+    /**
+     * Switches the active health platform provider (e.g. Device Pedometer, Health Connect, Apple Health).
+     *
+     * @param provider Selected [com.habitbell.app.health.HealthProviderType].
+     */
+    fun selectHealthProvider(provider: com.habitbell.app.health.HealthProviderType) {
+        healthStepManager.selectProvider(provider)
+    }
+
+    /**
+     * Injects synthetic footsteps to verify interval bells and completion gong boundaries.
+     *
+     * @param count Number of steps to inject.
+     */
+    fun injectTestSteps(count: Int = 250) {
+        val current = sessionState.value.currentSteps + count
+        engine.onStepCountUpdated(current, 108)
     }
 
     /**

@@ -31,21 +31,22 @@ Habit Bell is an offline-first, distraction-free wellness operating system engin
 |  - BackgroundMusicManager (Aum / SAF / YouTube|     |    PranayamaConfig, CompoundConfig) |
 |  - BatteryOptimizer & TimerService            |     +-------------------------------------+
 |  - HapticManager (Pocket-Mode Vibrations)     |
+|  - HealthStepManager (Multi-Platform Steps)   |
 +---------------------------------------+-------+
                                         |
       +---------------------------------+---------------------------------+
       |                                 |                                 |
       v                                 v                                 v
 +-----+----------------------+    +-----+----------------------+    +-----+----------------------+
-|     Android Auto Layer     |    |    TV & Cast Subsystems    |    |  Assistant & Integration   |
-|  - HabitBellCarAppService  |    |  1. Google Cast Framework  |    |  - Google Assistant Intents|
-|  - HabitBellCarSession     |    |     (HabitBellCastManager) |    |    (START_EXERCISE)        |
-|  - HabitBellCarScreen      |    |  2. Local TV Webcast (SSE) |    |  - App Shortcuts           |
-|  - HabitBellMediaService   |    |  3. Android TV & Google TV |    |    (shortcuts.xml)         |
-|  - Automotive Media Routing|    |     (Sony, TCL, Leanback)  |    |  - Deep Link Routing       |
-|    (USAGE_MEDIA -> Car HUD)|    |  4. Samsung & LG (DIAL)    |    +----------------------------+
-+----------------------------+    |  5. Apple TV (AirPlay 2)   |
-                                  +----------------------------+
+|     Android Auto Layer     |    |    TV & Cast Subsystems    |    |   Health & Wearables       |
+|  - HabitBellCarAppService  |    |  1. Google Cast Framework  |    |  1. Google Health Connect  |
+|  - HabitBellCarSession     |    |     (HabitBellCastManager) |    |     (Google Fit, Samsung)  |
+|  - HabitBellCarScreen      |    |  2. Local TV Webcast (SSE) |    |  2. Apple Health Bridge    |
+|  - HabitBellMediaService   |    |  3. Android TV & Google TV |    |     (HealthKit JSON/tvOS)  |
+|  - Automotive Media Routing|    |     (Sony, TCL, Leanback)  |    |  3. Hardware Pedometer     |
+|    (USAGE_MEDIA -> Car HUD)|    |  4. Samsung & LG (DIAL)    |    |     (Offline Step Sensor)  |
++----------------------------+    |  5. Apple TV (AirPlay 2)   |    |  4. Step Simulator (CI)    |
+                                  +----------------------------+    +----------------------------+
 ```
 
 ---
@@ -185,6 +186,54 @@ Habit Bell provides deep automotive integration complying with Android for Cars 
 
 ---
 
+### 2.9. Health & Step Tracking Subsystem (`com.habitbell.app.health`)
+
+The health subsystem elevates Habit Bell into an embodied, distraction-free walking meditation and wellness tracker. It abstracts step telemetry, cadence monitoring, and workout persistence across fragmented health ecosystems:
+
+#### 1. Architecture & Multi-Provider Abstraction
+- **`StepDataSource.kt`**: Unified interface establishing the reactive contract:
+  - `providerType: HealthProviderType`
+  - `isAvailable: Boolean`
+  - `stepFlow: StateFlow<StepUpdate>`
+  - Lifecycle hooks: `start(initialSessionSteps)`, `pause()`, `resume()`, `stop()`, `reset()`.
+- **`StepUpdate.kt`**: Immutable DTO capturing `sessionSteps` (steps accumulated during this session), `rawCumulativeSteps` (hardware/platform boot count), `cadenceStepsPerMinute` (SPM), and `timestampMillis`.
+- **`HealthProviderType.kt`**: Source classification (`HARDWARE_SENSOR`, `HEALTH_CONNECT`, `APPLE_HEALTH_BRIDGE`, `SIMULATED`).
+
+#### 2. Provider Implementations
+- **Native Hardware Pedometer (`HardwarePedometerProvider.kt`)**:
+  - Direct listener for Android's hardware `Sensor.TYPE_STEP_COUNTER`.
+  - **Zero Latency & 100% Offline**: Delivers sub-second step detection without network, external accounts, or cloud dependencies.
+  - **Temporal Sliding Window Cadence**: Computes instantaneous cadence (steps per minute) using timestamped step buffers over a 5-second sliding window, filtering sensor noise and jitter.
+- **Google Health Connect (`HealthConnectManager.kt`)**:
+  - Integrates AndroidX Health Connect (`androidx.health.connect:connect-client:1.1.0-alpha11`).
+  - **Bi-Directional Ecosystem Sync**: Connects with Google Fit, Samsung Health, Fitbit, Whoop, and Garmin.
+  - **Workout Recording**: Writes `ExerciseSessionRecord` (type: `EXERCISE_TYPE_WALKING`) and corresponding `StepsRecord` aggregates to the Health Connect datastore upon session completion.
+  - **Permission Contract**: Handles runtime permission rationale flows for `HealthPermission.getReadPermission(StepsRecord::class)`, `HealthPermission.getWritePermission(StepsRecord::class)`, and `HealthPermission.getWritePermission(ExerciseSessionRecord::class)`.
+- **Apple Health Bridge (`AppleHealthBridgeManager.kt`)**:
+  - Generates Apple HealthKit-compliant JSON workout descriptors (`HKWorkoutActivityTypeWalking`, `HKQuantityTypeIdentifierStepCount`).
+  - Coordinates cross-platform synchronization with `tv-platforms/apple-tvos` companion instances and HealthKit export tools.
+- **Deterministic Step Simulator (`SimulatedStepProvider.kt`)**:
+  - Generates rhythmic walking cadence (~108 steps per minute) for automated JUnit tests, CI pipelines, and emulator environments lacking physical accelerometer sensors.
+  - Supports discrete step injection via `injectSteps(count)` for instant boundary testing.
+- **Central Health Orchestrator (`HealthStepManager.kt`)**:
+  - Central singleton managing active provider selection, lifecycle delegation, and runtime permission verification (`ACTIVITY_RECOGNITION`).
+
+#### 3. Step-Based Interval Bells & Session Completion Math
+- **Dynamic Cadence Tracking**: Live calculation of steps per minute (SPM) rendered on Session HUDs.
+- **Interval Bell Countdown**:
+  - Mathematical interval tracking: `stepsIntoInterval = currentSteps % stepInterval`.
+  - `nextStepBellSteps = stepInterval - stepsIntoInterval`.
+  - Whenever `currentSteps % stepInterval == 0` during active walking, `AudioBellManager` plays the configured interval bell (Option C Zen Tingsha) with an accompanying distinct 2-pulse tactile vibration.
+- **Step Trigger Policies (`StepTriggerMode`)**:
+  - `TIME_ONLY`: Session completes only when total configured timer seconds expire.
+  - `STEPS_ONLY`: Session runs until the target step goal is achieved (e.g. exactly 3,000 steps).
+  - `TIME_OR_STEPS`: Whichever target is reached first (time expires or step goal met) triggers completion.
+- **Multi-Surface Car HUD & Media Synchronization**:
+  - Active step counts and cadence are dynamically injected into `MediaSessionCompat` metadata subtitles (e.g. `"1,250 / 3,000 steps • 108 SPM • Next bell: 250 steps"`).
+  - Automatically rendered on Android Auto vehicle displays, smartwatch notification cards, and locked screen media players.
+
+---
+
 ## 3. Concurrency & Threading Architecture
 
 | Component | Scope / Execution Context | Dispatcher | Architectural Rationale |
@@ -192,6 +241,9 @@ Habit Bell provides deep automotive integration complying with Android for Cars 
 | `TimerEngine` | `CoroutineScope(SupervisorJob())` | `Dispatchers.Default` | Offloads 1Hz countdown math, state machine transitions, and state emissions from the UI thread. |
 | `TimerRepository` | Dedicated Coroutine Scope | `Dispatchers.IO` | Ensures JSON serialization and disk I/O do not cause UI frame drops. |
 | `HabitBellViewModel` | `viewModelScope` | `Dispatchers.Main.immediate` | Dispatches UI actions and handles state updates bound to ViewModel lifecycle. |
+| `HealthStepManager` | `CoroutineScope(SupervisorJob())` | `Dispatchers.Default` | Coordinates step telemetry across sensor callbacks and updates session state off UI thread. |
+| `HardwarePedometerProvider` | Hardware Sensor Event Thread | `SensorManager.SENSOR_DELAY_UI` | Receives raw step counts from OS sensor subsystem and buffers timestamps for sliding-window cadence calculation. |
+| `HealthConnectManager` | Dedicated Coroutine Scope | `Dispatchers.IO` | Handles async Health Connect client queries, permissions, and workout record insertions. |
 | `LocalCastWebServer` | Daemon Thread Pool | Dedicated Socket Threads | Handles non-blocking raw socket requests, SSE streams, and asset delivery. |
 | `HabitBellCastManager` | Main Thread / Google Play Services | `Dispatchers.Main` | Integrates with Cast Framework callbacks, UI updates, and async Cast session events. |
 | `AirPlayCastManager` | `CoroutineScope(SupervisorJob())` + NSD | `Dispatchers.IO` | Dispatches Apple TV mDNS discovery events and handles RTSP / HTTP streaming asynchronously. |
@@ -206,6 +258,7 @@ Habit Bell provides deep automotive integration complying with Android for Cars 
 2. **Wi-Fi Multicast Lock**: Acquires `WifiManager.MulticastLock` (`"HabitBellTVMulticast"`) when TV Webcast is active to ensure mDNS / Bonjour packets pass through Android's network power-saving filters.
 3. **Proximity Sensor Monitoring**: Monitors device proximity in active sessions to automatically toggle Pocket Mode and the `#000000` AMOLED power curtain.
 4. **Automotive Audio Focus**: Requests transient audio focus ducking (`AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK`) with `USAGE_MEDIA` to ensure clean audio routing to car audio systems without disrupting navigation directions.
+5. **Pedometer & Activity Recognition Management**: Registers hardware step counter sensors with `SENSOR_DELAY_UI` only during active walking timer sessions; unregisters immediately upon pause, stop, or completion to prevent battery drain. Dynamically checks and requests `Manifest.permission.ACTIVITY_RECOGNITION` on Android 10+ (API 29+).
 
 ---
 

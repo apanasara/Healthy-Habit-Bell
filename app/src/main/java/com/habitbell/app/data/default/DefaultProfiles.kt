@@ -132,8 +132,8 @@ object DefaultProfiles {
     )
 
     /**
-     * Mindful Walking: 15-minute walking meditation with 5-minute interval check-ins.
-     * Pocket mode enabled by default for hands-free outdoor movement.
+     * Mindful Walking: 15-minute walking meditation with 5-minute time intervals and 500-step check-in bells.
+     * Dual-trigger mode completes at 2,000 steps or 15 minutes. Pocket mode enabled by default.
      */
     val MINDFUL_WALKING = TimerProfile(
         id = "mindful-walking-15",
@@ -147,7 +147,54 @@ object DefaultProfiles {
         theme = ThemeMode.AMOLED,
         displayMode = true,
         pocketMode = true,
-        isFavorite = false
+        isFavorite = true,
+        stepGoal = 2000,
+        stepInterval = 500,
+        stepTriggerMode = StepTriggerMode.TIME_OR_STEPS
+    )
+
+    /**
+     * Step Meditation (3,000 Steps): Step-focused walking meditation with a soothing bell every 500 steps.
+     * Step-exclusive trigger mode completes when the 3,000-step mindfulness goal is attained.
+     */
+    val STEP_WALK_MEDITATION = TimerProfile(
+        id = "step-walk-3000",
+        name = "Step Meditation (3k)",
+        type = TimerType.LINEAR,
+        category = "Movement",
+        iconName = "hiking",
+        totalDurationSeconds = 2700,     // 45 minutes maximum duration
+        intervalDurationSeconds = 0,     // Driven primarily by step interval bells
+        bellPattern = BellPattern.THREE_BELL,
+        theme = ThemeMode.AMOLED,
+        displayMode = true,
+        pocketMode = true,
+        isFavorite = false,
+        stepGoal = 3000,
+        stepInterval = 500,
+        stepTriggerMode = StepTriggerMode.STEPS_ONLY
+    )
+
+    /**
+     * Power Walking (5,000 Steps): High-cadence walking workout with a pace bell every 1,000 steps.
+     * Dual-trigger mode completes at 5,000 steps or 60 minutes.
+     */
+    val POWER_STEP_WALK = TimerProfile(
+        id = "power-step-walk-5000",
+        name = "Power Walking (5k)",
+        type = TimerType.LINEAR,
+        category = "Movement",
+        iconName = "directions_run",
+        totalDurationSeconds = 3600,     // 60 minutes
+        intervalDurationSeconds = 0,
+        bellPattern = BellPattern.SINGLE,
+        theme = ThemeMode.EYE_COMFORT,
+        displayMode = true,
+        pocketMode = true,
+        isFavorite = false,
+        stepGoal = 5000,
+        stepInterval = 1000,
+        stepTriggerMode = StepTriggerMode.TIME_OR_STEPS
     )
 
     /**
@@ -196,6 +243,8 @@ object DefaultProfiles {
         PRANAYAMA_478,
         SURYA_NAMASKAR,
         MINDFUL_WALKING,
+        STEP_WALK_MEDITATION,
+        POWER_STEP_WALK,
         MINDFUL_READING,
         HYDRATION
     )

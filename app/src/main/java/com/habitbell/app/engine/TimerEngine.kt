@@ -46,6 +46,12 @@ enum class SessionStatus {
  * @property poseRemainingSeconds Seconds remaining in the active compound pose step.
  * @property isVisualAlertActive True during visual alert windows (1s pre-alert and chime duration).
  * @property isDimmed True when session is resting between intervals and screen is auto-dimmed.
+ * @property currentSteps Total steps accumulated during active session.
+ * @property targetSteps Optional target steps required for session completion.
+ * @property nextStepBellSteps Steps remaining until next step interval chime.
+ * @property stepCadence Live cadence in steps per minute (SPM).
+ * @property isStepTrackingActive Whether step monitoring is active for this session.
+ * @property healthProvider Active health platform source providing step metrics.
  */
 data class TimerSessionState(
     val status: SessionStatus = SessionStatus.IDLE,
@@ -64,7 +70,14 @@ data class TimerSessionState(
     val poseRemainingSeconds: Int = 0,
     // Display Mode auto-dimming and visual alert indicators
     val isVisualAlertActive: Boolean = false,
-    val isDimmed: Boolean = false
+    val isDimmed: Boolean = false,
+    // Step and Health Metrics
+    val currentSteps: Int = 0,
+    val targetSteps: Int? = null,
+    val nextStepBellSteps: Int? = null,
+    val stepCadence: Int = 0,
+    val isStepTrackingActive: Boolean = false,
+    val healthProvider: com.habitbell.app.health.HealthProviderType = com.habitbell.app.health.HealthProviderType.HARDWARE_SENSOR
 ) {
     /**
      * Normalized completion progress ranging from `0.0f` (start) to `1.0f` (complete).
@@ -74,6 +87,14 @@ data class TimerSessionState(
         get() = if (totalSeconds > 0) {
             1f - (remainingSeconds.toFloat() / totalSeconds.toFloat())
         } else 0f
+
+    /**
+     * Normalized step completion progress ranging from `0.0f` to `1.0f`.
+     */
+    val stepProgressFraction: Float?
+        get() = targetSteps?.let { target ->
+            if (target > 0) (currentSteps.toFloat() / target.toFloat()).coerceIn(0f, 1f) else null
+        }
 
     /**
      * Formatted human-readable remaining time string in `MM:SS` format.
@@ -94,6 +115,22 @@ data class TimerSessionState(
             val s = nextBellSeconds % 60
             return String.format("%02d:%02d", m, s)
         }
+
+    /**
+     * Formatted human-readable step count display (e.g. "1,250 / 2,000 steps" or "1,250 steps").
+     */
+    val formattedStepCount: String
+        get() = if (targetSteps != null && targetSteps > 0) {
+            "%,d / %,d steps".format(currentSteps, targetSteps)
+        } else {
+            "%,d steps".format(currentSteps)
+        }
+
+    /**
+     * Formatted human-readable cadence string (e.g. "108 steps/min").
+     */
+    val formattedCadence: String
+        get() = "$stepCadence steps/min"
 }
 
 /**
@@ -137,6 +174,9 @@ class TimerEngine(
     /** Accumulated active elapsed realtime prior to pause, used for drift compensation. */
     private var pausedElapsedRealtime: Long = 0L
 
+    /** Steps accumulated at the most recent step interval chime trigger. */
+    private var lastStepBellTriggerCount: Int = 0
+
     /** Remaining seconds until the next bell chime in the current linear interval. */
     private var currentIntervalRemaining: Int = 0
 
@@ -174,12 +214,16 @@ class TimerEngine(
     fun loadProfile(profile: TimerProfile) {
         pause()
         visualAlertRemainingTicks = 0
+        lastStepBellTriggerCount = 0
         when (profile.type) {
             TimerType.LINEAR -> {
                 // Initialize linear countdown parameters
                 val total = profile.totalDurationSeconds
                 val interval = if (profile.intervalDurationSeconds > 0) profile.intervalDurationSeconds else total
                 currentIntervalRemaining = interval
+                val stepInterval = profile.stepInterval
+                val initialNextStepBell = if (stepInterval != null && stepInterval > 0) stepInterval else null
+
                 _state.value = TimerSessionState(
                     status = SessionStatus.IDLE,
                     profile = profile,
@@ -187,7 +231,12 @@ class TimerEngine(
                     totalSeconds = total,
                     nextBellSeconds = interval,
                     isVisualAlertActive = false,
-                    isDimmed = false
+                    isDimmed = false,
+                    currentSteps = 0,
+                    targetSteps = profile.stepGoal,
+                    nextStepBellSteps = initialNextStepBell,
+                    stepCadence = 0,
+                    isStepTrackingActive = profile.isStepTrackingEnabled
                 )
             }
             TimerType.MULTI_INTERVAL -> {
@@ -290,6 +339,68 @@ class TimerEngine(
     }
 
     /**
+     * Ingests real-time step count and cadence updates from [com.habitbell.app.health.HealthStepManager].
+     *
+     * Evaluates:
+     * 1. **Step Interval Chime**: Rings Option C 3-bell sequence (or silent 3-pulse tactile vibration in Pocket Mode)
+     *    and wakes the display every [TimerProfile.stepInterval] steps.
+     * 2. **Step Goal Completion**: Rings Temple Gong completion chime when [TimerProfile.stepGoal] is achieved.
+     *
+     * @param steps Total steps accumulated strictly within the active walking session.
+     * @param cadence Estimated cadence in steps per minute.
+     */
+    fun onStepCountUpdated(steps: Int, cadence: Int) {
+        if (_state.value.status != SessionStatus.RUNNING) return
+        val currentProfile = _state.value.profile
+        if (!currentProfile.isStepTrackingEnabled) return
+
+        val stepInterval = currentProfile.stepInterval
+        var triggerStepBell = false
+        var nextStepBell = _state.value.nextStepBellSteps
+
+        // Check periodic step interval chime boundary (e.g. every 500 steps)
+        if (stepInterval != null && stepInterval > 0) {
+            val stepsSinceLastBell = steps - lastStepBellTriggerCount
+            if (stepsSinceLastBell >= stepInterval && steps > 0) {
+                triggerStepBell = true
+                lastStepBellTriggerCount = (steps / stepInterval) * stepInterval
+                nextStepBell = stepInterval
+            } else {
+                nextStepBell = (stepInterval - (stepsSinceLastBell % stepInterval)).coerceAtLeast(1)
+            }
+        }
+
+        // Check session completion via step goal (e.g. reaching 2,000 steps)
+        val stepGoal = currentProfile.stepGoal
+        val isGoalReached = stepGoal != null && stepGoal > 0 && steps >= stepGoal
+
+        _state.update {
+            it.copy(
+                currentSteps = steps,
+                nextStepBellSteps = nextStepBell,
+                stepCadence = cadence
+            )
+        }
+
+        if (isGoalReached && currentProfile.stepTriggerMode != StepTriggerMode.TIME_ONLY) {
+            // Target step goal reached: complete session with Temple Gong!
+            onSessionCompleted()
+            return
+        }
+
+        if (triggerStepBell) {
+            if (isPocketModeActive()) {
+                // Pocket Mode: 3 distinct heavy tactile pulses
+                hapticManager.triggerIntervalHaptic()
+            } else {
+                // Audible 3-bell sequence + brighten display
+                audioManager.playIntervalBell()
+                visualAlertRemainingTicks = 5
+            }
+        }
+    }
+
+    /**
      * Resets the active timer session back to initial values according to the currently assigned profile.
      */
     fun reset() {
@@ -303,8 +414,13 @@ class TimerEngine(
      */
     private fun tickOneSecond() {
         val current = _state.value
-        // If 1 second or less remains, the next tick completes the entire session
+        // If 1 second or less remains, evaluate completion semantics
         if (current.remainingSeconds <= 1) {
+            if (current.profile.stepTriggerMode == StepTriggerMode.STEPS_ONLY) {
+                // In STEPS_ONLY mode, countdown reaches 00:00 but session continues until step goal is met
+                _state.update { it.copy(remainingSeconds = 0) }
+                return
+            }
             onSessionCompleted()
             return
         }

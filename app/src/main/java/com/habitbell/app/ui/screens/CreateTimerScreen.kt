@@ -42,6 +42,10 @@ fun CreateTimerScreen(
     var selectedTheme by remember { mutableStateOf(ThemeMode.AMOLED) }
     var displayMode by remember { mutableStateOf(true) }
     var pocketMode by remember { mutableStateOf(false) }
+    var isStepTracking by remember { mutableStateOf(false) }
+    var stepGoal by remember { mutableStateOf<Int?>(2000) }
+    var stepInterval by remember { mutableStateOf<Int?>(500) }
+    var triggerMode by remember { mutableStateOf(com.habitbell.app.data.model.StepTriggerMode.TIME_OR_STEPS) }
 
     Scaffold(
         topBar = {
@@ -101,7 +105,7 @@ fun CreateTimerScreen(
 
             item {
                 Text(
-                    text = "Interval Chime Bell",
+                    text = "Time Interval Chime Bell",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onBackground
                 )
@@ -134,6 +138,148 @@ fun CreateTimerScreen(
                                     .padding(vertical = 10.dp)
                                     .wrapContentWidth(Alignment.CenterHorizontally)
                             )
+                        }
+                    }
+                }
+            }
+
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Walking & Step Tracking", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onBackground)
+                        Text("Count steps via Pedometer / Health Connect", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Switch(
+                        checked = isStepTracking,
+                        onCheckedChange = {
+                            isStepTracking = it
+                            if (it) {
+                                category = "Movement"
+                                pocketMode = true
+                            }
+                        }
+                    )
+                }
+            }
+
+            if (isStepTracking) {
+                item {
+                    Text(
+                        text = "Step Goal (Completion Bell)",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        val goals = listOf(
+                            "None" to null,
+                            "1k" to 1000,
+                            "2k" to 2000,
+                            "3k" to 3000,
+                            "5k" to 5000
+                        )
+                        goals.forEach { (label, count) ->
+                            val isSelected = stepGoal == count
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable { stepGoal = count }
+                            ) {
+                                Text(
+                                    text = label,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onBackground,
+                                    modifier = Modifier
+                                        .padding(vertical = 10.dp)
+                                        .wrapContentWidth(Alignment.CenterHorizontally)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                item {
+                    Text(
+                        text = "Step Interval Bell (Chime every N steps)",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        val stepIntervals = listOf(
+                            "None" to null,
+                            "250" to 250,
+                            "500" to 500,
+                            "1,000" to 1000
+                        )
+                        stepIntervals.forEach { (label, count) ->
+                            val isSelected = stepInterval == count
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable { stepInterval = count }
+                            ) {
+                                Text(
+                                    text = label,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onBackground,
+                                    modifier = Modifier
+                                        .padding(vertical = 10.dp)
+                                        .wrapContentWidth(Alignment.CenterHorizontally)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                item {
+                    Text(
+                        text = "Session Completion Trigger",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        val modes = listOf(
+                            "Time or Steps" to com.habitbell.app.data.model.StepTriggerMode.TIME_OR_STEPS,
+                            "Steps Only" to com.habitbell.app.data.model.StepTriggerMode.STEPS_ONLY,
+                            "Time Only" to com.habitbell.app.data.model.StepTriggerMode.TIME_ONLY
+                        )
+                        modes.forEach { (label, mode) ->
+                            val isSelected = triggerMode == mode
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable { triggerMode = mode }
+                            ) {
+                                Text(
+                                    text = label,
+                                    fontSize = 10.sp,
+                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onBackground,
+                                    modifier = Modifier
+                                        .padding(vertical = 10.dp)
+                                        .wrapContentWidth(Alignment.CenterHorizontally)
+                                )
+                            }
                         }
                     }
                 }
@@ -206,16 +352,19 @@ fun CreateTimerScreen(
                     onClick = {
                         val profile = TimerProfile(
                             id = "custom-${UUID.randomUUID().toString().take(8)}",
-                            name = if (name.isNotBlank()) name else "Custom Session",
+                            name = if (name.isNotBlank()) name else if (isStepTracking) "Mindful Step Walk" else "Custom Session",
                             type = TimerType.LINEAR,
-                            category = category,
-                            iconName = "alarm",
+                            category = if (isStepTracking && category == "Meditation") "Movement" else category,
+                            iconName = if (isStepTracking) "directions_walk" else "alarm",
                             totalDurationSeconds = totalMinutes * 60,
                             intervalDurationSeconds = intervalSeconds,
                             theme = selectedTheme,
                             displayMode = displayMode,
                             pocketMode = pocketMode,
-                            isFavorite = true
+                            isFavorite = true,
+                            stepGoal = if (isStepTracking) stepGoal else null,
+                            stepInterval = if (isStepTracking) stepInterval else null,
+                            stepTriggerMode = if (isStepTracking) triggerMode else com.habitbell.app.data.model.StepTriggerMode.TIME_ONLY
                         )
                         onSave(profile)
                     },

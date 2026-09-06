@@ -12,6 +12,20 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
 
+    <!-- Health & Step Tracking Permissions (Pedometer sensor and Health Connect) -->
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
+    <uses-permission android:name="android.permission.health.READ_STEPS" />
+    <uses-permission android:name="android.permission.health.WRITE_STEPS" />
+    <uses-permission android:name="android.permission.health.WRITE_EXERCISE" />
+
+    <!-- Optional step counter hardware feature declaration -->
+    <uses-feature
+        android:name="android.hardware.sensor.stepcounter"
+        android:required="false" />
+    <uses-feature
+        android:name="android.hardware.sensor.stepdetector"
+        android:required="false" />
+
     <!-- Android TV & Google TV Leanback Support (Touchscreen optional; single universal APK) -->
     <uses-feature
         android:name="android.software.leanback"
@@ -81,6 +95,11 @@
                 <data android:scheme="habitbell" />
             </intent-filter>
 
+            <!-- Health Connect Permissions Rationale Action -->
+            <intent-filter>
+                <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+            </intent-filter>
+
             <!-- Google Assistant App Actions & Launcher Shortcuts -->
             <meta-data
                 android:name="android.app.shortcuts"
@@ -139,5 +158,13 @@
             android:name="com.google.android.gms.cast.framework.OPTIONS_PROVIDER_CLASS_NAME"
             android:value="com.habitbell.app.cast.CastOptionsProvider" />
     </application>
+
+    <!-- Health Connect Application Query for Android 13 and below compatibility -->
+    <queries>
+        <package android:name="com.google.android.apps.healthdata" />
+        <intent>
+            <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+        </intent>
+    </queries>
 
 </manifest>
