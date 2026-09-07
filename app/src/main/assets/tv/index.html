@@ -143,6 +143,40 @@
             text-align: center;
             margin-top: 10px;
         }
+        .breath-ring {
+            position: absolute;
+            width: 320px;
+            height: 320px;
+            border-radius: 50%;
+            pointer-events: none;
+            transition: all 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+            opacity: 0;
+            z-index: 2;
+        }
+        .breath-ring.inhale {
+            transform: scale(1.22);
+            background: radial-gradient(circle, rgba(229,169,60,0.35) 0%, rgba(229,169,60,0.06) 70%, transparent 100%);
+            border: 2px solid #E5A93C;
+            opacity: 0.85;
+        }
+        .breath-ring.hold-in {
+            transform: scale(1.22);
+            background: radial-gradient(circle, rgba(245,158,11,0.45) 0%, rgba(245,158,11,0.1) 70%, transparent 100%);
+            border: 2px dashed #F59E0B;
+            opacity: 0.95;
+        }
+        .breath-ring.exhale {
+            transform: scale(0.72);
+            background: radial-gradient(circle, rgba(56,189,248,0.3) 0%, rgba(56,189,248,0.05) 70%, transparent 100%);
+            border: 2px solid #38BDF8;
+            opacity: 0.75;
+        }
+        .breath-ring.hold-out {
+            transform: scale(0.65);
+            background: radial-gradient(circle, rgba(99,102,241,0.25) 0%, transparent 70%);
+            border: 1px dotted #818CF8;
+            opacity: 0.5;
+        }
         #ytFrame {
             position: absolute;
             width: 1px;
@@ -160,6 +194,7 @@
     </div>
 
     <div class="center-stage">
+        <div class="breath-ring" id="breathRing"></div>
         <svg class="progress-svg" viewBox="0 0 480 480">
             <circle class="progress-bg" cx="240" cy="240" r="220" />
             <circle class="progress-bar" id="progressBar" cx="240" cy="240" r="220" />
@@ -357,9 +392,11 @@
             return `${m}:${s}`;
         }
 
+        let customSubText = null;
+
         function updateUI() {
             document.getElementById('clockText').innerText = formatTime(remainingSeconds);
-            document.getElementById('bellText').innerText = `Next Bell in ${formatTime(nextBell)}`;
+            document.getElementById('bellText').innerText = customSubText || `Next Bell in ${formatTime(nextBell)}`;
 
             const progress = (totalSeconds - remainingSeconds) / totalSeconds;
             const offset = CIRCUMFERENCE * progress;
@@ -385,7 +422,8 @@
                 stopAumDrone();
                 stopYouTubeAudio();
                 playGongChime();
-                document.getElementById('bellText').innerText = "Session Completed 🙏";
+                customSubText = "Session Completed 🙏";
+                document.getElementById('bellText').innerText = customSubText;
                 updateUI();
                 return;
             }
@@ -423,8 +461,42 @@
                             remainingSeconds = data.remainingSeconds;
                             totalSeconds = data.totalSeconds || totalSeconds;
                             nextBell = data.nextBellSeconds || nextBell;
-                            updateUI();
                         }
+                        if (data.profileName) {
+                            document.getElementById('sessionTitle').innerText = data.profileName;
+                        }
+
+                        // Synchronize Pranayama or Surya Namaskar posture visual details
+                        const ring = document.getElementById('breathRing');
+                        if (data.pranayamaPhase && data.pranayamaPhase.length > 0) {
+                            const phaseDisp = data.pranayamaDisplay || data.pranayamaPhase;
+                            const sanskrit = data.pranayamaSanskrit ? ` (${data.pranayamaSanskrit})` : '';
+                            const roundText = `Round ${data.currentRound} / ${data.totalRounds}`;
+                            customSubText = `${phaseDisp}${sanskrit} • ${roundText}`;
+
+                            if (ring) {
+                                if (data.pranayamaPhase.indexOf('INHALE') !== -1) {
+                                    ring.className = 'breath-ring inhale';
+                                } else if (data.pranayamaPhase.indexOf('HOLD_IN') !== -1) {
+                                    ring.className = 'breath-ring hold-in';
+                                } else if (data.pranayamaPhase.indexOf('EXHALE') !== -1) {
+                                    ring.className = 'breath-ring exhale';
+                                } else {
+                                    ring.className = 'breath-ring hold-out';
+                                }
+                            }
+                        } else if (data.poseName && data.poseName.length > 0) {
+                            if (ring) ring.className = 'breath-ring';
+                            const poseTitle = data.poseSanskrit ? `${data.poseName} (${data.poseSanskrit})` : data.poseName;
+                            const breathCue = data.poseBreath ? ` • ${data.poseBreath}` : '';
+                            const roundText = `Round ${data.currentRound} / ${data.totalRounds}`;
+                            customSubText = `${poseTitle}${breathCue} • ${roundText}`;
+                        } else {
+                            if (ring) ring.className = 'breath-ring';
+                            customSubText = null;
+                        }
+
+                        updateUI();
                     }
                 })
                 .catch(() => {});

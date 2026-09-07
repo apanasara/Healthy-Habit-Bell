@@ -118,18 +118,35 @@ The heartbeat of the mindfulness runtime is a deterministic finite state machine
 
 #### 2. Google Cast Framework (`com.habitbell.app.cast`)
 - **Native Cast Integration**: Pure application TV streaming without screen mirroring using Google Play Services Cast Framework (`play-services-cast-framework:22.0.0`).
-- **`CastOptionsProvider.kt`**: Registers the official Default Media Receiver application ID (`CastMediaControlIntent.DEFAULT_MEDIA_RECEIVER_APPLICATION_ID`).
+- **`CastOptionsProvider.kt`**: Registers the official Default Media Receiver application ID (`CastMediaControlIntent.DEFAULT_MEDIA_RECEIVER_APPLICATION_ID` / `CC1AD845`).
 - **`HabitBellCastManager.kt`**: Singleton session manager coordinating discovery, device connection, and media metadata transmission to Chromecast, Sony Bravia, and Google Cast-enabled TVs.
+- **Cast Feedback Loop & 15-Second Reconnect Resolution (FLAW-2)**:
+  - Decouples Cast player state from false pause events: In `RemoteMediaClient.Callback`, transient states (`PLAYER_STATE_BUFFERING`, `PLAYER_STATE_LOADING`, `PLAYER_STATE_IDLE`, `PLAYER_STATE_UNKNOWN`) are explicitly ignored. Only genuine user transitions (`PLAYER_STATE_PLAYING` and `PLAYER_STATE_PAUSED`) dispatch to `onRemotePlaybackAction`.
+  - Implements `isDispatchingLocally` volatile re-entrancy flags on `loadSession`, `play()`, `pause()`, and `stop()` to eliminate echo feedback loops between mobile commands and Cast listener callbacks.
+  - Implements `lastCastProfileId` tracking in `CentralSessionHandler` so resuming from pause calls `castManager.play()` rather than reloading the stream from zero, preventing continuous buffering cycles.
+- **Profile-Specific Mindful Artwork & LAN Audio Streaming (FLAW-1)**:
+  - Replaced external Pixabay CDN audio URLs with high-fidelity, zero-cloud LAN streaming of `tv/aum.mp3` served directly by `LocalCastWebServer` on port `8888`.
+  - Dynamically binds session-specific high-resolution artwork (Sacred Lotus for Pranayama, Golden Dawn for Surya Namaskar, Mindful Eating Bowl, Forest Walk Path) tailored to the active profile.
 - **`CastButton.kt`**: Jetpack Compose-native Cast button wrapping AndroidX MediaRouter's `MediaRouteButton` to display discovery states and trigger device selection dialogs.
 - **Host Activity Architecture**: `MainActivity` inherits from `androidx.fragment.app.FragmentActivity` to provide the `FragmentManager` required by `MediaRouteButton` to display native Google Cast route picker dialogs across all Android platforms without runtime crashes.
 - **`HabitBellChooserDialogFragment` & `HabitBellControllerDialogFragment`**: Public top-level subclasses of `MediaRouteChooserDialogFragment` and `MediaRouteControllerDialogFragment` implementing zero-arg public constructors and theme bundle arguments (`HabitBellMediaRouteTheme_Dark` / `Light`). This strictly complies with Android's `FragmentManager` contract and prevents `IllegalStateException: Fragment ... must be a public static class` crashes upon Cast icon taps.
 
-#### 3. Local TV WebCast (`LocalCastWebServer.kt`)
+#### 3. Screen Mirroring Subsystem (Miracast / Wi-Fi Display / Any TV)
+- **Universal Living Room Projection (FLAW-3)**: Provides 1-tap integration with Android OS Screen Mirroring (`android.provider.Settings.ACTION_CAST_SETTINGS` with fallback to `ACTION_WIRELESS_SETTINGS`) in `SettingsDrawer.kt`.
+- **Zero-Latency Display Fallback**: Bridges non-Chromecast devices (Miracast dongles, projectors, FireTV, Roku, smart monitors) where Google Cast protocol is unavailable.
+- **Full Visual Fidelity**: Projects the phone's full Compose canvas directly onto the TV screen, displaying real-time Pranayama breathing animations (blooming lotus, expanding breath ring), live countdowns, and Surya Namaskar posture cards with zero cloud reliance.
+
+#### 4. Local TV WebCast (`LocalCastWebServer.kt` & `assets/tv/index.html`)
 - **Zero-Cloud Local Casting**: Embedded lightweight multi-threaded HTTP server running on port `8888`.
 - **Network Service Discovery (NSD)**: Registers an mDNS service (`_habitbell._tcp`) allowing any Smart TV browser on the same Wi-Fi network to discover and open the TV dashboard.
-- **Server-Sent Events & Real-Time Sync**: Exposes `/api/state` for real-time SSE broadcasts of timer progress and `/api/action/toggle` for bidirectional remote playback control from the TV browser.
+- **Enriched Real-Time State Contract (`/api/state`)**: Broadcasts comprehensive routine metadata including:
+  - `pranayamaPhase`, `pranayamaDisplay`, `pranayamaSanskrit`, `phaseRemaining`, `phaseDuration`.
+  - `poseName`, `poseSanskrit`, `poseBreath`, `poseRemaining` for compound yoga sequences.
+  - `currentRound` and `totalRounds`.
+- **Interactive TV Visualizer (`assets/tv/index.html`)**: Features an expanding/contracting breath visualizer ring (`.breath-ring.inhale`, `.hold-in`, `.exhale`, `.hold-out`) that morphs color, scale, and opacity in lockstep with the active breath phase, plus live Surya Namaskar asana guidance.
+- **Local Media Streaming**: Serves `/media/aum.mp3` with byte-range streaming support directly from application assets.
 
-#### 4. Samsung Smart TV (Tizen OS) & LG Smart TV (webOS) Ecosystem
+#### 5. Samsung Smart TV (Tizen OS) & LG Smart TV (webOS) Ecosystem
 - **Market Reach**: Samsung Tizen (~21%) and LG webOS (~12%) represent >33% of global connected smart TVs.
 - **Packaged Web TV Suite**:
   - `tv-platforms/samsung-tizen/`: Packaged Tizen Web Application container (`.wgt`) with `config.xml` manifest and Samsung TV Remote key handling (`tizen.tvinputdevice.registerKey`).
@@ -138,7 +155,7 @@ The heartbeat of the mindfulness runtime is a deterministic finite state machine
   - Dispatches SSDP (Simple Service Discovery Protocol) M-SEARCH UDP multicast probes (`239.255.255.250:1900`) for DIAL services (`urn:dial-multiscreen-org:service:dial:1`) and UPnP `MediaRenderer`.
   - Auto-identifies Samsung and LG TVs on the local Wi-Fi and provides zero-click remote launching of the TV dashboard.
 
-#### 5. Apple TV & AirPlay 2 Subsystem (`com.habitbell.app.cast`)
+#### 6. Apple TV & AirPlay 2 Subsystem (`com.habitbell.app.cast`)
 - **Market Context**: Apple TV (tvOS) dominates the premium streaming box sector. Because tvOS contains no web browser, Habit Bell deploys a dual-track strategy:
 - **Track 1 — Direct AirPlay 2 Sender Protocol (`AirPlayCastManager.kt`)**:
   - Scans for nearby Apple TV devices on local Wi-Fi via mDNS / Bonjour (`_airplay._tcp.` and `_raop._tcp.`).

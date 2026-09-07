@@ -1187,7 +1187,56 @@ private fun GlobalConfigContent(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Screen Mirroring (Miracast / Any TV / Projectors)
+                val screenMirrorContext = LocalContext.current
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            try {
+                                screenMirrorContext.startActivity(android.content.Intent(android.provider.Settings.ACTION_CAST_SETTINGS))
+                            } catch (e: Exception) {
+                                try {
+                                    screenMirrorContext.startActivity(android.content.Intent(android.provider.Settings.ACTION_WIRELESS_SETTINGS))
+                                } catch (_: Exception) {}
+                            }
+                        }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Cast,
+                            contentDescription = "Screen Mirroring",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Screen Mirroring (Miracast / Any TV)",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium
+                            )
+                            Text(
+                                text = "Mirror live phone screen (breathing lotus, poses & timer) to Miracast dongles, projectors & TVs",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Icon(
+                            imageVector = Icons.Outlined.ChevronRight,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
 
                 // TV Dashboard mode on phone
                 Surface(

@@ -10,6 +10,7 @@ import android.support.v4.media.session.PlaybackStateCompat
 import com.habitbell.app.auto.HabitBellMediaService
 import com.habitbell.app.data.default.DefaultProfiles
 import com.habitbell.app.data.model.TimerProfile
+import com.habitbell.app.data.model.TimerType
 import com.habitbell.app.data.repository.TimerRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -82,6 +83,9 @@ class CentralSessionHandler(private val application: Application) {
 
     /** Native Google Cast manager enabling pure app casting to TV hardware without mirroring. */
     val castManager: com.habitbell.app.cast.HabitBellCastManager = com.habitbell.app.cast.HabitBellCastManager.getInstance(application)
+
+    /** Tracks active cast session routine ID to avoid duplicate loadSession() calls on pause/resume. */
+    private var lastCastProfileId: String? = null
 
     /** AirPlay 2 discovery manager enabling direct casting to Apple TV hardware over Wi-Fi. */
     val airPlayManager: com.habitbell.app.cast.AirPlayCastManager = com.habitbell.app.cast.AirPlayCastManager.getInstance(application)
@@ -158,11 +162,30 @@ class CentralSessionHandler(private val application: Application) {
     }
 
     /**
-     * Connects remote media action callbacks from Google Cast TV remotes to central session control.
+     * Connects remote media action callbacks from Google Cast TV remotes to central session control,
+     * and synchronizes running session state to newly connected Cast displays.
      */
     private fun setupCastListener() {
         castManager.onRemotePlaybackAction = { isPlay ->
             if (isPlay) resume() else pause()
+        }
+
+        // Auto-load running session onto TV if Cast connection is established mid-session
+        scope.launch {
+            castManager.isCasting.collect { isCasting ->
+                if (isCasting && engine.state.value.status == SessionStatus.RUNNING) {
+                    val state = engine.state.value
+                    lastCastProfileId = state.profile.id
+                    val subtitle = buildSessionSubtitle(state)
+                    val artwork = resolveArtworkForProfile(state.profile)
+                    castManager.loadSession(
+                        profileName = state.profile.name,
+                        subtitle = subtitle,
+                        durationSeconds = state.totalSeconds,
+                        artworkUrl = artwork
+                    )
+                }
+            }
         }
     }
 
@@ -208,17 +231,18 @@ class CentralSessionHandler(private val application: Application) {
             }
 
             override fun onSeekTo(pos: Long) {
-                // Seek events from media controllers
+                // Seek events not applicable to guided intervals
             }
         })
         mediaSession.isActive = true
     }
 
     /**
-     * Observes [TimerEngine.state] transitions and synchronizes:
-     * 1. [MediaSessionCompat] playback state (PLAYING, PAUSED, STOPPED).
+     * Observes continuous timer state mutations from [TimerEngine] and orchestrates:
+     * 1. Automotive MediaSession playback state updates.
      * 2. Background music playback lifecycle.
      * 3. Foreground service indicators and wake locks.
+     * 4. Google Cast media receiver synchronization without buffering churn.
      */
     private fun observeEngineState() {
         scope.launch {
@@ -243,11 +267,19 @@ class CentralSessionHandler(private val application: Application) {
                             }
 
                             if (castManager.isCasting.value) {
-                                castManager.loadSession(
-                                    profileName = state.profile.name,
-                                    subtitle = "${state.profile.totalDurationSeconds / 60}m Mindful Session",
-                                    durationSeconds = state.totalSeconds
-                                )
+                                if (lastCastProfileId != state.profile.id) {
+                                    lastCastProfileId = state.profile.id
+                                    val subtitle = buildSessionSubtitle(state)
+                                    val artwork = resolveArtworkForProfile(state.profile)
+                                    castManager.loadSession(
+                                        profileName = state.profile.name,
+                                        subtitle = subtitle,
+                                        durationSeconds = state.totalSeconds,
+                                        artworkUrl = artwork
+                                    )
+                                } else {
+                                    castManager.play()
+                                }
                             }
                         }
                         SessionStatus.PAUSED -> {
@@ -269,6 +301,7 @@ class CentralSessionHandler(private val application: Application) {
                             displayAutomationManager.stopMonitoring()
                             bgMusicManager.stop()
                             repository.recordSessionCompleted(state.profile.id)
+                            lastCastProfileId = null
 
                             if (state.profile.isStepTrackingEnabled) {
                                 val finalSteps = state.currentSteps
@@ -288,6 +321,7 @@ class CentralSessionHandler(private val application: Application) {
                             displayAutomationManager.stopMonitoring()
                             bgMusicManager.stop()
                             healthStepManager.resetSession()
+                            lastCastProfileId = null
 
                             if (castManager.isCasting.value) {
                                 castManager.stop()
@@ -296,6 +330,48 @@ class CentralSessionHandler(private val application: Application) {
                     }
                 }
             }
+        }
+    }
+
+    /**
+     * Resolves high-resolution mindful artwork URL tailored to the active routine category.
+     *
+     * @param profile Active [TimerProfile].
+     * @return Curated high-res HTTPS artwork image URL.
+     */
+    private fun resolveArtworkForProfile(profile: TimerProfile): String {
+        return when {
+            profile.type == TimerType.MULTI_INTERVAL || profile.pranayamaConfig != null ->
+                "https://images.unsplash.com/photo-1545205597-3d9d02c29597?w=1200&auto=format&fit=crop&q=80" // Sacred Lotus Meditation
+            profile.type == TimerType.COMPOUND || profile.name.contains("Surya", ignoreCase = true) ->
+                "https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=1200&auto=format&fit=crop&q=80" // Golden Dawn Sun Salutation
+            profile.name.contains("Eat", ignoreCase = true) ->
+                "https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=1200&auto=format&fit=crop&q=80" // Mindful Dining
+            profile.name.contains("Walk", ignoreCase = true) || profile.stepGoal != null ->
+                "https://images.unsplash.com/photo-1476480862126-209bfaa8edc8?w=1200&auto=format&fit=crop&q=80" // Mindful Forest Path
+            profile.name.contains("Reiki", ignoreCase = true) ->
+                "https://images.unsplash.com/photo-1515377905703-c4788e51af15?w=1200&auto=format&fit=crop&q=80" // Energy Healing & Zen Stones
+            else ->
+                "https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=1200&auto=format&fit=crop&q=80"
+        }
+    }
+
+    /**
+     * Constructs descriptive contextual subtitle for the Cast receiver based on session mode.
+     *
+     * @param state Active [TimerSessionState].
+     * @return User-friendly subtitle string (e.g. "Breathwork • Round 1/12 • Adhama Classical").
+     */
+    private fun buildSessionSubtitle(state: TimerSessionState): String {
+        return when {
+            state.profile.pranayamaConfig != null ->
+                "Breathwork • Round ${state.currentRound}/${state.totalRounds} • Adhama Classical"
+            state.profile.compoundConfig != null ->
+                "Surya Namaskar • Round ${state.currentRound}/${state.totalRounds} • 12 Postures"
+            state.profile.stepGoal != null ->
+                "Mindful Walk • Goal: ${state.profile.stepGoal} steps"
+            else ->
+                "${state.profile.totalDurationSeconds / 60}m Mindful Session • Habit Bell"
         }
     }
 

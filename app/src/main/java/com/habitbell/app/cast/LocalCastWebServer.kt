@@ -29,7 +29,26 @@ import kotlin.concurrent.thread
  */
 class LocalCastWebServer(private val context: Context, private val port: Int = 8888) {
 
-    private val TAG = "LocalCastWebServer"
+    companion object {
+        private const val TAG = "LocalCastWebServer"
+
+        @Volatile
+        private var INSTANCE: LocalCastWebServer? = null
+
+        /**
+         * Returns or initializes the process-level [LocalCastWebServer] singleton instance.
+         *
+         * @param context Application context.
+         * @return Authoritative [LocalCastWebServer] instance.
+         */
+        fun getInstance(context: Context): LocalCastWebServer {
+            return INSTANCE ?: synchronized(this) {
+                INSTANCE ?: LocalCastWebServer(context.applicationContext).also {
+                    INSTANCE = it
+                }
+            }
+        }
+    }
 
     /** Bound server socket listening for incoming HTTP connections. */
     private var serverSocket: ServerSocket? = null
@@ -114,7 +133,16 @@ class LocalCastWebServer(private val context: Context, private val port: Int = 8
 
                 if (path.startsWith("/api/state")) {
                     val state = sessionHandler.sessionState.value
-                    val json = """{"status":"${state.status.name}","profileName":"${state.profile.name}","remainingSeconds":${state.remainingSeconds},"totalSeconds":${state.totalSeconds},"nextBellSeconds":${state.nextBellSeconds},"formattedTime":"${state.formattedRemainingTime}","formattedNextBell":"${state.formattedNextBellTime}","progressFraction":${state.progressFraction}}"""
+                    val phase = state.currentPranayamaPhase
+                    val phaseName = phase?.name ?: ""
+                    val phaseDisplay = phase?.displayName ?: ""
+                    val phaseSanskrit = phase?.sanskritName ?: ""
+                    val pose = state.currentPose
+                    val poseName = pose?.name ?: ""
+                    val poseSanskrit = pose?.sanskritName ?: ""
+                    val poseBreath = pose?.breathCue ?: ""
+
+                    val json = """{"status":"${state.status.name}","profileName":"${state.profile.name}","profileType":"${state.profile.type.name}","remainingSeconds":${state.remainingSeconds},"totalSeconds":${state.totalSeconds},"nextBellSeconds":${state.nextBellSeconds},"formattedTime":"${state.formattedRemainingTime}","formattedNextBell":"${state.formattedNextBellTime}","progressFraction":${state.progressFraction},"currentRound":${state.currentRound},"totalRounds":${state.totalRounds},"pranayamaPhase":"$phaseName","pranayamaDisplay":"$phaseDisplay","pranayamaSanskrit":"$phaseSanskrit","phaseRemaining":${state.phaseRemainingSeconds},"phaseDuration":${state.phaseDurationSeconds},"poseName":"$poseName","poseSanskrit":"$poseSanskrit","poseBreath":"$poseBreath","poseRemaining":${state.poseRemainingSeconds}}"""
                     val bytes = json.toByteArray(Charsets.UTF_8)
                     val response = "HTTP/1.1 200 OK\r\nContent-Type: application/json; charset=UTF-8\r\nContent-Length: ${bytes.size}\r\nAccess-Control-Allow-Origin: *\r\nConnection: close\r\n\r\n"
                     out.write(response.toByteArray(Charsets.UTF_8))
@@ -135,6 +163,24 @@ class LocalCastWebServer(private val context: Context, private val port: Int = 8
                     out.write(bytes)
                     out.flush()
                     socket.close()
+                } else if (path.startsWith("/media/aum.mp3") || path.startsWith("/aum.mp3")) {
+                    val bodyBytes = try {
+                        context.assets.open("tv/aum.mp3").use { it.readBytes() }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Could not open tv/aum.mp3 asset", e)
+                        ByteArray(0)
+                    }
+                    val response = "HTTP/1.1 200 OK\r\n" +
+                            "Content-Type: audio/mpeg\r\n" +
+                            "Content-Length: ${bodyBytes.size}\r\n" +
+                            "Accept-Ranges: bytes\r\n" +
+                            "Access-Control-Allow-Origin: *\r\n" +
+                            "Connection: close\r\n\r\n"
+                    out.write(response.toByteArray(Charsets.UTF_8))
+                    out.write(bodyBytes)
+                    out.flush()
+                    socket.close()
+                    Log.i(TAG, "Successfully served TV Webcast audio (${bodyBytes.size} bytes)")
                 } else {
                     // Read bundled TV dashboard HTML asset
                     val html = try {

@@ -116,19 +116,38 @@ class CentralSessionHandlerTest {
     fun testTvApiStateSerializationContract() {
         val state = TimerSessionState(
             status = SessionStatus.RUNNING,
-            profile = DefaultProfiles.EATING,
+            profile = DefaultProfiles.PRANAYAMA_HATHA,
             remainingSeconds = 1200,
             totalSeconds = 2700,
-            nextBellSeconds = 45
+            nextBellSeconds = 45,
+            currentRound = 3,
+            totalRounds = 12,
+            currentPranayamaPhase = com.habitbell.app.data.model.PranayamaPhase.INHALE,
+            phaseRemainingSeconds = 4,
+            phaseDurationSeconds = 4
         )
 
-        val json = """{"status":"${state.status.name}","profileName":"${state.profile.name}","remainingSeconds":${state.remainingSeconds},"totalSeconds":${state.totalSeconds},"nextBellSeconds":${state.nextBellSeconds},"formattedTime":"${state.formattedRemainingTime}","formattedNextBell":"${state.formattedNextBellTime}","progressFraction":${state.progressFraction}}"""
+        val phase = state.currentPranayamaPhase
+        val phaseName = phase?.name ?: ""
+        val phaseDisplay = phase?.displayName ?: ""
+        val phaseSanskrit = phase?.sanskritName ?: ""
+        val pose = state.currentPose
+        val poseName = pose?.name ?: ""
+        val poseSanskrit = pose?.sanskritName ?: ""
+        val poseBreath = pose?.breathCue ?: ""
+
+        val json = """{"status":"${state.status.name}","profileName":"${state.profile.name}","profileType":"${state.profile.type.name}","remainingSeconds":${state.remainingSeconds},"totalSeconds":${state.totalSeconds},"nextBellSeconds":${state.nextBellSeconds},"formattedTime":"${state.formattedRemainingTime}","formattedNextBell":"${state.formattedNextBellTime}","progressFraction":${state.progressFraction},"currentRound":${state.currentRound},"totalRounds":${state.totalRounds},"pranayamaPhase":"$phaseName","pranayamaDisplay":"$phaseDisplay","pranayamaSanskrit":"$phaseSanskrit","phaseRemaining":${state.phaseRemainingSeconds},"phaseDuration":${state.phaseDurationSeconds},"poseName":"$poseName","poseSanskrit":"$poseSanskrit","poseBreath":"$poseBreath","poseRemaining":${state.poseRemainingSeconds}}"""
 
         assertTrue(json.contains("\"status\":\"RUNNING\""))
-        assertTrue(json.contains("\"profileName\":\"Eating\""))
+        assertTrue(json.contains("\"profileName\":\"Pranayama (Hatha Yoga)\""))
         assertTrue(json.contains("\"remainingSeconds\":1200"))
         assertTrue(json.contains("\"formattedTime\":\"20:00\""))
         assertTrue(json.contains("\"nextBellSeconds\":45"))
+        assertTrue(json.contains("\"pranayamaPhase\":\"INHALE\""))
+        assertTrue(json.contains("\"pranayamaDisplay\":\"Inhale\""))
+        assertTrue(json.contains("\"pranayamaSanskrit\":\"Purak\""))
+        assertTrue(json.contains("\"currentRound\":3"))
+        assertTrue(json.contains("\"totalRounds\":12"))
     }
 
     /**
