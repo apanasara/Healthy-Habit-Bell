@@ -394,7 +394,7 @@ class MainActivity : FragmentActivity() {
     /**
      * Modulates the visibility of the Android system status bar.
      *
-     * When entering an active mindful timer screen ([AppScreen.SESSION]),
+     * When entering an active mindful timer screen ([AppScreen.SESSION] or [AppScreen.TV_DASHBOARD]),
      * the system status bar (displaying time clock, notification icons, battery gauge, and cellular/Wi-Fi
      * signals) is hidden to eliminate visual clutter, reduce cognitive distraction, and promote sustained presence.
      *
@@ -419,7 +419,8 @@ class MainActivity : FragmentActivity() {
      */
     override fun onResume() {
         super.onResume()
-        val isTimerScreen = viewModel.uiState.value.currentScreen == AppScreen.SESSION
+        val isTimerScreen = viewModel.uiState.value.currentScreen == AppScreen.SESSION ||
+                viewModel.uiState.value.currentScreen == AppScreen.TV_DASHBOARD
         setStatusBarHidden(isTimerScreen)
     }
 
@@ -433,19 +434,7 @@ class MainActivity : FragmentActivity() {
     }
 
     /**
-     * Cancels any pending hardware haptic pulses and ensures status bars are restored on termination.
-     */
-    override fun onDestroy() {
-        super.onDestroy()
-        viewModel.batteryOptimizer.setScreenBrightness(this, false)
-        setStatusBarHidden(false)
-        if (isFinishing) {
-            viewModel.cancelHaptics()
-        }
-    }
-
-    /**
-     * Detects if current hardware target is an Android TV / Google TV device.
+     * Determines whether the host execution environment is an Android TV, Google TV, or set-top box.
      *
      * Queries the system [UiModeManager.getCurrentModeType] configuration and inspects the
      * [PackageManager.FEATURE_LEANBACK] hardware profile.
@@ -457,5 +446,17 @@ class MainActivity : FragmentActivity() {
         val isTvUi = uiModeManager?.currentModeType == android.content.res.Configuration.UI_MODE_TYPE_TELEVISION
         val hasLeanback = packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_LEANBACK)
         return isTvUi || hasLeanback
+    }
+
+    /**
+     * Cancels any pending hardware haptic pulses and ensures status bars are restored on termination.
+     */
+    override fun onDestroy() {
+        super.onDestroy()
+        viewModel.batteryOptimizer.setScreenBrightness(this, false)
+        setStatusBarHidden(false)
+        if (isFinishing) {
+            viewModel.cancelHaptics()
+        }
     }
 }
