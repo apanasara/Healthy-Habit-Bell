@@ -34,6 +34,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.habitbell.app.data.model.PranayamaPhase
 import com.habitbell.app.data.model.TimerType
 import com.habitbell.app.engine.SessionStatus
 import com.habitbell.app.engine.TimerSessionState
@@ -141,21 +142,54 @@ private fun LandscapeSessionLayout(
     onToggleTheme: () -> Unit,
     onOpenTVMode: () -> Unit
 ) {
+    val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+    val buttonPillBg = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (isDark) 0.35f else 0.75f)
+    val buttonBorder = BorderStroke(
+        1.dp,
+        if (isDark) MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f)
+        else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.15f)
+    )
+
+    val isEating = sessionState.profile.category.contains("Eating", ignoreCase = true) ||
+        sessionState.profile.id.contains("eating", ignoreCase = true)
+    val isPranayama = sessionState.profile.type == TimerType.MULTI_INTERVAL
+
     Row(
         modifier = Modifier
             .fillMaxSize()
+            .statusBarsPadding()
+            .displayCutoutPadding()
+            .navigationBarsPadding()
             .padding(horizontal = 24.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Left Column: Timer Ring / Breath Indicator / Pose (Scaled for horizontal screen)
+        // Left Column: Visualizer Area (Hero Lotus / Eating Bowl / Circular Progress / Pose)
         Box(
             modifier = Modifier
-                .weight(1f)
+                .weight(1.15f)
                 .fillMaxHeight(),
             contentAlignment = Alignment.Center
         ) {
-            when (sessionState.profile.type) {
+            if (isEating) {
+                MindfulEatingLandscapeContent(
+                    sessionState = sessionState,
+                    onOpenSettings = onOpenSettings
+                )
+            } else when (sessionState.profile.type) {
+                TimerType.MULTI_INTERVAL -> {
+                    val phase = sessionState.currentPranayamaPhase
+                    if (phase != null) {
+                        BreathIndicator(
+                            phase = phase,
+                            remainingSeconds = sessionState.phaseRemainingSeconds,
+                            phaseDuration = sessionState.phaseDurationSeconds,
+                            size = 260.dp,
+                            showHud = false,
+                            modifier = Modifier.clickable { onOpenSettings() }
+                        )
+                    }
+                }
                 TimerType.LINEAR -> {
                     val progress = if (sessionState.profile.stepTriggerMode == com.habitbell.app.data.model.StepTriggerMode.STEPS_ONLY) {
                         sessionState.stepProgressFraction ?: sessionState.progressFraction
@@ -165,7 +199,7 @@ private fun LandscapeSessionLayout(
 
                     CircularProgressRing(
                         progress = progress,
-                        size = 195.dp,
+                        size = 210.dp,
                         strokeWidth = 5.dp
                     ) {
                         Column(
@@ -175,7 +209,7 @@ private fun LandscapeSessionLayout(
                             if (sessionState.profile.stepTriggerMode == com.habitbell.app.data.model.StepTriggerMode.STEPS_ONLY) {
                                 Text(
                                     text = "%,d".format(sessionState.currentSteps),
-                                    fontSize = 42.sp,
+                                    fontSize = 44.sp,
                                     fontWeight = FontWeight.ExtraLight,
                                     letterSpacing = (-1).sp,
                                     color = MaterialTheme.colorScheme.onBackground
@@ -188,46 +222,13 @@ private fun LandscapeSessionLayout(
                             } else {
                                 Text(
                                     text = sessionState.formattedRemainingTime,
-                                    fontSize = 44.sp,
+                                    fontSize = 46.sp,
                                     fontWeight = FontWeight.ExtraLight,
                                     letterSpacing = (-1).sp,
                                     color = MaterialTheme.colorScheme.onBackground
                                 )
                             }
-
-                            if (sessionState.isStepTrackingActive) {
-                                Text(
-                                    text = "🚶 ${sessionState.formattedStepCount}",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                                val nextStepBell = sessionState.nextStepBellSteps
-                                if (nextStepBell != null && nextStepBell > 0) {
-                                    Text(
-                                        text = "Bell in %,d steps".format(nextStepBell),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            } else if (sessionState.profile.intervalDurationSeconds > 0) {
-                                Text(
-                                    text = "Bell in ${sessionState.formattedNextBellTime}",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                            }
                         }
-                    }
-                }
-                TimerType.MULTI_INTERVAL -> {
-                    val phase = sessionState.currentPranayamaPhase
-                    if (phase != null) {
-                        BreathIndicator(
-                            phase = phase,
-                            remainingSeconds = sessionState.phaseRemainingSeconds,
-                            phaseDuration = sessionState.phaseDurationSeconds,
-                            size = 180.dp
-                        )
                     }
                 }
                 TimerType.COMPOUND -> {
@@ -244,12 +245,13 @@ private fun LandscapeSessionLayout(
             }
         }
 
-        // Right Column: Title, Quick Actions, Status, and Main Controls
+        Spacer(modifier = Modifier.width(16.dp))
+
+        // Right Column: Action Bar, Elevated HUD / Rhythm Capsule, and Controls
         Column(
             modifier = Modifier
-                .weight(1.1f)
-                .fillMaxHeight()
-                .padding(start = 16.dp),
+                .weight(1.05f)
+                .fillMaxHeight(),
             verticalArrangement = Arrangement.SpaceBetween,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -259,67 +261,204 @@ private fun LandscapeSessionLayout(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = onExit, modifier = Modifier.size(36.dp)) {
+                IconButton(
+                    onClick = onExit,
+                    modifier = Modifier
+                        .size(38.dp)
+                        .background(buttonPillBg, CircleShape)
+                        .border(buttonBorder, CircleShape)
+                ) {
                     Icon(
-                        Icons.Default.ArrowBack,
+                        painter = painterResource(id = R.drawable.ic_ph_back),
                         contentDescription = "Exit Session",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        tint = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(18.dp)
                     )
                 }
 
                 Text(
-                    text = sessionState.profile.name,
+                    text = if (isEating) "Mindful Eating" else sessionState.profile.name,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onBackground
                 )
 
-                val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
                     if (sessionState.profile.isCastSupported) {
-                        CastButton(modifier = Modifier.size(36.dp))
+                        Box(
+                            modifier = Modifier
+                                .size(38.dp)
+                                .background(buttonPillBg, CircleShape)
+                                .border(buttonBorder, CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            CastButton(modifier = Modifier.size(20.dp))
+                        }
                     }
-                    IconButton(onClick = onToggleTheme, modifier = Modifier.size(36.dp)) {
+                    IconButton(
+                        onClick = onToggleTheme,
+                        modifier = Modifier
+                            .size(38.dp)
+                            .background(buttonPillBg, CircleShape)
+                            .border(buttonBorder, CircleShape)
+                    ) {
                         Icon(
                             painter = painterResource(id = if (isDark) R.drawable.ic_ph_sun else R.drawable.ic_ph_moon),
                             contentDescription = if (isDark) "Switch to Light Mode" else "Switch to Dark Mode",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(20.dp)
+                            tint = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(18.dp)
                         )
                     }
-                    IconButton(onClick = onOpenSettings, modifier = Modifier.size(36.dp)) {
+                    IconButton(
+                        onClick = onOpenSettings,
+                        modifier = Modifier
+                            .size(38.dp)
+                            .background(buttonPillBg, CircleShape)
+                            .border(buttonBorder, CircleShape)
+                    ) {
                         Icon(
-                            Icons.Outlined.Settings,
+                            painter = painterResource(id = R.drawable.ic_ph_tune),
                             contentDescription = "Settings",
-                            tint = MaterialTheme.colorScheme.primary
+                            tint = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(18.dp)
                         )
                     }
                 }
             }
 
-            // Session Status & Extra Info
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(
-                    text = when (sessionState.status) {
-                        SessionStatus.RUNNING -> "● Active Mindful Session"
-                        SessionStatus.PAUSED -> "Paused"
-                        SessionStatus.COMPLETED -> "Session Completed 🙏"
-                        SessionStatus.IDLE -> "Ready"
-                    },
-                    style = MaterialTheme.typography.bodyMedium,
-                    fontWeight = FontWeight.Medium,
-                    color = if (sessionState.status == SessionStatus.RUNNING) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                if (sessionState.profile.type == TimerType.MULTI_INTERVAL) {
+            // Middle: Status / HUD / Rhythm Capsule
+            if (isPranayama) {
+                val phase = sessionState.currentPranayamaPhase
+                if (phase != null) {
+                    val primaryPranaColor = if (isDark) {
+                        when (phase) {
+                            PranayamaPhase.INHALE -> Color(0xFFF43F5E)
+                            PranayamaPhase.HOLD_IN -> Color(0xFFFBBF24)
+                            PranayamaPhase.EXHALE -> Color(0xFFA78BFA)
+                            PranayamaPhase.HOLD_OUT -> Color(0xFF38BDF8)
+                        }
+                    } else {
+                        when (phase) {
+                            PranayamaPhase.INHALE -> Color(0xFFE11D48)
+                            PranayamaPhase.HOLD_IN -> Color(0xFFD97706)
+                            PranayamaPhase.EXHALE -> Color(0xFF7C3AED)
+                            PranayamaPhase.HOLD_OUT -> Color(0xFF0284C7)
+                        }
+                    }
+
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                text = phase.sanskritName.uppercase(),
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                letterSpacing = 3.sp,
+                                color = primaryPranaColor
+                            )
+                            Text(
+                                text = phase.sanskritScript,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = primaryPranaColor.copy(alpha = 0.85f)
+                            )
+                        }
+
+                        Text(
+                            text = "${sessionState.phaseRemainingSeconds}",
+                            fontSize = 44.sp,
+                            fontWeight = FontWeight.ExtraLight,
+                            letterSpacing = (-1).sp,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+
+                        PranayamaPhaseRhythmBar(
+                            activePhase = phase,
+                            isDark = isDark,
+                            activeColor = primaryPranaColor
+                        )
+
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        Text(
+                            text = "Round ${sessionState.currentRound} of ${sessionState.totalRounds} • ${sessionState.formattedRemainingTime} left",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            } else if (isEating) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        text = "Round ${sessionState.currentRound} of ${sessionState.totalRounds} • ${sessionState.formattedRemainingTime} left",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        text = sessionState.formattedRemainingTime,
+                        fontSize = 44.sp,
+                        fontWeight = FontWeight.ExtraLight,
+                        letterSpacing = (-1).sp,
+                        color = MaterialTheme.colorScheme.onBackground
                     )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.3f))
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                        ) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.ic_ph_bell),
+                                contentDescription = "Bite Bell",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(13.dp)
+                            )
+                            Text(
+                                text = "Bite in ${sessionState.formattedNextBellTime}",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                }
+            } else {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        text = when (sessionState.status) {
+                            SessionStatus.RUNNING -> "● Active Mindful Session"
+                            SessionStatus.PAUSED -> "Paused"
+                            SessionStatus.COMPLETED -> "Session Completed 🙏"
+                            SessionStatus.IDLE -> "Ready"
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.Medium,
+                        color = if (sessionState.status == SessionStatus.RUNNING) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    if (sessionState.isStepTrackingActive) {
+                        Text(
+                            text = "🚶 ${sessionState.formattedStepCount} • Cadence: ${sessionState.formattedCadence}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    } else if (sessionState.profile.intervalDurationSeconds > 0) {
+                        Text(
+                            text = "Bell in ${sessionState.formattedNextBellTime}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
                 }
             }
 
-            // Bottom Controls (Reset, Play/Pause, Settings)
+            // Bottom Transport Controls (Phosphor Line Icons)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly,
@@ -328,50 +467,46 @@ private fun LandscapeSessionLayout(
                 IconButton(
                     onClick = onReset,
                     modifier = Modifier
-                        .size(48.dp)
-                        .background(
-                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-                            shape = CircleShape
-                        )
+                        .size(46.dp)
+                        .background(buttonPillBg, shape = CircleShape)
+                        .border(buttonBorder, shape = CircleShape)
                 ) {
                     Icon(
-                        Icons.Outlined.Refresh,
+                        painter = painterResource(id = R.drawable.ic_ph_reset),
                         contentDescription = "Reset",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(22.dp)
+                        tint = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(20.dp)
                     )
                 }
 
                 val isRunning = sessionState.status == SessionStatus.RUNNING
                 FilledIconButton(
                     onClick = onTogglePlayPause,
-                    modifier = Modifier.size(64.dp),
+                    modifier = Modifier.size(62.dp),
                     colors = IconButtonDefaults.filledIconButtonColors(
                         containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary
+                        contentColor = if (isDark) MaterialTheme.colorScheme.onPrimary else Color.White
                     )
                 ) {
                     Icon(
-                        imageVector = if (isRunning) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        painter = painterResource(id = if (isRunning) R.drawable.ic_ph_pause else R.drawable.ic_ph_play),
                         contentDescription = if (isRunning) "Pause" else "Play",
-                        modifier = Modifier.size(32.dp)
+                        modifier = Modifier.size(30.dp)
                     )
                 }
 
                 IconButton(
                     onClick = onOpenSettings,
                     modifier = Modifier
-                        .size(48.dp)
-                        .background(
-                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-                            shape = CircleShape
-                        )
+                        .size(46.dp)
+                        .background(buttonPillBg, shape = CircleShape)
+                        .border(buttonBorder, shape = CircleShape)
                 ) {
                     Icon(
-                        Icons.Outlined.Tune,
-                        contentDescription = "Adjust",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(22.dp)
+                        painter = painterResource(id = R.drawable.ic_ph_tune),
+                        contentDescription = "Settings",
+                        tint = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }
@@ -650,44 +785,10 @@ private fun PortraitSessionLayout(
                 }
 
                 TimerType.MULTI_INTERVAL -> {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        val phase = sessionState.currentPranayamaPhase
-                        if (phase != null) {
-                            BreathIndicator(
-                                phase = phase,
-                                remainingSeconds = sessionState.phaseRemainingSeconds,
-                                phaseDuration = sessionState.phaseDurationSeconds,
-                                size = 280.dp,
-                                modifier = Modifier.clickable { onOpenSettings() }
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(24.dp))
-
-                        Text(
-                            text = "Round ${sessionState.currentRound} of ${sessionState.totalRounds}",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                        val pConfig = sessionState.profile.pranayamaConfig
-                        if (pConfig?.isIntervalBellEnabled == true) {
-                            val intervalCadence = pConfig.intervalBellRoundCadence.takeIf { it > 0 } ?: 5
-                            val roundsUntilBell = intervalCadence - ((sessionState.currentRound - 1) % intervalCadence)
-                            Text(
-                                text = "🔔 Milestone bell in $roundsUntilBell ${if (roundsUntilBell == 1) "round" else "rounds"}",
-                                style = MaterialTheme.typography.labelSmall,
-                                letterSpacing = 1.sp,
-                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.85f)
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "Total Remaining: ${sessionState.formattedRemainingTime}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                    PranayamaPortraitContent(
+                        sessionState = sessionState,
+                        onOpenSettings = onOpenSettings
+                    )
                 }
 
                 TimerType.COMPOUND -> {
@@ -935,6 +1036,276 @@ private fun MindfulEatingContent(
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+/**
+ * Classical Pranayama multi-interval breathwork visualizer for portrait mode.
+ * Features an enlarged heroic side-view blooming lotus, integrated non-overlapping HUD,
+ * 4-phase segmented rhythm capsule, and round milestone status badge.
+ *
+ * @param sessionState Reactive timer state snapshot ([TimerSessionState]).
+ * @param onOpenSettings Open settings callback.
+ */
+@Composable
+private fun PranayamaPortraitContent(
+    sessionState: TimerSessionState,
+    onOpenSettings: () -> Unit
+) {
+    val phase = sessionState.currentPranayamaPhase ?: return
+    val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+
+    val primaryPranaColor = if (isDark) {
+        when (phase) {
+            PranayamaPhase.INHALE -> Color(0xFFF43F5E)
+            PranayamaPhase.HOLD_IN -> Color(0xFFFBBF24)
+            PranayamaPhase.EXHALE -> Color(0xFFA78BFA)
+            PranayamaPhase.HOLD_OUT -> Color(0xFF38BDF8)
+        }
+    } else {
+        when (phase) {
+            PranayamaPhase.INHALE -> Color(0xFFE11D48)
+            PranayamaPhase.HOLD_IN -> Color(0xFFD97706)
+            PranayamaPhase.EXHALE -> Color(0xFF7C3AED)
+            PranayamaPhase.HOLD_OUT -> Color(0xFF0284C7)
+        }
+    }
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        // Hero Enlarged Side-View Blooming Lotus (320dp height) with Non-Overlapping HUD
+        BreathIndicator(
+            phase = phase,
+            remainingSeconds = sessionState.phaseRemainingSeconds,
+            phaseDuration = sessionState.phaseDurationSeconds,
+            size = 320.dp,
+            showHud = true,
+            modifier = Modifier.clickable { onOpenSettings() }
+        )
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        // 4-Phase Segmented Rhythm Capsule
+        PranayamaPhaseRhythmBar(
+            activePhase = phase,
+            isDark = isDark,
+            activeColor = primaryPranaColor,
+            modifier = Modifier.fillMaxWidth(0.92f)
+        )
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        // Round Milestone Status Capsule
+        Surface(
+            shape = RoundedCornerShape(16.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (isDark) 0.35f else 0.6f),
+            border = BorderStroke(
+                1.dp,
+                if (isDark) MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f)
+                else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.15f)
+            ),
+            modifier = Modifier.padding(horizontal = 8.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+            ) {
+                Text(
+                    text = "Round ${sessionState.currentRound} of ${sessionState.totalRounds}",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                val pConfig = sessionState.profile.pranayamaConfig
+                if (pConfig?.isIntervalBellEnabled == true) {
+                    val intervalCadence = pConfig.intervalBellRoundCadence.takeIf { it > 0 } ?: 5
+                    val roundsUntilBell = intervalCadence - ((sessionState.currentRound - 1) % intervalCadence)
+                    Text(
+                        text = "• 🔔 Milestone in $roundsUntilBell",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = primaryPranaColor
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        Text(
+            text = "Total Remaining: ${sessionState.formattedRemainingTime}",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f)
+        )
+    }
+}
+
+/**
+ * 4-Phase Segmented Rhythm Capsule showing active breath state via glowing icons,
+ * phase nomenclature, and classical Sanskrit subtitles.
+ *
+ * @param activePhase Active breathwork phase.
+ * @param isDark Whether the active theme is dark mode.
+ * @param activeColor Dynamic color associated with the active phase.
+ * @param modifier Composable layout modifier.
+ */
+@Composable
+private fun PranayamaPhaseRhythmBar(
+    activePhase: PranayamaPhase,
+    isDark: Boolean,
+    activeColor: Color,
+    modifier: Modifier = Modifier
+) {
+    val phaseItems = listOf(
+        Triple(PranayamaPhase.INHALE, "Inhale", "Pūraka"),
+        Triple(PranayamaPhase.HOLD_IN, "Hold", "Antar"),
+        Triple(PranayamaPhase.EXHALE, "Exhale", "Recaka"),
+        Triple(PranayamaPhase.HOLD_OUT, "Rest", "Bāhya")
+    )
+
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        phaseItems.forEach { (phase, label, sanskrit) ->
+            val isActive = phase == activePhase
+            Surface(
+                modifier = Modifier.weight(1f),
+                shape = RoundedCornerShape(12.dp),
+                color = if (isActive) activeColor.copy(alpha = if (isDark) 0.20f else 0.14f)
+                else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (isDark) 0.30f else 0.50f),
+                border = BorderStroke(
+                    width = if (isActive) 1.5.dp else 1.dp,
+                    color = if (isActive) activeColor.copy(alpha = 0.7f)
+                    else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.15f)
+                )
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.padding(vertical = 6.dp, horizontal = 2.dp)
+                ) {
+                    val iconRes = when (phase) {
+                        PranayamaPhase.INHALE -> R.drawable.ic_ph_wind
+                        PranayamaPhase.HOLD_IN -> R.drawable.ic_ph_sparkle
+                        PranayamaPhase.EXHALE -> R.drawable.ic_ph_wind
+                        PranayamaPhase.HOLD_OUT -> R.drawable.ic_ph_waves
+                    }
+                    Icon(
+                        painter = painterResource(id = iconRes),
+                        contentDescription = label,
+                        tint = if (isActive) activeColor else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontSize = 10.sp,
+                        fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
+                        color = if (isActive) activeColor else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = sanskrit,
+                        fontSize = 8.sp,
+                        color = if (isActive) activeColor.copy(alpha = 0.85f) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Mindful Eating specific visualizer scaled for horizontal / landscape displays.
+ *
+ * @param sessionState Reactive timer state snapshot ([TimerSessionState]).
+ * @param onOpenSettings Open settings callback.
+ */
+@Composable
+private fun MindfulEatingLandscapeContent(
+    sessionState: TimerSessionState,
+    onOpenSettings: () -> Unit
+) {
+    val progress = sessionState.progressFraction
+    val isRunning = sessionState.status == SessionStatus.RUNNING
+
+    val intervalDuration = sessionState.profile.intervalDurationSeconds
+    val biteProgress = if (intervalDuration > 0) {
+        (1f - (sessionState.nextBellSeconds.toFloat() / intervalDuration.toFloat())).coerceIn(0f, 1f)
+    } else 0f
+
+    val animatedBiteProgress by animateFloatAsState(
+        targetValue = biteProgress,
+        animationSpec = tween(durationMillis = 800),
+        label = "BiteProgressLandscape"
+    )
+
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val surfaceVariantColor = MaterialTheme.colorScheme.surfaceVariant
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .clickable { onOpenSettings() },
+        contentAlignment = Alignment.Center
+    ) {
+        // Ambient candlelit radial aura
+        Box(
+            modifier = Modifier
+                .size(240.dp)
+                .background(
+                    Brush.radialGradient(
+                        colors = listOf(
+                            primaryColor.copy(alpha = if (isRunning) 0.15f else 0.05f),
+                            Color.Transparent
+                        ),
+                        radius = 350f
+                    )
+                )
+        )
+
+        // Mealtime Circular Progress Ring
+        CircularProgressRing(
+            progress = progress,
+            size = 210.dp,
+            strokeWidth = 5.dp
+        ) {
+            Box(
+                modifier = Modifier.size(68.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Canvas(modifier = Modifier.matchParentSize()) {
+                    val stroke = 3.dp.toPx()
+                    val radius = (size.minDimension - stroke) / 2f
+
+                    drawCircle(
+                        color = surfaceVariantColor.copy(alpha = 0.35f),
+                        radius = radius,
+                        style = Stroke(width = stroke)
+                    )
+
+                    if (intervalDuration > 0) {
+                        drawArc(
+                            color = primaryColor,
+                            startAngle = -90f,
+                            sweepAngle = 360f * animatedBiteProgress,
+                            useCenter = false,
+                            style = Stroke(width = stroke, cap = StrokeCap.Round)
+                        )
+                    }
+                }
+
+                Icon(
+                    painter = painterResource(id = R.drawable.ic_ph_bowl),
+                    contentDescription = "Mindful Eating",
+                    tint = primaryColor,
+                    modifier = Modifier.size(32.dp)
+                )
             }
         }
     }

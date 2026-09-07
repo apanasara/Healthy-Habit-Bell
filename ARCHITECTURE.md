@@ -430,13 +430,32 @@ Grounded in *Hatha Yoga Pradipika* (2.12) & *Gheranda Samhita* (5.49):
 - **Session Completion Bell**: Deep resonant **Temple Gong** (`130.8 Hz`) strikes gracefully upon completing all rounds.
 - **Pocket Mode Safeguard**: In Pocket Mode, audible chimes and voice guidance are replaced with distinct multi-pulse tactile haptic vibrations.
 
-#### 6. Sacred Blooming Lotus & Dynamic Prana Aura (`BreathIndicator.kt`)
-- **8-Petal Blooming Sacred Lotus**: Canvas-drawn organic geometry using cubic bezier paths.
-- **Purak (Inhale - 4s)**: Petals gracefully bloom outward from `0.42` to full expansion `1.0` with `FastOutSlowInEasing` and radiant dawn turquoise prana aura (`#2DD4BF`).
-- **Antar Kumbhak (Hold - 16s)**: Full lotus hovers with a living sinusoidal micro-pulse (`±2.5%` at ~0.5Hz) and rotating prana particles, creating a living breathing visual that never feels frozen.
-- **Rechak (Exhale - 8s)**: Petals gently rotate and fold inward towards center as the palette deepens into calming twilight amethyst (`#818CF8`).
-- **Bahya Kumbhak (Hold Out - 16s)**: Petals rest closed into a quiet dormant golden seed in the center, framed by a serene outer circular guideline representing *Shunya* (the void).
-- **Phase HUD**: Renders Romanized Sanskrit title, classical Devanagari script, English subtitle, large seconds countdown, and circular phase completion arc.
+#### 6. Classical Side-View Blooming Lotus, Dynamic Prana Aura & Landscape Layout (`BreathIndicator.kt`, `SessionScreen.kt`)
+- **Sacred Side-View Lotus Architecture**: Renders 13 organic curved petals structured across 7 distinct depth tiers (outermost horizontal wings -> lateral wings -> chalice petals -> central erect spine) drawn using smooth two-semicircular cubic Bezier curves.
+- **C2-Continuous Kinematics (Zero-Flicker Transitions)**:
+  - **Pūraka (Inhale)**: Petals gracefully unfurl outward into full bloom from waterline with smooth cubic lift (`bloom: 0.0f -> 1.0f`).
+  - **Antar Kumbhaka (Hold In)**: Fully open flower hovers soothingly with continuous living aquatic floating and subtle sinusoidal lateral sway with C2 boundary velocity matching ($v=0$).
+  - **Recaka (Exhale)**: Petals fold gently inward towards center as the flower descends smoothly to the waterline, closing into a serene resting bud (`bloom: 1.0f -> 0.0f`).
+  - **Bāhya Kumbhaka (Hold Out / Void)**: Closed bud rests tranquilly at the waterline in Shunya stillness with subtle bobbing.
+  - Guarantees seamless, zero-flicker cyclic transitions across all four phases ($1 \rightarrow 2 \rightarrow 3 \rightarrow 4 \rightarrow 1$).
+- **Theme-Harmonized Calyx Leaves ("Patte") & Stem**:
+  - Dynamically adapts the 3 calyx leaves, vertical stem, and central receptacle seed to the active theme palette:
+    - **AMOLED Dark Mode**: Luminous chartreuse/emerald green (`#A3E635` / `#84CC16`) with an ethereal glow.
+    - **Warm Parchment Mode**: Natural earthy sage/olive green (`#84CC16` / `#65A30D`) harmonized with warm linen tones.
+- **Phase-Harmonized Prana Palette**:
+  - Inhale: Luminous Ruby Rose (`#F43F5E` Dark / `#E11D48` Light)
+  - Hold In: Radiant Solar Amber (`#FBBF24` Dark / `#D97706` Light)
+  - Exhale: Meditative Twilight Violet (`#A78BFA` Dark / `#7C3AED` Light)
+  - Hold Out: Deep Starlight Cyan (`#38BDF8` Dark / `#0284C7` Light)
+- **Zero Numeral/Text Overlap Architecture**:
+  - Canvas geometry anchors the waterline at `0.77 * canvasHeight` and scales maximum petal length to `0.39 * canvasHeight`. The flower apex never exceeds `0.38 * canvasHeight`, preserving a generous 48dp clear margin above the bloom.
+  - Upper HUD elevates classical Sanskrit nomenclature (`PŪRAKA` / `पूरक`), Devanagari script, and a large minimalist seconds countdown with zero petal overlap.
+- **4-Phase Segmented Rhythm Capsule (`PranayamaPhaseRhythmBar`)**:
+  - Icon-driven segmented status capsules (`Inhale 🌬 Pūraka`, `Hold ⏳ Antar`, `Exhale 💨 Recaka`, `Rest 🌊 Bāhya`) highlighting the active breath state with glowing borders, phase tints, and Phosphor icons.
+- **Responsive 2-Column Landscape Layout (`LandscapeSessionLayout`)**:
+  - **Left Column**: Dedicated pure side-view lotus visualizer (`size = 260.dp`, `showHud = false`) floating tranquilly over waterline ripples and breathing radial prana aura without text clutter.
+  - **Right Column**: Integrated action bar with Phosphor pill buttons, elevated Sanskrit HUD, large countdown numeral, 4-phase rhythm capsule, round counter, and unified Phosphor transport controls.
+  - Mindful Eating in landscape similarly leverages a 2-column layout rendering the mealtime bowl with active bite-cycle arc on the left and meal countdown + bite capsule on the right.
 
 #### 7. Dedicated Pranayama Settings Architecture (`SettingsDrawer.kt`)
 - When `profile.pranayamaConfig != null`, `SettingsDrawer` completely isolates the configuration surface into `PranayamaSettingsSheet`:
