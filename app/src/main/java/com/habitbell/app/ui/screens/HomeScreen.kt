@@ -40,7 +40,6 @@ import com.habitbell.app.ui.theme.EyeComfortAmber
  * @param onToggleZenMode Callback to toggle the distraction-free Zen mode.
  * @param onCycleTheme Callback to cycle between AMOLED, Eye Comfort, Dark, and Light themes.
  * @param onCreateNewClick Callback invoked when the FAB is tapped to create a custom profile.
- * @param onOpenTVMode Callback invoked to launch a profile directly in TV Dashboard mode.
  * @param onOpenGlobalSettings Callback invoked to open the global settings configuration drawer.
  * @param modifier Composable layout modifier.
  */
@@ -58,7 +57,6 @@ fun HomeScreen(
     onToggleZenMode: () -> Unit,
     onCycleTheme: () -> Unit,
     onCreateNewClick: () -> Unit,
-    onOpenTVMode: (TimerProfile) -> Unit,
     onOpenGlobalSettings: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -117,7 +115,6 @@ fun HomeScreen(
                             FavoriteCard(
                                 profile = fav,
                                 onClick = { onSelectProfile(fav) },
-                                onTVClick = { onOpenTVMode(fav) },
                                 onSettingsClick = { onConfigureProfile(fav) }
                             )
                         }
@@ -172,7 +169,6 @@ fun HomeScreen(
                     profile = profile,
                     onClick = { onSelectProfile(profile) },
                     onToggleFav = { onToggleFavorite(profile.id) },
-                    onTVClick = { onOpenTVMode(profile) },
                     onSettingsClick = { onConfigureProfile(profile) }
                 )
             }
@@ -352,14 +348,12 @@ private fun RoutineReminderSection(
  *
  * @param profile [TimerProfile] data entity.
  * @param onClick Callback to launch session for this profile.
- * @param onTVClick Callback to launch TV leanback mode.
  * @param onSettingsClick Callback to open profile customization drawer.
  */
 @Composable
 private fun FavoriteCard(
     profile: TimerProfile,
     onClick: () -> Unit,
-    onTVClick: () -> Unit,
     onSettingsClick: () -> Unit
 ) {
     Card(
@@ -389,25 +383,13 @@ private fun FavoriteCard(
                     else -> "🔔"
                 }
                 Text(text = icon, fontSize = 24.sp)
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (profile.isCastSupported) {
-                        IconButton(onClick = onTVClick, modifier = Modifier.size(28.dp)) {
-                            Icon(
-                                Icons.Outlined.Cast,
-                                contentDescription = "Cast to TV",
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                    }
-                    IconButton(onClick = onSettingsClick, modifier = Modifier.size(28.dp)) {
-                        Icon(
-                            Icons.Outlined.Settings,
-                            contentDescription = "Settings",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(17.dp)
-                        )
-                    }
+                IconButton(onClick = onSettingsClick, modifier = Modifier.size(28.dp)) {
+                    Icon(
+                        Icons.Outlined.Settings,
+                        contentDescription = "Settings",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(17.dp)
+                    )
                 }
             }
 
@@ -479,7 +461,6 @@ private fun RecentChip(
  * @param profile [TimerProfile] metadata entity.
  * @param onClick Callback to start session.
  * @param onToggleFav Callback to toggle favorite star.
- * @param onTVClick Callback to launch TV mode.
  * @param onSettingsClick Callback to open settings drawer.
  */
 @Composable
@@ -487,7 +468,6 @@ private fun TimerProfileListItem(
     profile: TimerProfile,
     onClick: () -> Unit,
     onToggleFav: () -> Unit,
-    onTVClick: () -> Unit,
     onSettingsClick: () -> Unit
 ) {
     Card(
@@ -554,16 +534,6 @@ private fun TimerProfileListItem(
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
-                if (profile.isCastSupported) {
-                    IconButton(onClick = onTVClick) {
-                        Icon(
-                            Icons.Outlined.Cast,
-                            contentDescription = "Cast / TV Dashboard",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                }
                 IconButton(onClick = onSettingsClick) {
                     Icon(
                         Icons.Outlined.Settings,

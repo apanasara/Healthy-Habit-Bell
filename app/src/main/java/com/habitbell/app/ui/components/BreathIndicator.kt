@@ -69,7 +69,7 @@ fun BreathIndicator(
     remainingSeconds: Int,
     phaseDuration: Int,
     modifier: Modifier = Modifier,
-    size: Dp = 340.dp,
+    size: Dp? = null,
     showHud: Boolean = true,
     showGuidanceCapsule: Boolean = false
 ) {
@@ -131,37 +131,21 @@ fun BreathIndicator(
         PranayamaPhase.HOLD_OUT -> waveOffset * 0.9f
     }
 
-    // 3. Theme & Color Psychology
+    // 3. Theme & Color Palette Binding (Observation 3 & 4)
+    // Coherent single theme color across all phases, harmonizing with app design
     val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
-
-    val primaryPranaColor by animateColorAsState(
-        targetValue = if (isDark) {
-            when (phase) {
-                PranayamaPhase.INHALE -> Color(0xFFF43F5E)    // Luminous Ruby Rose (oxygenation)
-                PranayamaPhase.HOLD_IN -> Color(0xFFFBBF24)   // Radiant Solar Amber (retention)
-                PranayamaPhase.EXHALE -> Color(0xFFA78BFA)    // Meditative Twilight Violet (release)
-                PranayamaPhase.HOLD_OUT -> Color(0xFF38BDF8)  // Deep Starlight Cyan (Shunya void)
-            }
-        } else {
-            when (phase) {
-                PranayamaPhase.INHALE -> Color(0xFFE11D48)    // Deep Rose
-                PranayamaPhase.HOLD_IN -> Color(0xFFD97706)   // Warm Amber
-                PranayamaPhase.EXHALE -> Color(0xFF7C3AED)    // Mystic Violet
-                PranayamaPhase.HOLD_OUT -> Color(0xFF0284C7)  // Cerulean Blue
-            }
-        },
-        animationSpec = tween(durationMillis = 600),
-        label = "PranaColor"
-    )
+    val themePrimary = MaterialTheme.colorScheme.primary
+    val primaryPranaColor = themePrimary
 
     // Creative Theme-Harmonized Calyx ("Patte") & Stem Palette
     val leafFillColor = if (isDark) Color(0xFFA3E635).copy(alpha = 0.55f) else Color(0xFF84CC16).copy(alpha = 0.42f)
     val leafStrokeColor = if (isDark) Color(0xFFD9F99D).copy(alpha = 0.80f) else Color(0xFF65A30D).copy(alpha = 0.85f)
     val stemColor = if (isDark) Color(0xFF84CC16).copy(alpha = 0.90f) else Color(0xFF65A30D).copy(alpha = 0.90f)
     val receptacleColor = if (isDark) Color(0xFF84CC16) else Color(0xFF4D7C0F)
+    val boxModifier = if (size != null) modifier.size(size) else modifier
 
     Box(
-        modifier = modifier.size(size),
+        modifier = boxModifier,
         contentAlignment = Alignment.Center
     ) {
         // Canvas rendering Side-View Lotus, Prana Radial Aura, Water Ripples, and Calyx Leaves
@@ -169,19 +153,22 @@ fun BreathIndicator(
             val canvasW = this.size.width
             val canvasH = this.size.height
             val cx = canvasW / 2f
-            val baseWaterY = canvasH * 0.77f
+            val baseWaterY = canvasH * 0.74f
             val floatOffsetPx = floatOffsetDp.dp.toPx()
             val cy = baseWaterY + floatOffsetPx
-            val maxPetalLen = canvasH * 0.39f
-            val stemLen = canvasH * 0.11f
+
+            // Calculate petal length calibrated to fill width comfortably when fanned out (-84 deg to +84 deg)
+            // Observation 2: Increase flower size bigger to cover screen width in portrait mode
+            val maxPetalLen = minOf(canvasW * 0.48f, canvasH * 0.45f)
+            val stemLen = canvasH * 0.12f
 
             // A. Luminous Breathing Prana Radial Aura behind flower
-            val auraRadius = (maxPetalLen * 0.75f) + (bloom * maxPetalLen * 0.55f)
+            val auraRadius = (maxPetalLen * 0.85f) + (bloom * maxPetalLen * 0.45f)
             drawCircle(
                 brush = Brush.radialGradient(
                     colors = listOf(
-                        primaryPranaColor.copy(alpha = if (isDark) 0.22f else 0.14f),
-                        primaryPranaColor.copy(alpha = if (isDark) 0.08f else 0.04f),
+                        primaryPranaColor.copy(alpha = if (isDark) 0.25f else 0.16f),
+                        primaryPranaColor.copy(alpha = if (isDark) 0.10f else 0.05f),
                         Color.Transparent
                     ),
                     center = Offset(cx, baseWaterY - maxPetalLen * 0.35f),
@@ -195,7 +182,7 @@ fun BreathIndicator(
             drawCalmWaterRipples(
                 cx = cx,
                 waterY = baseWaterY,
-                rippleColor = if (isDark) Color(0xFF38BDF8) else Color(0xFF94A3B8),
+                rippleColor = if (isDark) primaryPranaColor.copy(alpha = 0.45f) else Color(0xFF94A3B8),
                 rippleAnimTime = rippleTime
             )
 
@@ -214,10 +201,11 @@ fun BreathIndicator(
                             widthRatio = spec.widthRatio,
                             alpha = spec.alpha,
                             fillColor = primaryPranaColor,
+                            // Observation 3: In dark mode, no need of outline of petals
                             strokeColor = if (isDark) {
-                                Color.White.copy(alpha = (spec.alpha * 1.1f).coerceAtMost(0.7f))
+                                Color.Transparent
                             } else {
-                                primaryPranaColor.copy(alpha = (spec.alpha * 1.2f).coerceAtMost(0.85f))
+                                primaryPranaColor.copy(alpha = (spec.alpha * 1.15f).coerceAtMost(0.85f))
                             }
                         )
                     }

@@ -167,9 +167,11 @@ The heartbeat of the mindfulness runtime is a deterministic finite state machine
 ---
 
 ### 2.5. Android Auto Subsystem (`com.habitbell.app.auto`)
-Habit Bell provides deep automotive integration complying with Android for Cars design guidelines:
-- **`HabitBellCarAppService.kt` & `HabitBellCarSession.kt`**: Entry point for Android Auto projecting template-based screens (`HabitBellCarScreen`) to the in-dash screen.
-- **`HabitBellMediaService.kt`**: Extends `MediaBrowserServiceCompat` to provide media library browsability in automotive media drawers (`CATEGORY_PROJECTION`, `CATEGORY_CAR_MODE`).
+Habit Bell provides deep automotive integration complying with Android for Cars design guidelines (Car App Library v1.7.0, Car API Level 8):
+- **`HabitBellCarAppService.kt`**: Top-level `CarAppService` entry point bound by the Android Auto host. Manifest category: `androidx.car.app.category.IOT` (wellness/timer/ambient routines). Uses `HostValidator.ALLOW_ALL_HOSTS_VALIDATOR` during development; production requires `HostValidator.Builder` with explicit allowlist.
+- **`HabitBellCarSession.kt`**: Per-connection session lifecycle manager. Handles initial `onCreateScreen()` and reconnection via `onNewIntent()` for transient disconnect recovery. Coordinates `DisplayAutomationManager.setCarConnected()` state across connect/disconnect transitions with diagnostic lifecycle logging.
+- **`HabitBellCarScreen.kt`**: Driver-safe `ListTemplate` with 3 glanceable wellness routines (Posture, Breath, Eating). Optimized for the 2-second glance rule with shortened titles, duration indicators, and `ActionStrip` global Stop button during active sessions. State observer throttled to status-change and minute-boundary invalidation only (prevents 1Hz IPC flooding that destabilizes the Android Auto host Binder bridge). All `invalidate()` calls guarded by `Lifecycle.State.STARTED` check with `IllegalStateException` catch for host teardown race conditions.
+- **`HabitBellMediaService.kt`**: Extends `MediaBrowserServiceCompat` to provide media library browsability in automotive media drawers. Notification updates throttled to every 5 seconds to eliminate IPC spam.
 - **Session Token Sharing**: Both services bind directly to `CentralSessionHandler.sessionToken`, guaranteeing that media button presses on vehicle steering wheels instantly control the central timer engine with zero lag.
 
 ---
@@ -442,19 +444,23 @@ Grounded in *Hatha Yoga Pradipika* (2.12) & *Gheranda Samhita* (5.49):
   - Dynamically adapts the 3 calyx leaves, vertical stem, and central receptacle seed to the active theme palette:
     - **AMOLED Dark Mode**: Luminous chartreuse/emerald green (`#A3E635` / `#84CC16`) with an ethereal glow.
     - **Warm Parchment Mode**: Natural earthy sage/olive green (`#84CC16` / `#65A30D`) harmonized with warm linen tones.
-- **Phase-Harmonized Prana Palette**:
-  - Inhale: Luminous Ruby Rose (`#F43F5E` Dark / `#E11D48` Light)
-  - Hold In: Radiant Solar Amber (`#FBBF24` Dark / `#D97706` Light)
-  - Exhale: Meditative Twilight Violet (`#A78BFA` Dark / `#7C3AED` Light)
-  - Hold Out: Deep Starlight Cyan (`#38BDF8` Dark / `#0284C7` Light)
-- **Zero Numeral/Text Overlap Architecture**:
-  - Canvas geometry anchors the waterline at `0.77 * canvasHeight` and scales maximum petal length to `0.39 * canvasHeight`. The flower apex never exceeds `0.38 * canvasHeight`, preserving a generous 48dp clear margin above the bloom.
-  - Upper HUD elevates classical Sanskrit nomenclature (`PŪRAKA` / `पूरक`), Devanagari script, and a large minimalist seconds countdown with zero petal overlap.
-- **4-Phase Segmented Rhythm Capsule (`PranayamaPhaseRhythmBar`)**:
-  - Icon-driven segmented status capsules (`Inhale 🌬 Pūraka`, `Hold ⏳ Antar`, `Exhale 💨 Recaka`, `Rest 🌊 Bāhya`) highlighting the active breath state with glowing borders, phase tints, and Phosphor icons.
+- **Unified Single-Color Theme Lotus Palette**:
+  - Eliminates phase-dependent color switching in favor of a serene, cohesive single theme color bound directly to `MaterialTheme.colorScheme.primary`:
+    - **Sun Day / Light Mode**: Warm Amber (`SunDayAmber` `#D97706`).
+    - **AMOLED / Dark Mode**: Bell Gold (`BellGold` `#D4AF37`) / Theme Primary.
+    - **Eye Comfort Mode**: Warm Amber (`EyeComfortAmber` `#E29D47`).
+- **Dark Mode Petal Outline Elimination**:
+  - In dark mode, petal stroke outlines are completely removed (`strokeColor = Color.Transparent`), allowing the luminous semi-transparent layered petals to blend organically against AMOLED pure black.
+  - In light mode, subtle tone-on-tone contours (`primaryPranaColor` with adaptive alpha) preserve delicate petal definition against warm parchment backgrounds.
+- **Screen-Width Responsive Geometry & Zero Numeral/Text Overlap**:
+  - Visualizer scales responsively to fill the full screen width (`fillMaxWidth()`) in portrait mode, with maximum petal length calibrated against canvas dimensions (`minOf(canvasW * 0.48f, canvasH * 0.42f)`).
+  - Canvas geometry anchors the waterline at `0.77 * canvasHeight`, preserving ample clear space above the bloom for elevated Sanskrit nomenclature (`PŪRAKA` / `पूरक`), Devanagari script, and countdown numerals without petal overlap.
+- **Lean Interface Architecture**:
+  - Eliminates redundant multi-capsule rhythm bars to provide an ultra-clean, distraction-free breathwork environment.
+  - Portrait mode arranges: Action Bar $\rightarrow$ Activity Title $\rightarrow$ Screen-Width Side-View Lotus $\rightarrow$ Round Milestone Badge $\rightarrow$ Transport Controls.
 - **Responsive 2-Column Landscape Layout (`LandscapeSessionLayout`)**:
-  - **Left Column**: Dedicated pure side-view lotus visualizer (`size = 260.dp`, `showHud = false`) floating tranquilly over waterline ripples and breathing radial prana aura without text clutter.
-  - **Right Column**: Integrated action bar with Phosphor pill buttons, elevated Sanskrit HUD, large countdown numeral, 4-phase rhythm capsule, round counter, and unified Phosphor transport controls.
+  - **Left Column**: Dedicated pure side-view lotus visualizer floating tranquilly over waterline ripples and breathing radial prana aura without text clutter.
+  - **Right Column**: Integrated action bar with Phosphor pill buttons, elevated Sanskrit HUD, large countdown numeral, round counter, and unified Phosphor transport controls.
   - Mindful Eating in landscape similarly leverages a 2-column layout rendering the mealtime bowl with active bite-cycle arc on the left and meal countdown + bite capsule on the right.
 
 #### 7. Dedicated Pranayama Settings Architecture (`SettingsDrawer.kt`)
