@@ -56,8 +56,8 @@ import com.habitbell.app.ui.components.CompoundPoseCard
  * @param onOpenSettings Callback to open the settings configuration drawer.
  * @param onExit Callback to exit session and return to the Home dashboard.
  * @param onToggleTheme Callback to centrally cycle or toggle the application visual theme.
- * @param onOpenTVMode Callback to open leanback TV Dashboard mode.
  * @param onUserInteraction Callback triggered when the user interacts with the display to wake from dimming.
+ * @param onOpenTVMode Optional callback to transition into leanback TV dashboard mode.
  * @param modifier Composable layout modifier.
  */
 @Composable
@@ -68,7 +68,7 @@ fun SessionScreen(
     onOpenSettings: () -> Unit,
     onExit: () -> Unit,
     onToggleTheme: () -> Unit,
-    onOpenTVMode: () -> Unit,
+    onOpenTVMode: () -> Unit = {},
     onUserInteraction: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -103,8 +103,7 @@ fun SessionScreen(
                 onReset = onReset,
                 onOpenSettings = onOpenSettings,
                 onExit = onExit,
-                onToggleTheme = onToggleTheme,
-                onOpenTVMode = onOpenTVMode
+                onToggleTheme = onToggleTheme
             )
         } else {
             PortraitSessionLayout(
@@ -113,8 +112,7 @@ fun SessionScreen(
                 onReset = onReset,
                 onOpenSettings = onOpenSettings,
                 onExit = onExit,
-                onToggleTheme = onToggleTheme,
-                onOpenTVMode = onOpenTVMode
+                onToggleTheme = onToggleTheme
             )
         }
     }
@@ -130,7 +128,6 @@ fun SessionScreen(
  * @param onOpenSettings Open settings callback.
  * @param onExit Exit to home callback.
  * @param onToggleTheme Central theme switcher callback.
- * @param onOpenTVMode TV leanback mode trigger callback.
  */
 @Composable
 private fun LandscapeSessionLayout(
@@ -139,8 +136,7 @@ private fun LandscapeSessionLayout(
     onReset: () -> Unit,
     onOpenSettings: () -> Unit,
     onExit: () -> Unit,
-    onToggleTheme: () -> Unit,
-    onOpenTVMode: () -> Unit
+    onToggleTheme: () -> Unit
 ) {
     val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val buttonPillBg = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (isDark) 0.35f else 0.75f)
@@ -329,25 +325,11 @@ private fun LandscapeSessionLayout(
                 }
             }
 
-            // Middle: Status / HUD / Rhythm Capsule
+            // Middle: Status / HUD (Lean design without redundant rhythm bar)
             if (isPranayama) {
                 val phase = sessionState.currentPranayamaPhase
                 if (phase != null) {
-                    val primaryPranaColor = if (isDark) {
-                        when (phase) {
-                            PranayamaPhase.INHALE -> Color(0xFFF43F5E)
-                            PranayamaPhase.HOLD_IN -> Color(0xFFFBBF24)
-                            PranayamaPhase.EXHALE -> Color(0xFFA78BFA)
-                            PranayamaPhase.HOLD_OUT -> Color(0xFF38BDF8)
-                        }
-                    } else {
-                        when (phase) {
-                            PranayamaPhase.INHALE -> Color(0xFFE11D48)
-                            PranayamaPhase.HOLD_IN -> Color(0xFFD97706)
-                            PranayamaPhase.EXHALE -> Color(0xFF7C3AED)
-                            PranayamaPhase.HOLD_OUT -> Color(0xFF0284C7)
-                        }
-                    }
+                    val primaryColor = MaterialTheme.colorScheme.primary
 
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -362,12 +344,12 @@ private fun LandscapeSessionLayout(
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold,
                                 letterSpacing = 3.sp,
-                                color = primaryPranaColor
+                                color = primaryColor
                             )
                             Text(
                                 text = phase.sanskritScript,
                                 style = MaterialTheme.typography.labelSmall,
-                                color = primaryPranaColor.copy(alpha = 0.85f)
+                                color = primaryColor.copy(alpha = 0.85f)
                             )
                         }
 
@@ -379,13 +361,7 @@ private fun LandscapeSessionLayout(
                             color = MaterialTheme.colorScheme.onBackground
                         )
 
-                        PranayamaPhaseRhythmBar(
-                            activePhase = phase,
-                            isDark = isDark,
-                            activeColor = primaryPranaColor
-                        )
-
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.height(6.dp))
 
                         Text(
                             text = "Round ${sessionState.currentRound} of ${sessionState.totalRounds} • ${sessionState.formattedRemainingTime} left",
@@ -524,7 +500,6 @@ private fun LandscapeSessionLayout(
  * @param onOpenSettings Open settings callback.
  * @param onExit Exit to home callback.
  * @param onToggleTheme Central theme switcher callback.
- * @param onOpenTVMode TV leanback mode trigger callback.
  */
 @Composable
 private fun PortraitSessionLayout(
@@ -533,8 +508,7 @@ private fun PortraitSessionLayout(
     onReset: () -> Unit,
     onOpenSettings: () -> Unit,
     onExit: () -> Unit,
-    onToggleTheme: () -> Unit,
-    onOpenTVMode: () -> Unit
+    onToggleTheme: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -633,16 +607,18 @@ private fun PortraitSessionLayout(
                 }
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
+            if (sessionState.profile.type != TimerType.MULTI_INTERVAL) {
+                Spacer(modifier = Modifier.height(14.dp))
 
-            // Lowered Title: Centered, serene, and completely below the physical camera cutout
-            Text(
-                text = if (isEating) "Mindful Eating" else sessionState.profile.name,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Normal,
-                letterSpacing = 0.8.sp,
-                color = MaterialTheme.colorScheme.onBackground
-            )
+                // Lowered Title: Centered, serene, and completely below the physical camera cutout
+                Text(
+                    text = if (isEating) "Mindful Eating" else sessionState.profile.name,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Normal,
+                    letterSpacing = 0.8.sp,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+            }
         }
 
         // Center: Ultra Minimal Countdown & Visual Guide
@@ -1043,8 +1019,8 @@ private fun MindfulEatingContent(
 
 /**
  * Classical Pranayama multi-interval breathwork visualizer for portrait mode.
- * Features an enlarged heroic side-view blooming lotus, integrated non-overlapping HUD,
- * 4-phase segmented rhythm capsule, and round milestone status badge.
+ * Features an enlarged heroic screen-width side-view blooming lotus, integrated non-overlapping HUD,
+ * and minimalist round milestone status badge without redundant rhythm pills.
  *
  * @param sessionState Reactive timer state snapshot ([TimerSessionState]).
  * @param onOpenSettings Open settings callback.
@@ -1056,48 +1032,25 @@ private fun PranayamaPortraitContent(
 ) {
     val phase = sessionState.currentPranayamaPhase ?: return
     val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
-
-    val primaryPranaColor = if (isDark) {
-        when (phase) {
-            PranayamaPhase.INHALE -> Color(0xFFF43F5E)
-            PranayamaPhase.HOLD_IN -> Color(0xFFFBBF24)
-            PranayamaPhase.EXHALE -> Color(0xFFA78BFA)
-            PranayamaPhase.HOLD_OUT -> Color(0xFF38BDF8)
-        }
-    } else {
-        when (phase) {
-            PranayamaPhase.INHALE -> Color(0xFFE11D48)
-            PranayamaPhase.HOLD_IN -> Color(0xFFD97706)
-            PranayamaPhase.EXHALE -> Color(0xFF7C3AED)
-            PranayamaPhase.HOLD_OUT -> Color(0xFF0284C7)
-        }
-    }
+    val themePrimary = MaterialTheme.colorScheme.primary
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier.fillMaxWidth()
     ) {
-        // Hero Enlarged Side-View Blooming Lotus (320dp height) with Non-Overlapping HUD
+        // Hero Enlarged Side-View Blooming Lotus covering full screen width
         BreathIndicator(
             phase = phase,
             remainingSeconds = sessionState.phaseRemainingSeconds,
             phaseDuration = sessionState.phaseDurationSeconds,
-            size = 320.dp,
             showHud = true,
-            modifier = Modifier.clickable { onOpenSettings() }
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(0.88f)
+                .clickable { onOpenSettings() }
         )
 
-        Spacer(modifier = Modifier.height(14.dp))
-
-        // 4-Phase Segmented Rhythm Capsule
-        PranayamaPhaseRhythmBar(
-            activePhase = phase,
-            isDark = isDark,
-            activeColor = primaryPranaColor,
-            modifier = Modifier.fillMaxWidth(0.92f)
-        )
-
-        Spacer(modifier = Modifier.height(14.dp))
+        Spacer(modifier = Modifier.height(6.dp))
 
         // Round Milestone Status Capsule
         Surface(
@@ -1128,7 +1081,7 @@ private fun PranayamaPortraitContent(
                     Text(
                         text = "• 🔔 Milestone in $roundsUntilBell",
                         style = MaterialTheme.typography.labelSmall,
-                        color = primaryPranaColor
+                        color = themePrimary
                     )
                 }
             }
@@ -1141,82 +1094,6 @@ private fun PranayamaPortraitContent(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f)
         )
-    }
-}
-
-/**
- * 4-Phase Segmented Rhythm Capsule showing active breath state via glowing icons,
- * phase nomenclature, and classical Sanskrit subtitles.
- *
- * @param activePhase Active breathwork phase.
- * @param isDark Whether the active theme is dark mode.
- * @param activeColor Dynamic color associated with the active phase.
- * @param modifier Composable layout modifier.
- */
-@Composable
-private fun PranayamaPhaseRhythmBar(
-    activePhase: PranayamaPhase,
-    isDark: Boolean,
-    activeColor: Color,
-    modifier: Modifier = Modifier
-) {
-    val phaseItems = listOf(
-        Triple(PranayamaPhase.INHALE, "Inhale", "Pūraka"),
-        Triple(PranayamaPhase.HOLD_IN, "Hold", "Antar"),
-        Triple(PranayamaPhase.EXHALE, "Exhale", "Recaka"),
-        Triple(PranayamaPhase.HOLD_OUT, "Rest", "Bāhya")
-    )
-
-    Row(
-        modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        phaseItems.forEach { (phase, label, sanskrit) ->
-            val isActive = phase == activePhase
-            Surface(
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(12.dp),
-                color = if (isActive) activeColor.copy(alpha = if (isDark) 0.20f else 0.14f)
-                else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (isDark) 0.30f else 0.50f),
-                border = BorderStroke(
-                    width = if (isActive) 1.5.dp else 1.dp,
-                    color = if (isActive) activeColor.copy(alpha = 0.7f)
-                    else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.15f)
-                )
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.padding(vertical = 6.dp, horizontal = 2.dp)
-                ) {
-                    val iconRes = when (phase) {
-                        PranayamaPhase.INHALE -> R.drawable.ic_ph_wind
-                        PranayamaPhase.HOLD_IN -> R.drawable.ic_ph_sparkle
-                        PranayamaPhase.EXHALE -> R.drawable.ic_ph_wind
-                        PranayamaPhase.HOLD_OUT -> R.drawable.ic_ph_waves
-                    }
-                    Icon(
-                        painter = painterResource(id = iconRes),
-                        contentDescription = label,
-                        tint = if (isActive) activeColor else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                        modifier = Modifier.size(14.dp)
-                    )
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = label,
-                        style = MaterialTheme.typography.labelSmall,
-                        fontSize = 10.sp,
-                        fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
-                        color = if (isActive) activeColor else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = sanskrit,
-                        fontSize = 8.sp,
-                        color = if (isActive) activeColor.copy(alpha = 0.85f) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
-                    )
-                }
-            }
-        }
     }
 }
 
