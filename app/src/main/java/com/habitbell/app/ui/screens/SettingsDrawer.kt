@@ -70,7 +70,6 @@ import com.habitbell.app.ui.viewmodel.SettingsDrawerTab
  * @param onVolumeChange Callback when bell volume slider is adjusted.
  * @param onTestBell Callback to play a test chime and haptic pulse.
  * @param onUpdateTime Callback when total duration or interval sliders are modified.
- * @param onOpenTVMode Callback to launch TV Dashboard mode.
  * @param tvCastUrl Network URL of the embedded TV cast web server.
  * @param bellStyle Backwards-compatible bell sound timbre (enforced to Option C / Gong).
  * @param onBellStyleSelected Callback when bell style is selected.
@@ -120,7 +119,6 @@ fun SettingsDrawer(
     onVolumeChange: (Float) -> Unit,
     onTestBell: () -> Unit,
     onUpdateTime: (totalSec: Int, intervalSec: Int) -> Unit,
-    onOpenTVMode: () -> Unit,
     tvCastUrl: String = "",
     bellStyle: BellSoundStyle = BellSoundStyle.ZEN_TINGSHA,
     onBellStyleSelected: (BellSoundStyle) -> Unit = {},
@@ -310,7 +308,6 @@ fun SettingsDrawer(
                             isCasting = isCasting,
                             castDeviceName = castDeviceName,
                             onDisconnectCast = onDisconnectCast,
-                            onOpenTVMode = onOpenTVMode,
                             tvCastUrl = tvCastUrl
                         )
                     }
@@ -873,7 +870,6 @@ private fun TimerSettingsContent(
  * @param isCasting Whether active TV casting is underway.
  * @param castDeviceName Target Cast receiver device name.
  * @param onDisconnectCast Callback to disconnect Cast session.
- * @param onOpenTVMode Callback to navigate to TV dashboard screen.
  * @param tvCastUrl Local HTTP playback URL for Smart TVs.
  */
 @Composable
@@ -901,7 +897,6 @@ private fun GlobalConfigContent(
     isCasting: Boolean,
     castDeviceName: String?,
     onDisconnectCast: () -> Unit,
-    onOpenTVMode: () -> Unit,
     tvCastUrl: String
 ) {
     val context = LocalContext.current
@@ -1233,30 +1228,6 @@ private fun GlobalConfigContent(
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // TV Dashboard mode on phone
-                Surface(
-                    shape = RoundedCornerShape(10.dp),
-                    color = MaterialTheme.colorScheme.surface,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { onOpenTVMode() }
-                ) {
-                    Row(
-                        modifier = Modifier.padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Icon(Icons.Outlined.Tv, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("TV Dashboard Mode (On Phone)", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
-                            Text("Oversized 110pt display readable across living room", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                        Icon(Icons.Outlined.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
 
