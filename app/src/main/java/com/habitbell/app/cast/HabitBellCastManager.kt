@@ -6,6 +6,7 @@ import android.util.Log
 import com.google.android.gms.cast.MediaInfo
 import com.google.android.gms.cast.MediaLoadRequestData
 import com.google.android.gms.cast.MediaMetadata
+import com.google.android.gms.cast.MediaStatus
 import com.google.android.gms.cast.framework.CastContext
 import com.google.android.gms.cast.framework.CastSession
 import com.google.android.gms.cast.framework.CastState
@@ -17,6 +18,7 @@ import com.google.android.gms.common.images.WebImage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -28,11 +30,12 @@ import kotlinx.coroutines.launch
  * Process-level singleton managing Google Cast SDK connectivity and TV streaming.
  *
  * ## Architectural Role & Component Relationships
- * Resolves Bug-1 and Bug-2 by establishing native Google Cast sender architecture:
+ * Resolves Bug-1, Bug-2, FLAW-1, and FLAW-2 by establishing native Google Cast sender architecture:
  * - Eliminates phone screen mirroring and avoids opening URLs inside the phone's browser.
  * - Streams mindfulness sessions directly to Google Cast / Chromecast / Google TV hardware.
  * - Communicates with [com.habitbell.app.engine.CentralSessionHandler] to synchronize playback
  *   states bi-directionally between the mobile phone, TV display, and automotive head units.
+ * - Decouples buffering from user-initiated pauses to prevent 15-second connect/disconnect churn.
  * - Integrates with [RemoteMediaClient] to deliver track metadata, artwork, and duration to the TV.
  *
  * ## Concurrency & Lifecycle
@@ -48,7 +51,13 @@ class HabitBellCastManager private constructor(private val context: Context) {
         private const val TAG = "HabitBellCastManager"
 
         /** Default Zen artwork image URL displayed on the TV receiver during mindfulness sessions. */
-        private const val DEFAULT_ARTWORK_URL = "https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=1200&auto=format&fit=crop&q=80"
+        const val DEFAULT_ARTWORK_URL = "https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=1200&auto=format&fit=crop&q=80"
+
+        /** High-res sacred lotus artwork for Pranayama sessions. */
+        const val PRANAYAMA_ARTWORK_URL = "https://images.unsplash.com/photo-1545205597-3d9d02c29597?w=1200&auto=format&fit=crop&q=80"
+
+        /** Fallback online ambient stream if local server is unreachable. */
+        const val DEFAULT_FALLBACK_STREAM_URL = "https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3?filename=meditation-bowl-ambient-60s.mp3"
 
         @Volatile
         private var INSTANCE: HabitBellCastManager? = null
@@ -101,13 +110,49 @@ class HabitBellCastManager private constructor(private val context: Context) {
     /** Callback interface notifying central session orchestration of TV remote interactions. */
     var onRemotePlaybackAction: ((isPlay: Boolean) -> Unit)? = null
 
+    /** Guard flag preventing local mobile play/pause/load dispatches from echoing back as TV remote commands. */
+    @Volatile
+    private var isDispatchingLocally = false
+
+    /** Tracks the last confirmed player state to eliminate redundant status transitions. */
+    private var lastObservedPlayerState: Int = MediaStatus.PLAYER_STATE_UNKNOWN
+
     /** Remote media client listener observing playback transitions on the TV. */
     private val remoteMediaClientCallback = object : RemoteMediaClient.Callback() {
         override fun onStatusUpdated() {
             val client = currentCastSession?.remoteMediaClient ?: return
-            val isPlaying = client.isPlaying
-            Log.d(TAG, "RemoteMediaClient status updated: isPlaying=$isPlaying")
-            onRemotePlaybackAction?.invoke(isPlaying)
+            val playerState = client.playerState
+
+            // 1. Ignore updates provoked by mobile's own local commands
+            if (isDispatchingLocally) {
+                Log.d(TAG, "Ignoring RemoteMediaClient status update during local mobile dispatch (playerState=$playerState)")
+                return
+            }
+
+            // 2. Explicitly ignore transient buffering, loading, or idle states to prevent 15s reconnect churn
+            if (playerState == MediaStatus.PLAYER_STATE_BUFFERING ||
+                playerState == MediaStatus.PLAYER_STATE_LOADING ||
+                playerState == MediaStatus.PLAYER_STATE_IDLE ||
+                playerState == MediaStatus.PLAYER_STATE_UNKNOWN
+            ) {
+                Log.d(TAG, "Ignoring transient Cast player state: $playerState (buffering/idle/loading)")
+                return
+            }
+
+            // 3. Only dispatch when player genuinely transitions between PLAYING and PAUSED
+            if (playerState != lastObservedPlayerState) {
+                lastObservedPlayerState = playerState
+                when (playerState) {
+                    MediaStatus.PLAYER_STATE_PLAYING -> {
+                        Log.i(TAG, "Remote TV resumed playback via physical TV remote")
+                        onRemotePlaybackAction?.invoke(true)
+                    }
+                    MediaStatus.PLAYER_STATE_PAUSED -> {
+                        Log.i(TAG, "Remote TV paused playback via physical TV remote")
+                        onRemotePlaybackAction?.invoke(false)
+                    }
+                }
+            }
         }
     }
 
@@ -219,30 +264,40 @@ class HabitBellCastManager private constructor(private val context: Context) {
      * Configures title, subtitle, duration, and high-resolution mindful artwork
      * for display on the TV receiver.
      *
-     * @param profileName Name of the active mindfulness routine (e.g., "Mindful Eating").
-     * @param subtitle Explanatory subtitle (e.g., "Habit Bell • 20m Session").
+     * @param profileName Name of the active mindfulness routine (e.g., "Pranayama (Hatha Yoga)").
+     * @param subtitle Explanatory subtitle (e.g., "Round 1/12 • 4:16:8:16").
      * @param durationSeconds Total duration of the routine in seconds.
      * @param streamUrl Optional streaming audio URL to play over the TV hardware.
+     * @param artworkUrl Optional high-resolution mindful artwork image URL.
      */
     fun loadSession(
         profileName: String,
         subtitle: String,
         durationSeconds: Int,
-        streamUrl: String? = null
+        streamUrl: String? = null,
+        artworkUrl: String? = null
     ) {
         val client = currentCastSession?.remoteMediaClient ?: return
 
+        isDispatchingLocally = true
         try {
+            val finalArtwork = artworkUrl ?: DEFAULT_ARTWORK_URL
             val movieMetadata = MediaMetadata(MediaMetadata.MEDIA_TYPE_MUSIC_TRACK).apply {
                 putString(MediaMetadata.KEY_TITLE, profileName)
                 putString(MediaMetadata.KEY_SUBTITLE, subtitle)
                 putString(MediaMetadata.KEY_ARTIST, "Habit Bell • Meditative Chimes")
                 putString(MediaMetadata.KEY_ALBUM_TITLE, "Habit Bell Living Room TV")
-                addImage(WebImage(Uri.parse(DEFAULT_ARTWORK_URL)))
+                addImage(WebImage(Uri.parse(finalArtwork)))
             }
 
-            // High-quality ambient audio stream or bundled media stream
-            val mediaUrl = streamUrl ?: "https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3?filename=meditation-bowl-ambient-60s.mp3"
+            // Prioritize local webserver authentic mindful stream over external CDN
+            val localServer = LocalCastWebServer(context)
+            val localIp = localServer.getLocalIpAddress()
+            val mediaUrl = streamUrl ?: if (localIp != null) {
+                "http://$localIp:8888/media/aum.mp3"
+            } else {
+                DEFAULT_FALLBACK_STREAM_URL
+            }
 
             val mediaInfo = MediaInfo.Builder(mediaUrl)
                 .setStreamType(MediaInfo.STREAM_TYPE_BUFFERED)
@@ -258,9 +313,14 @@ class HabitBellCastManager private constructor(private val context: Context) {
                 .build()
 
             client.load(requestData)
-            Log.i(TAG, "Loaded session '$profileName' onto Google Cast TV")
+            Log.i(TAG, "Loaded session '$profileName' onto Google Cast TV (mediaUrl=$mediaUrl)")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to load session onto Google Cast TV", e)
+        } finally {
+            scope.launch {
+                delay(1200)
+                isDispatchingLocally = false
+            }
         }
     }
 
@@ -268,14 +328,24 @@ class HabitBellCastManager private constructor(private val context: Context) {
      * Directs the connected TV receiver to resume playback.
      */
     fun play() {
+        isDispatchingLocally = true
         currentCastSession?.remoteMediaClient?.play()
+        scope.launch {
+            delay(600)
+            isDispatchingLocally = false
+        }
     }
 
     /**
      * Directs the connected TV receiver to pause playback.
      */
     fun pause() {
+        isDispatchingLocally = true
         currentCastSession?.remoteMediaClient?.pause()
+        scope.launch {
+            delay(600)
+            isDispatchingLocally = false
+        }
     }
 
     /**
@@ -284,9 +354,9 @@ class HabitBellCastManager private constructor(private val context: Context) {
     fun togglePlayPause() {
         val client = currentCastSession?.remoteMediaClient ?: return
         if (client.isPlaying) {
-            client.pause()
+            pause()
         } else {
-            client.play()
+            play()
         }
     }
 
@@ -294,7 +364,13 @@ class HabitBellCastManager private constructor(private val context: Context) {
      * Halts media playback on the TV receiver.
      */
     fun stop() {
+        isDispatchingLocally = true
         currentCastSession?.remoteMediaClient?.stop()
+        lastObservedPlayerState = MediaStatus.PLAYER_STATE_UNKNOWN
+        scope.launch {
+            delay(600)
+            isDispatchingLocally = false
+        }
     }
 
     /**
