@@ -57,7 +57,6 @@ import com.habitbell.app.ui.components.CompoundPoseCard
  * @param onExit Callback to exit session and return to the Home dashboard.
  * @param onToggleTheme Callback to centrally cycle or toggle the application visual theme.
  * @param onUserInteraction Callback triggered when the user interacts with the display to wake from dimming.
- * @param onOpenTVMode Optional callback to transition into leanback TV dashboard mode.
  * @param modifier Composable layout modifier.
  */
 @Composable
@@ -68,7 +67,6 @@ fun SessionScreen(
     onOpenSettings: () -> Unit,
     onExit: () -> Unit,
     onToggleTheme: () -> Unit,
-    onOpenTVMode: () -> Unit = {},
     onUserInteraction: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {

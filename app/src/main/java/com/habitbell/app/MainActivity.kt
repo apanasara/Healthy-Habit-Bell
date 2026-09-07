@@ -33,7 +33,7 @@ import com.habitbell.app.ui.viewmodel.HabitBellViewModel
  *
  * Responsibilities:
  * 1. **Window Insets**: Enables edge-to-edge immersive rendering.
- * 2. **Compose Root**: Hosts screen navigation transitions between Home, Session, TV Dashboard, and Create Timer.
+ * 2. **Compose Root**: Hosts screen navigation transitions between Home, Session, and Create Timer.
  * 3. **Google Cast Framework Integration**: Extends [FragmentActivity] to supply [androidx.fragment.app.FragmentManager]
  *    required by [androidx.mediarouter.app.MediaRouteButton] for native Cast device discovery dialogs.
  * 4. **Hardware Display Coordination**: Dynamically binds `FLAG_KEEP_SCREEN_ON` via [HabitBellViewModel.batteryOptimizer].
@@ -123,8 +123,8 @@ class MainActivity : FragmentActivity() {
 
             // Distraction-free full-screen immersion: dynamically hide system status bar
             // (time clock, battery percentage, app notification icons, and network indicators)
-            // whenever the user is on an active timer session screen (SESSION or TV_DASHBOARD)
-            val isTimerScreen = uiState.currentScreen == AppScreen.SESSION || uiState.currentScreen == AppScreen.TV_DASHBOARD
+            // whenever the user is on an active timer session screen (SESSION)
+            val isTimerScreen = uiState.currentScreen == AppScreen.SESSION
             LaunchedEffect(isTimerScreen) {
                 setStatusBarHidden(isTimerScreen)
             }
@@ -164,11 +164,7 @@ class MainActivity : FragmentActivity() {
                                 reminders = reminders,
                                 isZenMode = uiState.isZenMode,
                                 onSelectProfile = { profile ->
-                                    if (isTelevisionDevice()) {
-                                        viewModel.startProfileSession(profile, openTVMode = true)
-                                    } else {
-                                        viewModel.startProfileSession(profile)
-                                    }
+                                    viewModel.startProfileSession(profile)
                                 },
                                 onToggleZenMode = {
                                     viewModel.setZenMode(!uiState.isZenMode)
@@ -205,21 +201,9 @@ class MainActivity : FragmentActivity() {
                                     }
                                     viewModel.setTheme(nextTheme)
                                 },
-                                onOpenTVMode = {
-                                    viewModel.navigateTo(AppScreen.TV_DASHBOARD)
-                                },
                                 onUserInteraction = {
                                     viewModel.userInteractionWake()
                                 }
-                            )
-                        }
-
-                        AppScreen.TV_DASHBOARD -> {
-                            TVDashboardScreen(
-                                sessionState = sessionState,
-                                onTogglePlayPause = { viewModel.togglePlayPause() },
-                                onReset = { viewModel.resetSession() },
-                                onExitTVMode = { viewModel.exitSessionToHome() }
                             )
                         }
 
@@ -264,10 +248,6 @@ class MainActivity : FragmentActivity() {
                             },
                             onTestVoiceCue = { style -> viewModel.testPranayamaVoiceCue(style) },
                             onTestPranayamaIntervalBell = { viewModel.testPranayamaIntervalBell() },
-                            onOpenTVMode = {
-                                viewModel.openSettingsDrawer(false)
-                                viewModel.navigateTo(AppScreen.TV_DASHBOARD)
-                            },
                             tvCastUrl = viewModel.getTvCastUrl(),
                             isBgMusicEnabled = uiState.isBgMusicEnabled,
                             bgMusicType = uiState.bgMusicType,
@@ -394,7 +374,7 @@ class MainActivity : FragmentActivity() {
     /**
      * Modulates the visibility of the Android system status bar.
      *
-     * When entering an active mindful timer screen ([AppScreen.SESSION] or [AppScreen.TV_DASHBOARD]),
+     * When entering an active mindful timer screen ([AppScreen.SESSION]),
      * the system status bar (displaying time clock, notification icons, battery gauge, and cellular/Wi-Fi
      * signals) is hidden to eliminate visual clutter, reduce cognitive distraction, and promote sustained presence.
      *
@@ -419,8 +399,7 @@ class MainActivity : FragmentActivity() {
      */
     override fun onResume() {
         super.onResume()
-        val isTimerScreen = viewModel.uiState.value.currentScreen == AppScreen.SESSION ||
-                viewModel.uiState.value.currentScreen == AppScreen.TV_DASHBOARD
+        val isTimerScreen = viewModel.uiState.value.currentScreen == AppScreen.SESSION
         setStatusBarHidden(isTimerScreen)
     }
 
@@ -431,21 +410,6 @@ class MainActivity : FragmentActivity() {
         super.onStop()
         viewModel.batteryOptimizer.setScreenBrightness(this, false)
         setStatusBarHidden(false)
-    }
-
-    /**
-     * Determines whether the host execution environment is an Android TV, Google TV, or set-top box.
-     *
-     * Queries the system [UiModeManager.getCurrentModeType] configuration and inspects the
-     * [PackageManager.FEATURE_LEANBACK] hardware profile.
-     *
-     * @return `true` if executing on television hardware; `false` for handheld phones, tablets, or cars.
-     */
-    private fun isTelevisionDevice(): Boolean {
-        val uiModeManager = getSystemService(android.content.Context.UI_MODE_SERVICE) as? android.app.UiModeManager
-        val isTvUi = uiModeManager?.currentModeType == android.content.res.Configuration.UI_MODE_TYPE_TELEVISION
-        val hasLeanback = packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_LEANBACK)
-        return isTvUi || hasLeanback
     }
 
     /**

@@ -8,7 +8,7 @@ Habit Bell is an offline-first, distraction-free wellness operating system engin
                   +-------------------------------------------------------------------------+
                   |                             Presentation Layer                          |
                   |  - Jetpack Compose Screens (HomeScreen, SessionScreen, SettingsDrawer)  |
-                  |  - Android TV & Google TV Leanback UI (TVDashboardScreen, D-Pad focus)  |
+                  |  - Living Room Ecosystem (Google Cast, Miracast Wireless Display)       |
                   |  - Animated Components (BreathIndicator, CircularProgressRing, Overlay) |
                   |  - System Bar Immersion (WindowInsetsControllerCompat status bar hide)  |
                   |  - Universal Cast Surface (CastButton, MediaRouteDialog integration)    |
@@ -107,14 +107,14 @@ The heartbeat of the mindfulness runtime is a deterministic finite state machine
 
 ### 2.4. TV & Living Room Subsystems
 
-#### 1. Android TV & Google TV Leanback Support (Sony Bravia, TCL, Hisense, Chromecast)
+#### 1. Living Room & TV Integration Subsystem (Google Cast & Miracast Screen Mirroring)
+- **Living Room Strategy**: Living Room TV connectivity is exclusively handled through genuine TV streaming pipelines: **Google Cast** (cloud/LAN media receiver) and **Screen Mirroring (Miracast)**. The confusing on-phone "TV Dashboard Mode" (previously an oversized on-device display) has been completely removed from all navigation and UI surfaces.
 - **Universal Single APK**: A single binary deployment targets smartphones, tablets, foldables, automotive head units, and Android TV / Google TV.
 - **Sony Bravia Hardware Integration**: All modern Sony Bravia smart TVs run Google TV / Android TV with Chromecast built-in. Habit Bell provides first-class Sony compatibility out of the box via both native APK installation and Google Cast streaming.
 - **Manifest Architecture**:
   - Declares `<category android:name="android.intent.category.LEANBACK_LAUNCHER" />` for TV app drawers.
   - Declares `android:banner="@drawable/tv_banner"` for high-resolution 16:9 Android TV launcher cards.
   - Features marked optional (`required="false"`): `android.software.leanback`, `android.hardware.touchscreen`, `android.hardware.microphone`, `android.hardware.telephony`, `android.hardware.camera`.
-- **Remote Control & D-Pad Ergonomics**: `TVDashboardScreen` provides high-contrast D-pad focus traversal, large-format countdown typography, and oversized action buttons for 10-foot TV viewing.
 
 #### 2. Google Cast Framework (`com.habitbell.app.cast`)
 - **Native Cast Integration**: Pure application TV streaming without screen mirroring using Google Play Services Cast Framework (`play-services-cast-framework:22.0.0`).
@@ -301,7 +301,7 @@ To eliminate vertical clutter and decouple dynamic session parameters from persi
   - 1-tap Sun ☀️ ⇄ Moon 🌙 toggle plus granular theme selection (`AMOLED`, `EYE_COMFORT`, `DARK`, `LIGHT`).
 - **Master Audio Gain Controls**: Side-by-side volume sliders for both **Bell Master Gain** and **Background Ambient Gain** ($0\%..100\%$).
 - **Pedometer & Health Platform Connectivity**: Centralized selection of active step providers (`Hardware Sensor`, `Health Connect`, `Apple Health Bridge`, `Step Simulator`), sensor permission status indicators, and synthetic step injection tools.
-- **Living Room & TV Casting**: Embedded Google Cast route controls (`CastButton`), TV Dashboard mode launcher, and Smart TV browser link copy.
+- **Living Room & TV Casting**: Embedded Google Cast route controls (`CastButton`), Miracast Screen Mirroring shortcut, and Smart TV browser link copy.
 - **Hardware Battery Protections**: Proximity-driven AMOLED Pocket Mode blanking, Auto-Dimming, and Display Awake management.
 
 #### 3. Permanent Signature Acoustic Identity (Zero Timbre Configuration)

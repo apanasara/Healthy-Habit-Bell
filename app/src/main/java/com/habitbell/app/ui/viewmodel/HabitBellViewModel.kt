@@ -28,9 +28,6 @@ enum class AppScreen {
     /** Active fullscreen timer session display with circular countdown and controls. */
     SESSION,
 
-    /** Big-screen leanback mode for TV or landscape mirroring. */
-    TV_DASHBOARD,
-
     /** Custom profile creation and configuration editor screen. */
     CREATE_TIMER
 }
@@ -226,13 +223,12 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
      * Loads a profile into the engine and transitions the UI to the session view.
      *
      * @param profile The target [TimerProfile] to execute.
-     * @param openTVMode If true, opens the leanback TV dashboard screen instead of standard mobile screen.
      */
-    fun startProfileSession(profile: TimerProfile, openTVMode: Boolean = false) {
+    fun startProfileSession(profile: TimerProfile) {
         sessionHandler.startProfile(profile)
         _uiState.update {
             it.copy(
-                currentScreen = if (openTVMode) AppScreen.TV_DASHBOARD else AppScreen.SESSION,
+                currentScreen = AppScreen.SESSION,
                 isDisplayMode = profile.displayMode,
                 isPocketModeManual = profile.pocketMode
             )
