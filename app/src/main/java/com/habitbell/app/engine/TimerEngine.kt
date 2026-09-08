@@ -302,8 +302,9 @@ class TimerEngine(
         if (wasIdle && _state.value.profile.type == TimerType.MULTI_INTERVAL) {
             val config = _state.value.profile.pranayamaConfig
             val firstPhase = _state.value.currentPranayamaPhase
+            val phaseDuration = _state.value.phaseDurationSeconds
             if (config != null && config.isVoiceGuidanceEnabled && firstPhase != null && !isPocketModeActive()) {
-                voiceGuide?.speakPhaseCue(firstPhase, config.voiceCueStyle, config.isTriBandhaVoiceEnabled, config.voiceVolume)
+                voiceGuide?.speakPhaseCue(firstPhase, config.voiceCueStyle, config.isTriBandhaVoiceEnabled, config.voiceVolume, phaseDuration)
             }
         }
 
@@ -551,7 +552,13 @@ class TimerEngine(
             } else {
                 // Articulate gentle lady voice instruction for the upcoming phase
                 if (config.isVoiceGuidanceEnabled) {
-                    voiceGuide?.speakPhaseCue(nextStep.phase, config.voiceCueStyle, config.isTriBandhaVoiceEnabled, config.voiceVolume)
+                    voiceGuide?.speakPhaseCue(
+                        nextStep.phase,
+                        config.voiceCueStyle,
+                        config.isTriBandhaVoiceEnabled,
+                        config.voiceVolume,
+                        nextStep.durationSeconds
+                    )
                 }
             }
 

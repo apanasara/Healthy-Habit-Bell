@@ -169,12 +169,29 @@ class PranayamaVoiceGuide(
     /**
      * Resolves the high-definition studio-mastered audio resource corresponding to [phase] and [style].
      *
+     * If [style] is [VoiceCueStyle.BILINGUAL] but [stepDurationSeconds] is too short (less than 4s),
+     * it gracefully falls back to the concise authentic Sanskrit cue to guarantee that voice prompts
+     * like "Inhale" or "Exhale" are never abruptly cut in half when the subsequent phase starts.
+     *
      * @param phase Active breathwork phase ([PranayamaPhase]).
      * @param style Linguistic delivery style ([VoiceCueStyle]).
+     * @param stepDurationSeconds Duration allocated for this breath phase in seconds (optional).
      * @return Raw resource ID, or null if TTS fallback should be utilized.
      */
-    private fun resolveAudioResource(phase: PranayamaPhase, style: VoiceCueStyle): Int? {
-        return when (style) {
+    private fun resolveAudioResource(
+        phase: PranayamaPhase,
+        style: VoiceCueStyle,
+        stepDurationSeconds: Int? = null
+    ): Int? {
+        // When step duration is less than 4 seconds, bilingual cue (~3.0s) would collide with the next step.
+        // Fall back to clean single-word Sanskrit cue (~2.0s) so speech is never clipped mid-word.
+        val effectiveStyle = if (style == VoiceCueStyle.BILINGUAL && stepDurationSeconds != null && stepDurationSeconds < 4) {
+            VoiceCueStyle.SANSKRIT
+        } else {
+            style
+        }
+
+        return when (effectiveStyle) {
             VoiceCueStyle.SANSKRIT -> when (phase) {
                 PranayamaPhase.INHALE -> R.raw.pranayama_purak_sanskrit
                 PranayamaPhase.HOLD_IN -> R.raw.pranayama_kumbhak_sanskrit
@@ -203,22 +220,24 @@ class PranayamaVoiceGuide(
      * @param style Optional override of [VoiceCueStyle]. Defaults to configured [cueStyle].
      * @param isTriBandhaVoiceEnabled Whether to articulate the Tri-Bandha prompt during retention phases.
      * @param volume Subdued voice gain (0.15f..1.0f, default 0.52f).
+     * @param stepDurationSeconds Allocated duration of this phase in seconds. Used for smart duration clipping protection.
      */
     fun speakPhaseCue(
         phase: PranayamaPhase,
         style: VoiceCueStyle = cueStyle,
         isTriBandhaVoiceEnabled: Boolean = false,
-        volume: Float = 0.52f
+        volume: Float = 0.52f,
+        stepDurationSeconds: Int? = null
     ) {
         if (!isVoiceEnabled) return
 
         val safeVol = volume.coerceIn(0.15f, 1.0f)
-        val rawRes = resolveAudioResource(phase, style)
+        val rawRes = resolveAudioResource(phase, style, stepDurationSeconds)
 
         if (rawRes != null) {
             playMasteredAudio(rawRes, safeVol)
         } else {
-            speakWithTts(phase, style, isTriBandhaVoiceEnabled, safeVol)
+            speakWithTts(phase, style, isTriBandhaVoiceEnabled, safeVol, stepDurationSeconds)
         }
     }
 
@@ -236,12 +255,12 @@ class PranayamaVoiceGuide(
     ) {
         val safeVol = volume.coerceIn(0.15f, 1.0f)
         val samplePhase = if (isTriBandhaVoiceEnabled) PranayamaPhase.HOLD_IN else PranayamaPhase.INHALE
-        val rawRes = resolveAudioResource(samplePhase, style)
+        val rawRes = resolveAudioResource(samplePhase, style, stepDurationSeconds = 8)
 
         if (rawRes != null) {
             playMasteredAudio(rawRes, safeVol)
         } else {
-            speakWithTts(samplePhase, style, isTriBandhaVoiceEnabled, safeVol)
+            speakWithTts(samplePhase, style, isTriBandhaVoiceEnabled, safeVol, stepDurationSeconds = 8)
         }
     }
 
@@ -286,11 +305,18 @@ class PranayamaVoiceGuide(
         phase: PranayamaPhase,
         style: VoiceCueStyle,
         isTriBandhaVoiceEnabled: Boolean,
-        volume: Float
+        volume: Float,
+        stepDurationSeconds: Int? = null
     ) {
         if (!isInitialized || tts == null) return
 
-        val text = when (style) {
+        val effectiveStyle = if (style == VoiceCueStyle.BILINGUAL && stepDurationSeconds != null && stepDurationSeconds < 4) {
+            VoiceCueStyle.SANSKRIT
+        } else {
+            style
+        }
+
+        val text = when (effectiveStyle) {
             VoiceCueStyle.SANSKRIT -> when (phase) {
                 PranayamaPhase.INHALE -> "पूरक..."
                 PranayamaPhase.HOLD_IN -> if (isTriBandhaVoiceEnabled) "कुम्भक... त्रिबन्ध..." else "कुम्भक..."
@@ -298,10 +324,10 @@ class PranayamaVoiceGuide(
                 PranayamaPhase.HOLD_OUT -> if (isTriBandhaVoiceEnabled) "कुम्भक... त्रिबन्ध..." else "कुम्भक..."
             }
             VoiceCueStyle.BILINGUAL -> when (phase) {
-                PranayamaPhase.INHALE -> "पूरक... Inhale"
-                PranayamaPhase.HOLD_IN -> if (isTriBandhaVoiceEnabled) "कुम्भक... Hold with Tri-Bandha" else "कुम्भक... Hold"
-                PranayamaPhase.EXHALE -> "रेचक... Exhale"
-                PranayamaPhase.HOLD_OUT -> if (isTriBandhaVoiceEnabled) "कुम्भक... Hold with Tri-Bandha" else "कुम्भक... Hold"
+                PranayamaPhase.INHALE -> "पूरक Inhale"
+                PranayamaPhase.HOLD_IN -> if (isTriBandhaVoiceEnabled) "कुम्भक Hold with Tri-Bandha" else "कुम्भक Hold"
+                PranayamaPhase.EXHALE -> "रेचक Exhale"
+                PranayamaPhase.HOLD_OUT -> if (isTriBandhaVoiceEnabled) "कुम्भक Hold with Tri-Bandha" else "कुम्भक Hold"
             }
             VoiceCueStyle.ENGLISH -> when (phase) {
                 PranayamaPhase.INHALE -> "Inhale"
