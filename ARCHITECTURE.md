@@ -385,7 +385,10 @@ In *Hatha Yoga Pradipika* (HYP 2.2), Svatmarama establishes the inseparable link
 
 The practice regulates the four sacred limbs of the breath cycle:
 1. **Puraka (पूरक - Inhalation)**: Conscious diaphragmatic intake drawing cosmic life force (*Prana*) into the torso.
-2. **Antar Kumbhaka (अभ्यन्तर कुम्भक - Internal Retention)**: Preserving breath in full lungs, awakening the *Sushumna Nadi*, building internal pressure, and maximizing cellular oxygen diffusion.
+2. **Antar Kumbhaka (अभ्यन्तर कुम्भक - Internal Retention)**: Preserving breath in full lungs, awakening the *Sushumna Nadi*, building internal pressure, and maximizing cellular oxygen diffusion. In accordance with classical Hatha Yoga (*HYP* 3.55-3.56), internal retention is practiced with **Tri-Bandha (त्रिबन्ध)**:
+   - **Mūla Bandha (मूलबन्ध - Root Lock)**: Perineal/pelvic floor contraction stimulating the parasympathetic pelvic splanchnic nerves and redirecting *Apana Vayu* upward into *Sushumna*.
+   - **Madhyama Uḍḍīyāna Bandha (उड्डीयान बन्ध - Abdominal Lock)**: In *Antar Kumbhaka*, gentle inward engagement of the lower abdominal wall below the navel (*Madhyama/Laghu Uḍḍīyāna*) stabilizes intra-abdominal pressure against the descending diaphragm without compressing fully inflated lungs.
+   - **Kūpa Bandha (कूपबन्ध / जालंधर बन्ध - Throat Lock)**: Resting the chin firmly into the jugular notch (*Kaṇṭha Kūpa*, *PYS* 3.30: *kaṇṭhakūpe kṣutpipāsānivṛttiḥ*). This mechanically stimulates the carotid sinus baroreceptors, triggering the reflex vagal bradycardia that lowers heart rate, regulates intracranial arterial pressure during retention, and halts mental fluctuation.
 3. **Rechaka (रेचक - Exhalation)**: Slow, prolonged exhalation expelling *Apana*, physical toxins, and mental tension.
 4. **Bahya Kumbhaka (बाह्य कुम्भक - External Retention / Shunya Void)**: Resting in primordial emptiness between breaths, stimulating hypercapnic adaptation (CO₂ tolerance) and cerebral vasodilation (Bohr effect).
 

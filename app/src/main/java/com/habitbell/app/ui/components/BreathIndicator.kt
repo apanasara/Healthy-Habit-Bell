@@ -252,6 +252,20 @@ fun BreathIndicator(
                     color = primaryPranaColor.copy(alpha = 0.85f)
                 )
 
+                // Tri-Bandha guidance subtitle during Antar Kumbhaka (Mūla, Uḍḍīyāna, and Kūpa Bandha)
+                val bandhaText = phase.bandhaScript
+                if (bandhaText != null) {
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = bandhaText,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        letterSpacing = 0.5.sp,
+                        color = primaryPranaColor.copy(alpha = if (isDark) 0.92f else 0.85f)
+                    )
+                }
+
                 Spacer(modifier = Modifier.height(2.dp))
 
                 // Large Minimalist Seconds Countdown Numeral

@@ -351,6 +351,18 @@ private fun LandscapeSessionLayout(
                             )
                         }
 
+                        // Tri-Bandha guidance in Landscape HUD during Antar Kumbhaka
+                        val bandhaText = phase.bandhaScript
+                        if (bandhaText != null) {
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = bandhaText,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontSize = 11.sp,
+                                color = primaryColor.copy(alpha = 0.85f)
+                            )
+                        }
+
                         Text(
                             text = "${sessionState.phaseRemainingSeconds}",
                             fontSize = 44.sp,
