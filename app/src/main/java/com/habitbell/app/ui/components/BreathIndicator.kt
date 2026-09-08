@@ -224,9 +224,8 @@ fun BreathIndicator(
             }
         }
 
-        // Integrated HUD (Rendered cleanly when showHud = true, immune to petal overlap)
+        // Integrated Upper HUD: Sanskrit Nomenclature and Countdown Numeral positioned high above flower apex
         if (showHud) {
-            // Upper HUD: Sanskrit Nomenclature and Countdown Numeral positioned high above flower apex
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
@@ -252,32 +251,6 @@ fun BreathIndicator(
                     color = primaryPranaColor.copy(alpha = 0.85f)
                 )
 
-                // Tri-Bandha guidance subtitle during Kumbhaka (Mūla, Uḍḍīyāna, and Kūpa Bandha)
-                val bandhaText = phase.bandhaScript
-                val bandhaEng = phase.bandhaEnglish
-                if (bandhaText != null) {
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = bandhaText,
-                        style = MaterialTheme.typography.labelSmall,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium,
-                        letterSpacing = 0.5.sp,
-                        color = primaryPranaColor.copy(alpha = if (isDark) 0.92f else 0.85f)
-                    )
-                }
-                if (bandhaEng != null) {
-                    Spacer(modifier = Modifier.height(1.dp))
-                    Text(
-                        text = bandhaEng,
-                        style = MaterialTheme.typography.labelSmall,
-                        fontSize = 9.5.sp,
-                        fontWeight = FontWeight.Light,
-                        letterSpacing = 0.5.sp,
-                        color = primaryPranaColor.copy(alpha = if (isDark) 0.80f else 0.70f)
-                    )
-                }
-
                 Spacer(modifier = Modifier.height(2.dp))
 
                 // Large Minimalist Seconds Countdown Numeral
@@ -289,26 +262,56 @@ fun BreathIndicator(
                     color = MaterialTheme.colorScheme.onBackground
                 )
             }
+        }
 
-            // Lower Anchor: Optional English Biofeedback Guidance Capsule
-            if (showGuidanceCapsule) {
-                Surface(
-                    shape = RoundedCornerShape(20.dp),
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (isDark) 0.45f else 0.75f),
-                    border = BorderStroke(1.dp, primaryPranaColor.copy(alpha = 0.35f)),
-                    modifier = Modifier
-                        .padding(bottom = 8.dp)
-                        .align(Alignment.BottomCenter)
-                ) {
+        // Lower Area: Classical Tri-Bandha guidance below the lotus flower during Kumbhaka (Antar & Bahya)
+        val bandhaText = phase.bandhaScript
+        val bandhaEng = phase.bandhaEnglish
+        if (bandhaText != null) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp)
+                    .align(Alignment.BottomCenter)
+            ) {
+                Text(
+                    text = bandhaText,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontSize = 11.5.sp,
+                    fontWeight = FontWeight.Medium,
+                    letterSpacing = 0.5.sp,
+                    color = primaryPranaColor.copy(alpha = if (isDark) 0.95f else 0.88f)
+                )
+                if (bandhaEng != null) {
+                    Spacer(modifier = Modifier.height(1.dp))
                     Text(
-                        text = phase.displayName,
+                        text = bandhaEng,
                         style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.Medium,
+                        fontSize = 9.5.sp,
+                        fontWeight = FontWeight.Light,
                         letterSpacing = 0.5.sp,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+                        color = primaryPranaColor.copy(alpha = if (isDark) 0.80f else 0.70f)
                     )
                 }
+            }
+        } else if (showGuidanceCapsule) {
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (isDark) 0.45f else 0.75f),
+                border = BorderStroke(1.dp, primaryPranaColor.copy(alpha = 0.35f)),
+                modifier = Modifier
+                    .padding(bottom = 8.dp)
+                    .align(Alignment.BottomCenter)
+            ) {
+                Text(
+                    text = phase.displayName,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Medium,
+                    letterSpacing = 0.5.sp,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+                )
             }
         }
     }
