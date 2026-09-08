@@ -170,8 +170,8 @@ class PranayamaFlowTest {
 
         val switched = config.withStepDurations(voiceStyle = VoiceCueStyle.BILINGUAL)
         assertEquals(VoiceCueStyle.BILINGUAL, switched.voiceCueStyle)
-        assertTrue(switched.voiceCueStyle.displayName.contains("Option B"))
-        assertTrue(config.voiceCueStyle.displayName.contains("Option A"))
+        assertTrue(switched.voiceCueStyle.displayName.contains("Option 2"))
+        assertTrue(config.voiceCueStyle.displayName.contains("Option 1"))
     }
 
     /**

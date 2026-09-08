@@ -83,6 +83,7 @@ class TimerRepository(private val context: Context) {
                 val pTriBandhaVoice = prefs.getBoolean("profile_pranayama_tribandha_voice_${defaultProfile.id}", baseConfig.isTriBandhaVoiceEnabled)
                 val pIntervalBellEnabled = prefs.getBoolean("profile_pranayama_interval_bell_${defaultProfile.id}", baseConfig.isIntervalBellEnabled)
                 val pIntervalCadence = prefs.getInt("profile_pranayama_interval_cadence_${defaultProfile.id}", baseConfig.intervalBellRoundCadence)
+                val pVoiceVolume = prefs.getFloat("profile_pranayama_voice_vol_${defaultProfile.id}", baseConfig.voiceVolume)
 
                 if (pPurak > 0 || pAntar >= 0 || pRechak > 0 || pBahya >= 0 || pRounds > 0) {
                     baseConfig.withStepDurations(
@@ -95,7 +96,8 @@ class TimerRepository(private val context: Context) {
                         cadence = pIntervalCadence,
                         voiceEnabled = pVoiceEnabled,
                         voiceStyle = pVoiceStyle,
-                        tribandhaVoiceEnabled = pTriBandhaVoice
+                        tribandhaVoiceEnabled = pTriBandhaVoice,
+                        voiceVolume = pVoiceVolume
                     )
                 } else {
                     baseConfig.copy(
@@ -103,7 +105,8 @@ class TimerRepository(private val context: Context) {
                         intervalBellRoundCadence = pIntervalCadence,
                         isVoiceGuidanceEnabled = pVoiceEnabled,
                         voiceCueStyle = pVoiceStyle,
-                        isTriBandhaVoiceEnabled = pTriBandhaVoice
+                        isTriBandhaVoiceEnabled = pTriBandhaVoice,
+                        voiceVolume = pVoiceVolume
                     )
                 }
             }
@@ -272,6 +275,7 @@ class TimerRepository(private val context: Context) {
      * @param isVoiceEnabled Whether gentle lady voice prompts are triggered on phase transitions.
      * @param voiceStyle Linguistic cue style ([VoiceCueStyle]).
      * @param isTriBandhaVoiceEnabled Whether gentle lady voice speaks the Tri-Bandha prompt during Kumbhaka.
+     * @param voiceVolume Subdued voice guidance volume (0.15f..1.0f, default 0.52f).
      */
     fun updatePranayamaSettings(
         profileId: String,
@@ -284,7 +288,8 @@ class TimerRepository(private val context: Context) {
         intervalBellCadence: Int = 5,
         isVoiceEnabled: Boolean = true,
         voiceStyle: VoiceCueStyle = VoiceCueStyle.SANSKRIT,
-        isTriBandhaVoiceEnabled: Boolean = true
+        isTriBandhaVoiceEnabled: Boolean = true,
+        voiceVolume: Float = 0.52f
     ) {
         prefs.edit()
             .putInt("profile_pranayama_purak_$profileId", purakSeconds)
@@ -297,6 +302,7 @@ class TimerRepository(private val context: Context) {
             .putBoolean("profile_pranayama_voice_$profileId", isVoiceEnabled)
             .putString("profile_pranayama_voice_style_$profileId", voiceStyle.name)
             .putBoolean("profile_pranayama_tribandha_voice_$profileId", isTriBandhaVoiceEnabled)
+            .putFloat("profile_pranayama_voice_vol_$profileId", voiceVolume)
             .apply()
 
         _profiles.update { list ->
@@ -312,7 +318,8 @@ class TimerRepository(private val context: Context) {
                         targetRounds = targetRounds,
                         isIntervalBellEnabled = isIntervalBellEnabled,
                         intervalBellRoundCadence = intervalBellCadence,
-                        isTriBandhaVoiceEnabled = isTriBandhaVoiceEnabled
+                        isTriBandhaVoiceEnabled = isTriBandhaVoiceEnabled,
+                        voiceVolume = voiceVolume
                     )).withStepDurations(
                         purak = purakSeconds,
                         antar = antarKumbhakSeconds,
@@ -323,7 +330,8 @@ class TimerRepository(private val context: Context) {
                         cadence = intervalBellCadence,
                         voiceEnabled = isVoiceEnabled,
                         voiceStyle = voiceStyle,
-                        tribandhaVoiceEnabled = isTriBandhaVoiceEnabled
+                        tribandhaVoiceEnabled = isTriBandhaVoiceEnabled,
+                        voiceVolume = voiceVolume
                     )
                     profile.copy(
                         pranayamaConfig = updatedConfig,

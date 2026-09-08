@@ -86,6 +86,21 @@ The audio architecture guarantees high-fidelity, boundary-free sound reproductio
 - **Sandboxed YouTube Audio Streaming**:
   - Headless, ad-free YouTube audio extraction and streaming engine using an isolated `WebView`.
   - Injects custom JavaScript to suppress video canvas rendering, minimize CPU usage, and guarantee seamless looping and persistent custom URL playback.
+- **Raised-Cosine S-Curve Crossfader**:
+  - `smoothFadeTo(targetGain, durationMs)`: Smoothly interpolates volume transitions via raised-cosine S-curve easing: `0.5 * (1 - cos(π * progress))`.
+  - `duckVolume(0.20f, 350L)`: Temporarily and smoothly lowers ambient background audio during voice guidance cues to ensure crystalline vocal clarity.
+  - `restoreVolume(500L)`: Elegantly restores ambient music back to configured gain without jarring steps or pops.
+
+#### 3. Melodious Anti-Startle Voice Guidance Subsystem (`PranayamaVoiceGuide.kt`)
+- **Acoustic Design Rationale**:
+  - Sudden, loud vocal instructions during deep breath retention (*Kumbhaka*) or contemplation trigger an abrupt sympathetic nervous startle response, shattering meditative absorption (*dhyana*).
+  - Habit Bell eliminates jarring transitions through an unhurried, sweet, soft, high-frequency female voice profile matching the gentle, revered tonal swara of Bollywood singing legend **Lata Mangeshkar**.
+- **Voice Profile Standard & Mastered Assets**:
+  - **Acoustic Profile**: Natural high-frequency swara (`pitch: +52Hz`), meditative cadence (`rate: -45%` / `0.55x`), clean yogic pronunciation, and whisper-soft default gain (`0.52f`).
+  - **Option 1 (Only Sanskrit)**: Traditional Sanskrit sacred cues (`R.raw.pranayama_purak_sanskrit`, `R.raw.pranayama_kumbhak_sanskrit`, `R.raw.pranayama_rechak_sanskrit`, `R.raw.pranayama_bahya_sanskrit`).
+  - **Option 2 (Sanskrit + English)**: Bilingual cues (`R.raw.pranayama_purak_bilingual`, `R.raw.pranayama_kumbhak_bilingual`, `R.raw.pranayama_rechak_bilingual`, `R.raw.pranayama_bahya_bilingual`).
+  - **Anti-Startle Lead Delay**: Inserts a 120ms gentle delay after ducking begins before audio playback, letting ambient music settle before the voice begins.
+  - **Cross-Subsystem Reuse Guarantee**: This voice profile specification (`hi-IN-SwaraNeural`, `+52Hz`, `-45%` tempo, gentle soothing swara) is established as the architectural standard and will be reused across subsequent mindfulness routines, including the 12 classical mantras and breath cues of **Surya Namaskar**.
 
 ---
 
