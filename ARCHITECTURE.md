@@ -392,7 +392,7 @@ The practice regulates the four sacred limbs of the breath cycle:
 3. **Rechaka (रेचक - Exhalation)**: Slow, prolonged exhalation expelling *Apana*, physical toxins, and mental tension.
 4. **Bahya Kumbhaka (बाह्य कुम्भक - External Retention / Shunya Void)**: Resting in primordial emptiness between breaths, stimulating hypercapnic adaptation (CO₂ tolerance) and cerebral vasodilation (Bohr effect). In classical Hatha Yoga, **Tri-Bandha (त्रिबन्ध)** is also actively applied during Bahya Kumbhaka, where the diaphragm is naturally elevated into the thoracic cavity, facilitating full abdominal vacuum suction (*Pūrṇa Uḍḍīyāna Bandha*), root seal (*Mūla Bandha*), and suprasternal jugular lock (*Kūpa Bandha*).
 
-Both retention phases unconditionally display the classical Devanagari guidance `त्रिबन्ध (मूलबन्ध • उड्डीयान बन्ध • कूपबन्ध)` along with English transliteration `Tri-Bandha: Mūla • Uḍḍīyāna • Kūpa` in the Upper HUD.
+Both retention phases unconditionally display the classical Devanagari guidance `त्रिबन्ध (मूलबन्ध • उड्डीयान बन्ध • कूपबन्ध)` along with English transliteration `Tri-Bandha: Mūla • Uḍḍīyāna • Kūpa` positioned gracefully directly below the lotus flower and resting waterline, keeping the Upper HUD lean, spacious, and dedicated solely to phase nomenclature and the countdown numeral.
 
 #### 2. Proportional Ratio Stages & Visama Vritti Dynamics
 When Bahya Kumbhaka (external void) is included, practitioners advance through classical proportional stages selected via the **Proportional Ratio Stages Dropdown**:
