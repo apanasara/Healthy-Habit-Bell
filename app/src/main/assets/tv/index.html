@@ -251,6 +251,38 @@
             }
             return audioCtx;
         }
+// Helper to get current bell volume from UI slider (0.0–1.0)
+function getBellVolume() {
+    const slider = document.getElementById('bellVolume');
+    if (slider) {
+        const val = parseFloat(slider.value);
+        return isNaN(val) ? 0.45 : val; // fallback to default
+    }
+    return 0.45;
+}
+
+// Helper to get current background music volume from UI slider (0.0–1.0)
+function getBgVolume() {
+    const slider = document.getElementById('bgVolume');
+    if (slider) {
+        const val = parseFloat(slider.value);
+        return isNaN(val) ? 0.35 : val; // fallback to default
+    }
+    return 0.35;
+}
+
+// Update AUM drone gain and YouTube volume when background volume slider changes
+document.getElementById('bgVolume').addEventListener('input', () => {
+    const vol = getBgVolume();
+    if (aumGain) {
+        aumGain.gain.setValueAtTime(vol, getAudioContext().currentTime);
+    }
+    const frame = document.getElementById('ytFrame');
+    if (frame && frame.contentWindow) {
+        // YouTube iframe API: setVolume expects 0-100
+        frame.contentWindow.postMessage(JSON.stringify({event:"command",func:"setVolume",args:[vol * 100]}), '*');
+    }
+});
 
         function playHarmonicChime(freq, volume, duration) {
             try {
@@ -281,11 +313,11 @@
 
         function playCountdownStrike(secondsRemaining) {
             if (secondsRemaining === 3) {
-                playHarmonicChime(2048, 0.45, 4.0);
+                playHarmonicChime(2048, getBellVolume(), 4.0);
             } else if (secondsRemaining === 2) {
-                playHarmonicChime(1536, 0.70, 4.5);
+                playHarmonicChime(1536, getBellVolume(), 4.5);
             } else if (secondsRemaining === 1) {
-                playHarmonicChime(1024, 1.00, 7.5);
+                playHarmonicChime(1024, getBellVolume(), 7.5);
             }
         }
 

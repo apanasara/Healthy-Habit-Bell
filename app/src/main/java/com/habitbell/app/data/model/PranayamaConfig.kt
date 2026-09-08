@@ -28,18 +28,32 @@ enum class VoiceCueStyle(val displayName: String, val shortLabel: String) {
  * @property cue Extended instruction prompt displayed or spoken during phase transitions.
  * @property sanskritName Romanized Sanskrit title (Purak, Kumbhak, Rechak).
  * @property sanskritScript Devanagari script representation for traditional mindfulness immersion.
+ * @property bandhaScript Classical Sanskrit guidance for energetic bandhas (e.g. Tri-Bandha during Antar Kumbhaka).
+ * @property bandhaEnglish English transliteration and guidance for energetic bandhas.
  */
 enum class PranayamaPhase(
     val displayName: String,
     val cue: String,
     val sanskritName: String,
-    val sanskritScript: String
+    val sanskritScript: String,
+    val bandhaScript: String? = null,
+    val bandhaEnglish: String? = null
 ) {
     /** Puraka: Controlled diaphragmatic inhalation drawing in cosmic Prana. */
     INHALE("Inhale", "Inhale deeply", "Purak", "पूरक"),
 
-    /** Antar Kumbhaka: Internal breath retention awakening Sushumna Nadi with full lungs. */
-    HOLD_IN("Hold In", "Hold breath", "Kumbhak", "अभ्यन्तर कुम्भक"),
+    /**
+     * Antar Kumbhaka: Internal breath retention awakening Sushumna Nadi with full lungs.
+     * Accompanied by classical Tri-Bandha (Mūla Bandha, Madhyama Uḍḍīyāna Bandha, and Kūpa/Jālandhara Bandha).
+     */
+    HOLD_IN(
+        displayName = "Hold In",
+        cue = "Hold breath with Tri-Bandha",
+        sanskritName = "Kumbhak",
+        sanskritScript = "अभ्यन्तर कुम्भक",
+        bandhaScript = "त्रिबन्ध (मूलबन्ध • उड्डीयान बन्ध • कूपबन्ध)",
+        bandhaEnglish = "Tri-Bandha: Mūla • Uḍḍīyāna • Kūpa"
+    ),
 
     /** Rechaka: Slow, continuous exhalation releasing Apana and mental tension. */
     EXHALE("Exhale", "Exhale slowly", "Rechak", "रेचक"),
