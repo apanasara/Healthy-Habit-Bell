@@ -243,10 +243,10 @@ class MainActivity : FragmentActivity() {
                             onUpdateTime = { total, interval ->
                                 viewModel.updateActiveProfileTimes(total, interval)
                             },
-                            onUpdatePranayama = { purak, antar, rechak, bahya, rounds, intervalBellEnabled, intervalCadence, voiceEnabled, voiceStyle, tribandhaVoiceEnabled ->
-                                viewModel.updateActivePranayamaSettings(purak, antar, rechak, bahya, rounds, intervalBellEnabled, intervalCadence, voiceEnabled, voiceStyle, tribandhaVoiceEnabled)
+                            onUpdatePranayama = { purak, antar, rechak, bahya, rounds, intervalBellEnabled, intervalCadence, voiceEnabled, voiceStyle, tribandhaVoiceEnabled, voiceVolume ->
+                                viewModel.updateActivePranayamaSettings(purak, antar, rechak, bahya, rounds, intervalBellEnabled, intervalCadence, voiceEnabled, voiceStyle, tribandhaVoiceEnabled, voiceVolume)
                             },
-                            onTestVoiceCue = { style, isTriBandha -> viewModel.testPranayamaVoiceCue(style, isTriBandha) },
+                            onTestVoiceCue = { style, isTriBandha, volume -> viewModel.testPranayamaVoiceCue(style, isTriBandha, volume) },
                             onTestPranayamaIntervalBell = { viewModel.testPranayamaIntervalBell() },
                             tvCastUrl = viewModel.getTvCastUrl(),
                             isBgMusicEnabled = uiState.isBgMusicEnabled,

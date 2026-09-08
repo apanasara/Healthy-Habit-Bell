@@ -143,8 +143,8 @@ fun SettingsDrawer(
     onHealthProviderSelected: (HealthProviderType) -> Unit = {},
     onTestStep: () -> Unit = {},
     onUpdateSteps: (goal: Int?, interval: Int?, mode: StepTriggerMode) -> Unit = { _, _, _ -> },
-    onUpdatePranayama: (purak: Int, antar: Int, rechak: Int, bahya: Int, rounds: Int, intervalBellEnabled: Boolean, intervalCadence: Int, voiceEnabled: Boolean, voiceStyle: VoiceCueStyle, tribandhaVoiceEnabled: Boolean) -> Unit = { _, _, _, _, _, _, _, _, _, _ -> },
-    onTestVoiceCue: (VoiceCueStyle, Boolean) -> Unit = { _, _ -> },
+    onUpdatePranayama: (purak: Int, antar: Int, rechak: Int, bahya: Int, rounds: Int, intervalBellEnabled: Boolean, intervalCadence: Int, voiceEnabled: Boolean, voiceStyle: VoiceCueStyle, tribandhaVoiceEnabled: Boolean, voiceVolume: Float) -> Unit = { _, _, _, _, _, _, _, _, _, _, _ -> },
+    onTestVoiceCue: (VoiceCueStyle, Boolean, Float) -> Unit = { _, _, _ -> },
     onTestPranayamaIntervalBell: () -> Unit = {},
     hasActivityPermission: Boolean = true,
     onRequestActivityPermission: () -> Unit = {},
@@ -326,8 +326,8 @@ private fun TimerSettingsContent(
     profile: TimerProfile,
     onUpdateTime: (totalSec: Int, intervalSec: Int) -> Unit,
     onUpdateSteps: (goal: Int?, interval: Int?, mode: StepTriggerMode) -> Unit,
-    onUpdatePranayama: (purak: Int, antar: Int, rechak: Int, bahya: Int, rounds: Int, intervalBellEnabled: Boolean, intervalCadence: Int, voiceEnabled: Boolean, voiceStyle: VoiceCueStyle, tribandhaVoiceEnabled: Boolean) -> Unit,
-    onTestVoiceCue: (VoiceCueStyle, Boolean) -> Unit,
+    onUpdatePranayama: (purak: Int, antar: Int, rechak: Int, bahya: Int, rounds: Int, intervalBellEnabled: Boolean, intervalCadence: Int, voiceEnabled: Boolean, voiceStyle: VoiceCueStyle, tribandhaVoiceEnabled: Boolean, voiceVolume: Float) -> Unit,
+    onTestVoiceCue: (VoiceCueStyle, Boolean, Float) -> Unit,
     onTestPranayamaIntervalBell: () -> Unit,
     onTestOptionC: () -> Unit,
     onTestGong: () -> Unit,
@@ -1499,8 +1499,8 @@ private fun PranayamaPhaseInputFieldRow(
 @Composable
 private fun PranayamaSettingsSheet(
     profile: TimerProfile,
-    onUpdatePranayama: (purak: Int, antar: Int, rechak: Int, bahya: Int, rounds: Int, intervalBellEnabled: Boolean, intervalCadence: Int, voiceEnabled: Boolean, voiceStyle: VoiceCueStyle, tribandhaVoiceEnabled: Boolean) -> Unit,
-    onTestVoiceCue: (VoiceCueStyle, Boolean) -> Unit,
+    onUpdatePranayama: (purak: Int, antar: Int, rechak: Int, bahya: Int, rounds: Int, intervalBellEnabled: Boolean, intervalCadence: Int, voiceEnabled: Boolean, voiceStyle: VoiceCueStyle, tribandhaVoiceEnabled: Boolean, voiceVolume: Float) -> Unit,
+    onTestVoiceCue: (VoiceCueStyle, Boolean, Float) -> Unit,
     onTestPranayamaIntervalBell: () -> Unit,
     isBgMusicEnabled: Boolean,
     bgMusicType: BackgroundSoundType,
@@ -1526,7 +1526,8 @@ private fun PranayamaSettingsSheet(
         intervalBellRoundCadence = 5,
         isVoiceGuidanceEnabled = true,
         voiceCueStyle = VoiceCueStyle.SANSKRIT,
-        isTriBandhaVoiceEnabled = true
+        isTriBandhaVoiceEnabled = true,
+        voiceVolume = 0.52f
     )
 
     var purak by remember(profile.id, initialConfig.purakSeconds) { mutableStateOf(initialConfig.purakSeconds) }
@@ -1539,6 +1540,7 @@ private fun PranayamaSettingsSheet(
     var voiceEnabled by remember(profile.id, initialConfig.isVoiceGuidanceEnabled) { mutableStateOf(initialConfig.isVoiceGuidanceEnabled) }
     var voiceStyle by remember(profile.id, initialConfig.voiceCueStyle) { mutableStateOf(initialConfig.voiceCueStyle) }
     var tribandhaVoiceEnabled by remember(profile.id, initialConfig.isTriBandhaVoiceEnabled) { mutableStateOf(initialConfig.isTriBandhaVoiceEnabled) }
+    var voiceVolume by remember(profile.id, initialConfig.voiceVolume) { mutableStateOf(initialConfig.voiceVolume) }
 
     fun dispatchUpdate(
         newPurak: Int = purak,
@@ -1550,7 +1552,8 @@ private fun PranayamaSettingsSheet(
         newIntervalCadence: Int = intervalCadence,
         newVoiceEnabled: Boolean = voiceEnabled,
         newVoiceStyle: VoiceCueStyle = voiceStyle,
-        newTribandhaVoiceEnabled: Boolean = tribandhaVoiceEnabled
+        newTribandhaVoiceEnabled: Boolean = tribandhaVoiceEnabled,
+        newVoiceVolume: Float = voiceVolume
     ) {
         purak = newPurak
         antar = newAntar
@@ -1562,7 +1565,8 @@ private fun PranayamaSettingsSheet(
         voiceEnabled = newVoiceEnabled
         voiceStyle = newVoiceStyle
         tribandhaVoiceEnabled = newTribandhaVoiceEnabled
-        onUpdatePranayama(newPurak, newAntar, newRechak, newBahya, newRounds, newIntervalBellEnabled, newIntervalCadence, newVoiceEnabled, newVoiceStyle, newTribandhaVoiceEnabled)
+        voiceVolume = newVoiceVolume
+        onUpdatePranayama(newPurak, newAntar, newRechak, newBahya, newRounds, newIntervalBellEnabled, newIntervalCadence, newVoiceEnabled, newVoiceStyle, newTribandhaVoiceEnabled, newVoiceVolume)
     }
 
     var dropdownExpanded by remember { mutableStateOf(false) }
@@ -1899,8 +1903,8 @@ private fun PranayamaSettingsSheet(
 
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         listOf(
-                            VoiceCueStyle.SANSKRIT to "Option A: Sanskrit ('Purak', 'Kumbhak', 'Rechak') [Default]",
-                            VoiceCueStyle.BILINGUAL to "Option B: Bilingual ('Purak... Inhale', 'Kumbhak... Hold')"
+                            VoiceCueStyle.SANSKRIT to "Option 1: Only Sanskrit ('Purak', 'Kumbhak', 'Rechak') [Default]",
+                            VoiceCueStyle.BILINGUAL to "Option 2: Sanskrit + English ('Purak... Inhale', 'Kumbhak... Hold')"
                         ).forEach { (style, description) ->
                             val isSelected = voiceStyle == style
                             Surface(
@@ -1935,7 +1939,45 @@ private fun PranayamaSettingsSheet(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // Soothing Voice Volume Slider (Whisper-Soft to Gentle)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                "Soothing Voice Volume",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            val volPercent = (voiceVolume * 100).toInt()
+                            val toneDescription = when {
+                                voiceVolume <= 0.35f -> "Gentle Whisper"
+                                voiceVolume <= 0.65f -> "Meditative Soft (Default)"
+                                else -> "Clear Swara"
+                            }
+                            Text(
+                                text = "$volPercent% • $toneDescription",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                    Slider(
+                        value = voiceVolume,
+                        onValueChange = { dispatchUpdate(newVoiceVolume = it) },
+                        valueRange = 0.15f..1.0f,
+                        colors = SliderDefaults.colors(
+                            thumbColor = MaterialTheme.colorScheme.primary,
+                            activeTrackColor = MaterialTheme.colorScheme.primary
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Spacer(modifier = Modifier.height(6.dp))
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                     Spacer(modifier = Modifier.height(10.dp))
 
@@ -1967,21 +2009,21 @@ private fun PranayamaSettingsSheet(
                     Spacer(modifier = Modifier.height(12.dp))
 
                     OutlinedButton(
-                        onClick = { onTestVoiceCue(voiceStyle, tribandhaVoiceEnabled) },
+                        onClick = { onTestVoiceCue(voiceStyle, tribandhaVoiceEnabled, voiceVolume) },
                         shape = RoundedCornerShape(8.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         val label = if (tribandhaVoiceEnabled) {
                             when (voiceStyle) {
-                                VoiceCueStyle.BILINGUAL -> "▶ Audition 'Kumbhak... Hold with Tri-Bandha'"
-                                VoiceCueStyle.ENGLISH -> "▶ Audition 'Hold... Tri-Bandha'"
-                                else -> "▶ Audition 'Kumbhak... Tri-Bandha'"
+                                VoiceCueStyle.BILINGUAL -> "▶ Audition Option 2 ('Kumbhak... Hold with Tri-Bandha')"
+                                VoiceCueStyle.ENGLISH -> "▶ Audition English Voice ('Hold... Tri-Bandha')"
+                                else -> "▶ Audition Option 1 ('Kumbhak... Tri-Bandha')"
                             }
                         } else {
                             when (voiceStyle) {
-                                VoiceCueStyle.BILINGUAL -> "▶ Audition Option B Voice ('Purak... Inhale')"
+                                VoiceCueStyle.BILINGUAL -> "▶ Audition Option 2 Voice ('Purak... Inhale')"
                                 VoiceCueStyle.ENGLISH -> "▶ Audition English Voice ('Inhale')"
-                                else -> "▶ Audition Option A Voice ('Purak')"
+                                else -> "▶ Audition Option 1 Voice ('Purak')"
                             }
                         }
                         Text(label)

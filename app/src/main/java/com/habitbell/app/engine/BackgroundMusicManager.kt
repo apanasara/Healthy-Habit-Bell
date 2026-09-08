@@ -61,6 +61,9 @@ class BackgroundMusicManager(private val context: Context) {
     /** State flag to prevent redundant restart loops. */
     private var isPlaying: Boolean = false
 
+    /** Tracks whether ambient volume is temporarily ducked for voice guidance. */
+    private var isDucked: Boolean = false
+
     /** Master toggle enabling or disabling background music playback. */
     var isEnabled: Boolean = true
 
@@ -85,8 +88,11 @@ class BackgroundMusicManager(private val context: Context) {
             }
         }
 
-    /** State flag indicating whether background ambient soundscape is currently ducked. */
-    private var isDucked: Boolean = false
+    /** Current actual output gain applied to audio outputs (0.0f..1.0f). */
+    private var currentOutputGain: Float = 0.35f
+
+    /** Active smooth volume crossfading animator runnable handle. */
+    private var fadeAnimator: Runnable? = null
 
     /**
      * Applies normalized volume gain directly to active audio player handles.
@@ -95,6 +101,7 @@ class BackgroundMusicManager(private val context: Context) {
      */
     private fun applyVolumeToOutputs(target: Float) {
         val safeGain = target.coerceIn(0f, 1f)
+        currentOutputGain = safeGain
         try {
             mediaPlayer?.setVolume(safeGain, safeGain)
         } catch (_: Exception) {}
@@ -102,24 +109,59 @@ class BackgroundMusicManager(private val context: Context) {
     }
 
     /**
-     * Smoothly attenuates ambient background music volume to a subtle level during voice cues.
+     * Smoothly crossfades ambient volume to [targetGain] over [durationMs] using raised-cosine easing.
      *
-     * @param duckedRatio Ratio of regular volume to retain (default 0.25f, e.g. 25% of configured gain).
+     * @param targetGain Target volume ratio (0.0f..1.0f).
+     * @param durationMs Crossfade duration in milliseconds (default 350ms).
      */
-    fun duckVolume(duckedRatio: Float = 0.25f) {
-        if (!isEnabled || !isPlaying) return
-        isDucked = true
-        val target = (volume * duckedRatio).coerceIn(0.04f, 0.15f)
-        applyVolumeToOutputs(target)
+    fun smoothFadeTo(targetGain: Float, durationMs: Long = 350L) {
+        fadeAnimator?.let { mainHandler.removeCallbacks(it) }
+        val startGain = currentOutputGain
+        val target = targetGain.coerceIn(0f, 1f)
+        val startTime = System.currentTimeMillis()
+        val stepInterval = 20L
+
+        fadeAnimator = object : Runnable {
+            override fun run() {
+                val elapsed = System.currentTimeMillis() - startTime
+                val progress = (elapsed.toFloat() / durationMs).coerceIn(0f, 1f)
+                // Raised-cosine S-curve easing: 0.5 * (1 - cos(pi * progress))
+                val easeProgress = 0.5f * (1.0f - kotlin.math.cos(Math.PI.toFloat() * progress))
+                val current = startGain + (target - startGain) * easeProgress
+                applyVolumeToOutputs(current)
+
+                if (progress < 1.0f) {
+                    mainHandler.postDelayed(this, stepInterval)
+                } else {
+                    fadeAnimator = null
+                }
+            }
+        }
+        mainHandler.post(fadeAnimator!!)
     }
 
     /**
-     * Restores ambient background music gain back to the user's configured volume level.
+     * Smoothly attenuates ambient background music volume to a subtle level during voice cues.
+     *
+     * @param duckedRatio Ratio of regular volume to retain (default 0.20f, e.g. 20% of configured gain).
+     * @param durationMs Fade duration in milliseconds (default 350ms).
      */
-    fun restoreVolume() {
+    fun duckVolume(duckedRatio: Float = 0.20f, durationMs: Long = 350L) {
+        if (!isEnabled || !isPlaying) return
+        isDucked = true
+        val target = (volume * duckedRatio).coerceIn(0.04f, 0.15f)
+        smoothFadeTo(target, durationMs)
+    }
+
+    /**
+     * Restores ambient background music gain smoothly back to the user's configured volume level.
+     *
+     * @param durationMs Fade duration in milliseconds (default 500ms).
+     */
+    fun restoreVolume(durationMs: Long = 500L) {
         if (!isDucked) return
         isDucked = false
-        applyVolumeToOutputs(volume)
+        smoothFadeTo(volume, durationMs)
     }
 
     /**
@@ -228,6 +270,8 @@ class BackgroundMusicManager(private val context: Context) {
      */
     fun stop() {
         isPlaying = false
+        fadeAnimator?.let { mainHandler.removeCallbacks(it) }
+        fadeAnimator = null
         stopMediaPlayer()
         stopYouTube()
     }

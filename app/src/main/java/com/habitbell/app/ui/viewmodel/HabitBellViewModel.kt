@@ -593,7 +593,8 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
         intervalBellCadence: Int = 5,
         isVoiceEnabled: Boolean = true,
         voiceStyle: com.habitbell.app.data.model.VoiceCueStyle = com.habitbell.app.data.model.VoiceCueStyle.SANSKRIT,
-        isTriBandhaVoiceEnabled: Boolean = true
+        isTriBandhaVoiceEnabled: Boolean = true,
+        voiceVolume: Float = 0.52f
     ) {
         val currentProfile = sessionState.value.profile
         repository.updatePranayamaSettings(
@@ -607,7 +608,8 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
             intervalBellCadence = intervalBellCadence,
             isVoiceEnabled = isVoiceEnabled,
             voiceStyle = voiceStyle,
-            isTriBandhaVoiceEnabled = isTriBandhaVoiceEnabled
+            isTriBandhaVoiceEnabled = isTriBandhaVoiceEnabled,
+            voiceVolume = voiceVolume
         )
         val updatedConfig = (currentProfile.pranayamaConfig ?: com.habitbell.app.data.model.PranayamaConfig(emptyList(), targetRounds))
             .withStepDurations(
@@ -620,7 +622,8 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
                 cadence = intervalBellCadence,
                 voiceEnabled = isVoiceEnabled,
                 voiceStyle = voiceStyle,
-                tribandhaVoiceEnabled = isTriBandhaVoiceEnabled
+                tribandhaVoiceEnabled = isTriBandhaVoiceEnabled,
+                voiceVolume = voiceVolume
             )
         engine.loadProfile(
             currentProfile.copy(
@@ -633,14 +636,16 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
     /**
      * Auditions a sample gentle lady voice cue for settings preview according to [style].
      *
-     * @param style Selected voice cue style (Option A Sanskrit vs Option B Bilingual).
+     * @param style Selected voice cue style (Option 1 Sanskrit vs Option 2 Bilingual).
      * @param isTriBandhaVoiceEnabled Whether to audition the Tri-Bandha retention cue.
+     * @param voiceVolume Subdued preview volume gain (0.15f..1.0f).
      */
     fun testPranayamaVoiceCue(
         style: com.habitbell.app.data.model.VoiceCueStyle = com.habitbell.app.data.model.VoiceCueStyle.SANSKRIT,
-        isTriBandhaVoiceEnabled: Boolean = false
+        isTriBandhaVoiceEnabled: Boolean = false,
+        voiceVolume: Float = 0.52f
     ) {
-        voiceGuide.auditionCue(style, isTriBandhaVoiceEnabled)
+        voiceGuide.auditionCue(style, isTriBandhaVoiceEnabled, voiceVolume)
     }
 
     /**

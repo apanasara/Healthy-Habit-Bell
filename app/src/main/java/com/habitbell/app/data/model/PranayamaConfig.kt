@@ -4,14 +4,14 @@ package com.habitbell.app.data.model
  * Voice guidance prompt delivery style for Pranayama phase transitions.
  */
 enum class VoiceCueStyle(val displayName: String, val shortLabel: String) {
-    /** Option A: Traditional Sanskrit cues spoken by gentle lady voice ("Purak", "Kumbhak", "Rechak"). Default. */
-    SANSKRIT("Option A: Sanskrit (Purak, Kumbhak, Rechak)", "Option A (Sanskrit)"),
+    /** Option 1: Authentic Sanskrit cues spoken in soothing Lata-style melodious swara ("Purak", "Kumbhak", "Rechak", "Bahya"). Default. */
+    SANSKRIT("Option 1: Only Sanskrit (Purak, Kumbhak, Rechak)", "Only Sanskrit"),
 
-    /** Option B: Bilingual Sanskrit and English cues ("Purak... Inhale", "Kumbhak... Hold", etc.). */
-    BILINGUAL("Option B: Bilingual (Purak... Inhale)", "Option B (Bilingual)"),
+    /** Option 2: Sanskrit + English bilingual guidance cues ("Purak... Inhale", "Kumbhak... Hold", "Rechak... Exhale"). */
+    BILINGUAL("Option 2: Sanskrit + English (Purak... Inhale)", "Sanskrit + English"),
 
-    /** Option C: English only cues spoken by gentle lady voice ("Inhale", "Hold", "Exhale", "Hold empty"). */
-    ENGLISH("Option C: English (Inhale, Hold, Exhale)", "English")
+    /** Option 3: English only cues spoken with gentle mindfulness cadence ("Inhale", "Hold", "Exhale", "Rest"). */
+    ENGLISH("Option 3: English (Inhale, Hold, Exhale)", "English")
 }
 
 /**
@@ -103,6 +103,7 @@ data class PranayamaStep(
  * @property isVoiceGuidanceEnabled Whether the gentle lady voice guidance triggers at phase transitions.
  * @property voiceCueStyle Preferred linguistic style for spoken voice guidance ([VoiceCueStyle]).
  * @property isTriBandhaVoiceEnabled Whether gentle lady voice speaks the Tri-Bandha guidance cue during Kumbhaka.
+ * @property voiceVolume Subdued volume gain for voice guidance (0.15f..1.0f, default 0.52f).
  */
 data class PranayamaConfig(
     val steps: List<PranayamaStep>,
@@ -111,7 +112,8 @@ data class PranayamaConfig(
     val intervalBellRoundCadence: Int = 5,
     val isVoiceGuidanceEnabled: Boolean = true,
     val voiceCueStyle: VoiceCueStyle = VoiceCueStyle.SANSKRIT,
-    val isTriBandhaVoiceEnabled: Boolean = true
+    val isTriBandhaVoiceEnabled: Boolean = true,
+    val voiceVolume: Float = 0.52f
 ) {
     /** Duration of the Puraka (Inhale) phase in seconds. Defaults to 4 seconds. */
     val purakSeconds: Int
@@ -150,6 +152,7 @@ data class PranayamaConfig(
      * @param voiceEnabled Optional voice guidance toggle.
      * @param voiceStyle Optional voice cue linguistic style.
      * @param tribandhaVoiceEnabled Optional Tri-Bandha spoken voice cue toggle during Kumbhaka.
+     * @param voiceVolume Optional voice guidance gain (0.15f..1.0f).
      * @return Updated [PranayamaConfig] instance.
      */
     fun withStepDurations(
@@ -162,7 +165,8 @@ data class PranayamaConfig(
         cadence: Int? = null,
         voiceEnabled: Boolean? = null,
         voiceStyle: VoiceCueStyle? = null,
-        tribandhaVoiceEnabled: Boolean? = null
+        tribandhaVoiceEnabled: Boolean? = null,
+        voiceVolume: Float? = null
     ): PranayamaConfig {
         val updatedSteps = listOf(
             PranayamaStep(PranayamaPhase.INHALE, purak.coerceAtLeast(1)),
@@ -177,7 +181,8 @@ data class PranayamaConfig(
             intervalBellRoundCadence = cadence ?: intervalBellRoundCadence,
             isVoiceGuidanceEnabled = voiceEnabled ?: isVoiceGuidanceEnabled,
             voiceCueStyle = voiceStyle ?: this.voiceCueStyle,
-            isTriBandhaVoiceEnabled = tribandhaVoiceEnabled ?: this.isTriBandhaVoiceEnabled
+            isTriBandhaVoiceEnabled = tribandhaVoiceEnabled ?: this.isTriBandhaVoiceEnabled,
+            voiceVolume = voiceVolume ?: this.voiceVolume
         )
     }
 }
