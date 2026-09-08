@@ -143,8 +143,8 @@ fun SettingsDrawer(
     onHealthProviderSelected: (HealthProviderType) -> Unit = {},
     onTestStep: () -> Unit = {},
     onUpdateSteps: (goal: Int?, interval: Int?, mode: StepTriggerMode) -> Unit = { _, _, _ -> },
-    onUpdatePranayama: (purak: Int, antar: Int, rechak: Int, bahya: Int, rounds: Int, intervalBellEnabled: Boolean, intervalCadence: Int, voiceEnabled: Boolean, voiceStyle: VoiceCueStyle) -> Unit = { _, _, _, _, _, _, _, _, _ -> },
-    onTestVoiceCue: (VoiceCueStyle) -> Unit = {},
+    onUpdatePranayama: (purak: Int, antar: Int, rechak: Int, bahya: Int, rounds: Int, intervalBellEnabled: Boolean, intervalCadence: Int, voiceEnabled: Boolean, voiceStyle: VoiceCueStyle, tribandhaVoiceEnabled: Boolean) -> Unit = { _, _, _, _, _, _, _, _, _, _ -> },
+    onTestVoiceCue: (VoiceCueStyle, Boolean) -> Unit = { _, _ -> },
     onTestPranayamaIntervalBell: () -> Unit = {},
     hasActivityPermission: Boolean = true,
     onRequestActivityPermission: () -> Unit = {},
@@ -326,8 +326,8 @@ private fun TimerSettingsContent(
     profile: TimerProfile,
     onUpdateTime: (totalSec: Int, intervalSec: Int) -> Unit,
     onUpdateSteps: (goal: Int?, interval: Int?, mode: StepTriggerMode) -> Unit,
-    onUpdatePranayama: (purak: Int, antar: Int, rechak: Int, bahya: Int, rounds: Int, intervalBellEnabled: Boolean, intervalCadence: Int, voiceEnabled: Boolean, voiceStyle: VoiceCueStyle) -> Unit,
-    onTestVoiceCue: (VoiceCueStyle) -> Unit,
+    onUpdatePranayama: (purak: Int, antar: Int, rechak: Int, bahya: Int, rounds: Int, intervalBellEnabled: Boolean, intervalCadence: Int, voiceEnabled: Boolean, voiceStyle: VoiceCueStyle, tribandhaVoiceEnabled: Boolean) -> Unit,
+    onTestVoiceCue: (VoiceCueStyle, Boolean) -> Unit,
     onTestPranayamaIntervalBell: () -> Unit,
     onTestOptionC: () -> Unit,
     onTestGong: () -> Unit,
@@ -1499,8 +1499,8 @@ private fun PranayamaPhaseInputFieldRow(
 @Composable
 private fun PranayamaSettingsSheet(
     profile: TimerProfile,
-    onUpdatePranayama: (purak: Int, antar: Int, rechak: Int, bahya: Int, rounds: Int, intervalBellEnabled: Boolean, intervalCadence: Int, voiceEnabled: Boolean, voiceStyle: VoiceCueStyle) -> Unit,
-    onTestVoiceCue: (VoiceCueStyle) -> Unit,
+    onUpdatePranayama: (purak: Int, antar: Int, rechak: Int, bahya: Int, rounds: Int, intervalBellEnabled: Boolean, intervalCadence: Int, voiceEnabled: Boolean, voiceStyle: VoiceCueStyle, tribandhaVoiceEnabled: Boolean) -> Unit,
+    onTestVoiceCue: (VoiceCueStyle, Boolean) -> Unit,
     onTestPranayamaIntervalBell: () -> Unit,
     isBgMusicEnabled: Boolean,
     bgMusicType: BackgroundSoundType,
@@ -1525,7 +1525,8 @@ private fun PranayamaSettingsSheet(
         isIntervalBellEnabled = false,
         intervalBellRoundCadence = 5,
         isVoiceGuidanceEnabled = true,
-        voiceCueStyle = VoiceCueStyle.SANSKRIT
+        voiceCueStyle = VoiceCueStyle.SANSKRIT,
+        isTriBandhaVoiceEnabled = true
     )
 
     var purak by remember(profile.id, initialConfig.purakSeconds) { mutableStateOf(initialConfig.purakSeconds) }
@@ -1537,6 +1538,7 @@ private fun PranayamaSettingsSheet(
     var intervalCadence by remember(profile.id, initialConfig.intervalBellRoundCadence) { mutableStateOf(initialConfig.intervalBellRoundCadence) }
     var voiceEnabled by remember(profile.id, initialConfig.isVoiceGuidanceEnabled) { mutableStateOf(initialConfig.isVoiceGuidanceEnabled) }
     var voiceStyle by remember(profile.id, initialConfig.voiceCueStyle) { mutableStateOf(initialConfig.voiceCueStyle) }
+    var tribandhaVoiceEnabled by remember(profile.id, initialConfig.isTriBandhaVoiceEnabled) { mutableStateOf(initialConfig.isTriBandhaVoiceEnabled) }
 
     fun dispatchUpdate(
         newPurak: Int = purak,
@@ -1547,7 +1549,8 @@ private fun PranayamaSettingsSheet(
         newIntervalBellEnabled: Boolean = intervalBellEnabled,
         newIntervalCadence: Int = intervalCadence,
         newVoiceEnabled: Boolean = voiceEnabled,
-        newVoiceStyle: VoiceCueStyle = voiceStyle
+        newVoiceStyle: VoiceCueStyle = voiceStyle,
+        newTribandhaVoiceEnabled: Boolean = tribandhaVoiceEnabled
     ) {
         purak = newPurak
         antar = newAntar
@@ -1558,7 +1561,8 @@ private fun PranayamaSettingsSheet(
         intervalCadence = newIntervalCadence
         voiceEnabled = newVoiceEnabled
         voiceStyle = newVoiceStyle
-        onUpdatePranayama(newPurak, newAntar, newRechak, newBahya, newRounds, newIntervalBellEnabled, newIntervalCadence, newVoiceEnabled, newVoiceStyle)
+        tribandhaVoiceEnabled = newTribandhaVoiceEnabled
+        onUpdatePranayama(newPurak, newAntar, newRechak, newBahya, newRounds, newIntervalBellEnabled, newIntervalCadence, newVoiceEnabled, newVoiceStyle, newTribandhaVoiceEnabled)
     }
 
     var dropdownExpanded by remember { mutableStateOf(false) }
@@ -1931,16 +1935,54 @@ private fun PranayamaSettingsSheet(
                         }
                     }
 
+                    Spacer(modifier = Modifier.height(10.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Tri-Bandha Voice Guidance Toggle
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                "Tri-Bandha Voice Cue",
+                                style = MaterialTheme.typography.bodySmall,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = "Whispers 'Kumbhak... Tri-Bandha' during breath retention",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = tribandhaVoiceEnabled,
+                            onCheckedChange = { dispatchUpdate(newTribandhaVoiceEnabled = it) },
+                            colors = SwitchDefaults.colors(checkedThumbColor = MaterialTheme.colorScheme.primary)
+                        )
+                    }
+
                     Spacer(modifier = Modifier.height(12.dp))
 
                     OutlinedButton(
-                        onClick = { onTestVoiceCue(voiceStyle) },
+                        onClick = { onTestVoiceCue(voiceStyle, tribandhaVoiceEnabled) },
                         shape = RoundedCornerShape(8.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        val label = when (voiceStyle) {
-                            VoiceCueStyle.BILINGUAL -> "▶ Audition Option B Voice ('Purak... Inhale')"
-                            else -> "▶ Audition Option A Voice ('Purak')"
+                        val label = if (tribandhaVoiceEnabled) {
+                            when (voiceStyle) {
+                                VoiceCueStyle.BILINGUAL -> "▶ Audition 'Kumbhak... Hold with Tri-Bandha'"
+                                VoiceCueStyle.ENGLISH -> "▶ Audition 'Hold... Tri-Bandha'"
+                                else -> "▶ Audition 'Kumbhak... Tri-Bandha'"
+                            }
+                        } else {
+                            when (voiceStyle) {
+                                VoiceCueStyle.BILINGUAL -> "▶ Audition Option B Voice ('Purak... Inhale')"
+                                VoiceCueStyle.ENGLISH -> "▶ Audition English Voice ('Inhale')"
+                                else -> "▶ Audition Option A Voice ('Purak')"
+                            }
                         }
                         Text(label)
                     }

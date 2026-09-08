@@ -581,6 +581,7 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
      * @param intervalBellCadence Number of rounds between milestone bells (e.g. 5).
      * @param isVoiceEnabled Whether gentle lady voice prompts are triggered on phase transitions.
      * @param voiceStyle Linguistic cue style ([com.habitbell.app.data.model.VoiceCueStyle]).
+     * @param isTriBandhaVoiceEnabled Whether gentle lady voice speaks the Tri-Bandha guidance cue during Kumbhaka.
      */
     fun updateActivePranayamaSettings(
         purakSeconds: Int,
@@ -591,7 +592,8 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
         isIntervalBellEnabled: Boolean = false,
         intervalBellCadence: Int = 5,
         isVoiceEnabled: Boolean = true,
-        voiceStyle: com.habitbell.app.data.model.VoiceCueStyle = com.habitbell.app.data.model.VoiceCueStyle.SANSKRIT
+        voiceStyle: com.habitbell.app.data.model.VoiceCueStyle = com.habitbell.app.data.model.VoiceCueStyle.SANSKRIT,
+        isTriBandhaVoiceEnabled: Boolean = true
     ) {
         val currentProfile = sessionState.value.profile
         repository.updatePranayamaSettings(
@@ -604,7 +606,8 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
             isIntervalBellEnabled = isIntervalBellEnabled,
             intervalBellCadence = intervalBellCadence,
             isVoiceEnabled = isVoiceEnabled,
-            voiceStyle = voiceStyle
+            voiceStyle = voiceStyle,
+            isTriBandhaVoiceEnabled = isTriBandhaVoiceEnabled
         )
         val updatedConfig = (currentProfile.pranayamaConfig ?: com.habitbell.app.data.model.PranayamaConfig(emptyList(), targetRounds))
             .withStepDurations(
@@ -616,7 +619,8 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
                 intervalEnabled = isIntervalBellEnabled,
                 cadence = intervalBellCadence,
                 voiceEnabled = isVoiceEnabled,
-                voiceStyle = voiceStyle
+                voiceStyle = voiceStyle,
+                tribandhaVoiceEnabled = isTriBandhaVoiceEnabled
             )
         engine.loadProfile(
             currentProfile.copy(
@@ -630,9 +634,13 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
      * Auditions a sample gentle lady voice cue for settings preview according to [style].
      *
      * @param style Selected voice cue style (Option A Sanskrit vs Option B Bilingual).
+     * @param isTriBandhaVoiceEnabled Whether to audition the Tri-Bandha retention cue.
      */
-    fun testPranayamaVoiceCue(style: com.habitbell.app.data.model.VoiceCueStyle = com.habitbell.app.data.model.VoiceCueStyle.SANSKRIT) {
-        voiceGuide.auditionCue(style)
+    fun testPranayamaVoiceCue(
+        style: com.habitbell.app.data.model.VoiceCueStyle = com.habitbell.app.data.model.VoiceCueStyle.SANSKRIT,
+        isTriBandhaVoiceEnabled: Boolean = false
+    ) {
+        voiceGuide.auditionCue(style, isTriBandhaVoiceEnabled)
     }
 
     /**

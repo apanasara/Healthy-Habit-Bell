@@ -162,30 +162,39 @@ class PranayamaVoiceGuide(
     /**
      * Speaks the guided cue for a newly engaged Pranayama phase with automatic audio ducking.
      *
+     * When [isTriBandhaVoiceEnabled] is active and the incoming phase is a Kumbhaka retention
+     * ([PranayamaPhase.HOLD_IN] or [PranayamaPhase.HOLD_OUT]), the gentle lady voice articulates
+     * the sacred Tri-Bandha guidance cue (e.g. "Kumbhak... Tri-Bandha" or "Hold... Tri-Bandha").
+     *
      * @param phase The active [PranayamaPhase] beginning execution.
      * @param style Optional override of [VoiceCueStyle]. Defaults to configured [cueStyle].
+     * @param isTriBandhaVoiceEnabled Whether to articulate the Tri-Bandha prompt during retention phases.
      */
-    fun speakPhaseCue(phase: PranayamaPhase, style: VoiceCueStyle = cueStyle) {
+    fun speakPhaseCue(
+        phase: PranayamaPhase,
+        style: VoiceCueStyle = cueStyle,
+        isTriBandhaVoiceEnabled: Boolean = false
+    ) {
         if (!isVoiceEnabled || !isInitialized || tts == null) return
 
         val spokenText = when (style) {
             VoiceCueStyle.SANSKRIT -> when (phase) {
                 PranayamaPhase.INHALE -> "Purak"
-                PranayamaPhase.HOLD_IN -> "Kumbhak"
+                PranayamaPhase.HOLD_IN -> if (isTriBandhaVoiceEnabled) "Kumbhak... Tri-Bandha" else "Kumbhak"
                 PranayamaPhase.EXHALE -> "Rechak"
-                PranayamaPhase.HOLD_OUT -> "Kumbhak"
+                PranayamaPhase.HOLD_OUT -> if (isTriBandhaVoiceEnabled) "Kumbhak... Tri-Bandha" else "Kumbhak"
             }
             VoiceCueStyle.ENGLISH -> when (phase) {
                 PranayamaPhase.INHALE -> "Inhale"
-                PranayamaPhase.HOLD_IN -> "Hold breath"
+                PranayamaPhase.HOLD_IN -> if (isTriBandhaVoiceEnabled) "Hold... Tri-Bandha" else "Hold breath"
                 PranayamaPhase.EXHALE -> "Exhale"
-                PranayamaPhase.HOLD_OUT -> "Hold empty"
+                PranayamaPhase.HOLD_OUT -> if (isTriBandhaVoiceEnabled) "Hold... Tri-Bandha" else "Hold empty"
             }
             VoiceCueStyle.BILINGUAL -> when (phase) {
                 PranayamaPhase.INHALE -> "Purak... Inhale"
-                PranayamaPhase.HOLD_IN -> "Kumbhak... Hold"
+                PranayamaPhase.HOLD_IN -> if (isTriBandhaVoiceEnabled) "Kumbhak... Hold with Tri-Bandha" else "Kumbhak... Hold"
                 PranayamaPhase.EXHALE -> "Rechak... Exhale"
-                PranayamaPhase.HOLD_OUT -> "Kumbhak... Hold empty"
+                PranayamaPhase.HOLD_OUT -> if (isTriBandhaVoiceEnabled) "Kumbhak... Hold with Tri-Bandha" else "Kumbhak... Hold empty"
             }
         }
 
@@ -196,13 +205,25 @@ class PranayamaVoiceGuide(
      * Auditions a sample spoken cue for settings preview based on selected [VoiceCueStyle].
      *
      * @param style Preferred voice cue style to sample. Defaults to active [cueStyle].
+     * @param isTriBandhaVoiceEnabled Whether to audition the Tri-Bandha retention cue.
      */
-    fun auditionCue(style: VoiceCueStyle = cueStyle) {
+    fun auditionCue(
+        style: VoiceCueStyle = cueStyle,
+        isTriBandhaVoiceEnabled: Boolean = false
+    ) {
         if (!isInitialized || tts == null) return
-        val sampleText = when (style) {
-            VoiceCueStyle.SANSKRIT -> "Purak"
-            VoiceCueStyle.BILINGUAL -> "Purak... Inhale"
-            VoiceCueStyle.ENGLISH -> "Inhale"
+        val sampleText = if (isTriBandhaVoiceEnabled) {
+            when (style) {
+                VoiceCueStyle.SANSKRIT -> "Kumbhak... Tri-Bandha"
+                VoiceCueStyle.BILINGUAL -> "Kumbhak... Hold with Tri-Bandha"
+                VoiceCueStyle.ENGLISH -> "Hold... Tri-Bandha"
+            }
+        } else {
+            when (style) {
+                VoiceCueStyle.SANSKRIT -> "Purak"
+                VoiceCueStyle.BILINGUAL -> "Purak... Inhale"
+                VoiceCueStyle.ENGLISH -> "Inhale"
+            }
         }
         speakUtterance(sampleText)
     }

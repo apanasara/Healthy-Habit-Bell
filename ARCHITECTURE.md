@@ -390,7 +390,9 @@ The practice regulates the four sacred limbs of the breath cycle:
    - **Madhyama Uḍḍīyāna Bandha (उड्डीयान बन्ध - Abdominal Lock)**: In *Antar Kumbhaka*, gentle inward engagement of the lower abdominal wall below the navel (*Madhyama/Laghu Uḍḍīyāna*) stabilizes intra-abdominal pressure against the descending diaphragm without compressing fully inflated lungs.
    - **Kūpa Bandha (कूपबन्ध / जालंधर बन्ध - Throat Lock)**: Resting the chin firmly into the jugular notch (*Kaṇṭha Kūpa*, *PYS* 3.30: *kaṇṭhakūpe kṣutpipāsānivṛttiḥ*). This mechanically stimulates the carotid sinus baroreceptors, triggering the reflex vagal bradycardia that lowers heart rate, regulates intracranial arterial pressure during retention, and halts mental fluctuation.
 3. **Rechaka (रेचक - Exhalation)**: Slow, prolonged exhalation expelling *Apana*, physical toxins, and mental tension.
-4. **Bahya Kumbhaka (बाह्य कुम्भक - External Retention / Shunya Void)**: Resting in primordial emptiness between breaths, stimulating hypercapnic adaptation (CO₂ tolerance) and cerebral vasodilation (Bohr effect).
+4. **Bahya Kumbhaka (बाह्य कुम्भक - External Retention / Shunya Void)**: Resting in primordial emptiness between breaths, stimulating hypercapnic adaptation (CO₂ tolerance) and cerebral vasodilation (Bohr effect). In classical Hatha Yoga, **Tri-Bandha (त्रिबन्ध)** is also actively applied during Bahya Kumbhaka, where the diaphragm is naturally elevated into the thoracic cavity, facilitating full abdominal vacuum suction (*Pūrṇa Uḍḍīyāna Bandha*), root seal (*Mūla Bandha*), and suprasternal jugular lock (*Kūpa Bandha*).
+
+Both retention phases unconditionally display the classical Devanagari guidance `त्रिबन्ध (मूलबन्ध • उड्डीयान बन्ध • कूपबन्ध)` along with English transliteration `Tri-Bandha: Mūla • Uḍḍīyāna • Kūpa` in the Upper HUD.
 
 #### 2. Proportional Ratio Stages & Visama Vritti Dynamics
 When Bahya Kumbhaka (external void) is included, practitioners advance through classical proportional stages selected via the **Proportional Ratio Stages Dropdown**:
@@ -423,6 +425,12 @@ Grounded in *Hatha Yoga Pradipika* (2.12) & *Gheranda Samhita* (5.49):
   - **Option A (Traditional Sanskrit) [Default]**: Whispers authentic cues (`"Purak"`, `"Kumbhak"`, `"Rechak"`, `"Kumbhak"`).
   - **Option B (Bilingual Guided)**: Combines Sanskrit roots with English instructions (`"Purak... Inhale"`, `"Kumbhak... Hold"`, `"Rechak... Exhale"`, `"Kumbhak... Hold empty"`).
   - Switchable in the dedicated Pranayama Settings Sheet with a live audition button.
+- **Tri-Bandha Voice Guidance Toggle (`isTriBandhaVoiceEnabled`, Default: ON)**:
+  - When enabled, the gentle voice specifically whispers the sacred Tri-Bandha instruction upon entering both internal and external retentions:
+    - *Sanskrit*: `"Kumbhak... Tri-Bandha"`
+    - *Bilingual*: `"Kumbhak... Hold with Tri-Bandha"`
+    - *English*: `"Hold... Tri-Bandha"`
+  - Decoupled from the visual HUD (the HUD always presents Tri-Bandha unconditionally during Kumbhaka, while the auditory voice prompt is controlled by this user toggle).
 - **Dynamic Background Audio Ducking**:
   - Synchronously commands `BackgroundMusicManager.duckVolume(0.20f)` to smoothly attenuate ambient meditation drones down to ~15%–20% gain during speech.
   - Automatically restores normal volume upon `UtteranceProgressListener.onDone` or error.
@@ -472,7 +480,7 @@ Grounded in *Hatha Yoga Pradipika* (2.12) & *Gheranda Samhita* (5.49):
   2. **Base Inhale Scaling**: Quick 2s, 3s, 4s, 5s, 6s proportional recalculation chips.
   3. **Four Phase Input Fields**: Direct numerical text entry and -1s, +1s, +4s steppers for Purak, Kumbhak (In), Rechak, Kumbhak (Out).
   4. **Target Practice Rounds**: 12 rounds default (*Adhama* standard), with custom steppers and classic stage presets.
-  5. **Gentle Lady Voice Guide**: Option A (Sanskrit) default vs Option B (Bilingual) switch, with live audition.
+  5. **Gentle Lady Voice Guide**: Option A (Sanskrit) default vs Option B (Bilingual) switch, dedicated Tri-Bandha voice cue toggle (`isTriBandhaVoiceEnabled`), and dynamic live audition button.
   6. **Meditative Interval Bell**: Default OFF toggle, cadence selector, and 432 Hz audition button.
   7. **Subtle Background Music**: Ambient sound toggle, Aum drone / YouTube / Custom file, and subtle volume slider.
 - Bypasses generic timer countdown and signature 3-bell cards, maintaining a serene, focused user experience.

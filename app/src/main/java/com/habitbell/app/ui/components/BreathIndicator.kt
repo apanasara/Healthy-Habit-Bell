@@ -252,8 +252,9 @@ fun BreathIndicator(
                     color = primaryPranaColor.copy(alpha = 0.85f)
                 )
 
-                // Tri-Bandha guidance subtitle during Antar Kumbhaka (Mūla, Uḍḍīyāna, and Kūpa Bandha)
+                // Tri-Bandha guidance subtitle during Kumbhaka (Mūla, Uḍḍīyāna, and Kūpa Bandha)
                 val bandhaText = phase.bandhaScript
+                val bandhaEng = phase.bandhaEnglish
                 if (bandhaText != null) {
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
@@ -263,6 +264,17 @@ fun BreathIndicator(
                         fontWeight = FontWeight.Medium,
                         letterSpacing = 0.5.sp,
                         color = primaryPranaColor.copy(alpha = if (isDark) 0.92f else 0.85f)
+                    )
+                }
+                if (bandhaEng != null) {
+                    Spacer(modifier = Modifier.height(1.dp))
+                    Text(
+                        text = bandhaEng,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontSize = 9.5.sp,
+                        fontWeight = FontWeight.Light,
+                        letterSpacing = 0.5.sp,
+                        color = primaryPranaColor.copy(alpha = if (isDark) 0.80f else 0.70f)
                     )
                 }
 
