@@ -179,13 +179,15 @@ class PranayamaVoiceGuide(
                 PranayamaPhase.INHALE -> R.raw.pranayama_purak_sanskrit
                 PranayamaPhase.HOLD_IN -> R.raw.pranayama_kumbhak_sanskrit
                 PranayamaPhase.EXHALE -> R.raw.pranayama_rechak_sanskrit
-                PranayamaPhase.HOLD_OUT -> R.raw.pranayama_bahya_sanskrit
+                // In traditional 4-step Pranayama, both retention steps (internal and external) are Kumbhaka
+                PranayamaPhase.HOLD_OUT -> R.raw.pranayama_kumbhak_sanskrit
             }
             VoiceCueStyle.BILINGUAL -> when (phase) {
                 PranayamaPhase.INHALE -> R.raw.pranayama_purak_bilingual
                 PranayamaPhase.HOLD_IN -> R.raw.pranayama_kumbhak_bilingual
                 PranayamaPhase.EXHALE -> R.raw.pranayama_rechak_bilingual
-                PranayamaPhase.HOLD_OUT -> R.raw.pranayama_bahya_bilingual
+                // In traditional 4-step Pranayama, both retention steps (internal and external) are Kumbhaka
+                PranayamaPhase.HOLD_OUT -> R.raw.pranayama_kumbhak_bilingual
             }
             VoiceCueStyle.ENGLISH -> null
         }
@@ -293,19 +295,19 @@ class PranayamaVoiceGuide(
                 PranayamaPhase.INHALE -> "पूरक..."
                 PranayamaPhase.HOLD_IN -> if (isTriBandhaVoiceEnabled) "कुम्भक... त्रिबन्ध..." else "कुम्भक..."
                 PranayamaPhase.EXHALE -> "रेचक..."
-                PranayamaPhase.HOLD_OUT -> "बाह्य..."
+                PranayamaPhase.HOLD_OUT -> if (isTriBandhaVoiceEnabled) "कुम्भक... त्रिबन्ध..." else "कुम्भक..."
             }
             VoiceCueStyle.BILINGUAL -> when (phase) {
                 PranayamaPhase.INHALE -> "पूरक... Inhale"
                 PranayamaPhase.HOLD_IN -> if (isTriBandhaVoiceEnabled) "कुम्भक... Hold with Tri-Bandha" else "कुम्भक... Hold"
                 PranayamaPhase.EXHALE -> "रेचक... Exhale"
-                PranayamaPhase.HOLD_OUT -> "बाह्य... Rest"
+                PranayamaPhase.HOLD_OUT -> if (isTriBandhaVoiceEnabled) "कुम्भक... Hold with Tri-Bandha" else "कुम्भक... Hold"
             }
             VoiceCueStyle.ENGLISH -> when (phase) {
                 PranayamaPhase.INHALE -> "Inhale"
                 PranayamaPhase.HOLD_IN -> if (isTriBandhaVoiceEnabled) "Hold... Tri-Bandha" else "Hold"
                 PranayamaPhase.EXHALE -> "Exhale"
-                PranayamaPhase.HOLD_OUT -> "Rest"
+                PranayamaPhase.HOLD_OUT -> "Hold"
             }
         }
 
