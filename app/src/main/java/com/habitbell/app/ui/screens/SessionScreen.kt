@@ -351,8 +351,9 @@ private fun LandscapeSessionLayout(
                             )
                         }
 
-                        // Tri-Bandha guidance in Landscape HUD during Antar Kumbhaka
+                        // Tri-Bandha guidance in Landscape HUD during Kumbhaka
                         val bandhaText = phase.bandhaScript
+                        val bandhaEng = phase.bandhaEnglish
                         if (bandhaText != null) {
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
@@ -360,6 +361,16 @@ private fun LandscapeSessionLayout(
                                 style = MaterialTheme.typography.labelSmall,
                                 fontSize = 11.sp,
                                 color = primaryColor.copy(alpha = 0.85f)
+                            )
+                        }
+                        if (bandhaEng != null) {
+                            Spacer(modifier = Modifier.height(1.dp))
+                            Text(
+                                text = bandhaEng,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontSize = 9.5.sp,
+                                fontWeight = FontWeight.Light,
+                                color = primaryColor.copy(alpha = 0.75f)
                             )
                         }
 

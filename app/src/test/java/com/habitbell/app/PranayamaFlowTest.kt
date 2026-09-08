@@ -63,7 +63,8 @@ class PranayamaFlowTest {
     }
 
     /**
-     * Verifies that each phase contains correct classical Sanskrit nomenclature and Devanagari script.
+     * Verifies that each phase contains correct classical Sanskrit nomenclature and Devanagari script,
+     * and that both Antar Kumbhaka and Bahya Kumbhaka include classical Tri-Bandha guidance.
      */
     @Test
     fun testPranayamaPhaseSanskritNomenclature() {
@@ -72,12 +73,33 @@ class PranayamaFlowTest {
 
         assertEquals("Kumbhak", PranayamaPhase.HOLD_IN.sanskritName)
         assertEquals("अभ्यन्तर कुम्भक", PranayamaPhase.HOLD_IN.sanskritScript)
+        assertEquals("त्रिबन्ध (मूलबन्ध • उड्डीयान बन्ध • कूपबन्ध)", PranayamaPhase.HOLD_IN.bandhaScript)
+        assertEquals("Tri-Bandha: Mūla • Uḍḍīyāna • Kūpa", PranayamaPhase.HOLD_IN.bandhaEnglish)
 
         assertEquals("Rechak", PranayamaPhase.EXHALE.sanskritName)
         assertEquals("रेचक", PranayamaPhase.EXHALE.sanskritScript)
 
         assertEquals("Kumbhak", PranayamaPhase.HOLD_OUT.sanskritName)
         assertEquals("बाह्य कुम्भक", PranayamaPhase.HOLD_OUT.sanskritScript)
+        assertEquals("त्रिबन्ध (मूलबन्ध • उड्डीयान बन्ध • कूपबन्ध)", PranayamaPhase.HOLD_OUT.bandhaScript)
+        assertEquals("Tri-Bandha: Mūla • Uḍḍīyāna • Kūpa", PranayamaPhase.HOLD_OUT.bandhaEnglish)
+    }
+
+    /**
+     * Verifies that Tri-Bandha Voice Guidance defaults to enabled and can be toggled via mutation.
+     */
+    @Test
+    fun testTriBandhaGuidanceAndVoiceConfiguration() {
+        val config = DefaultProfiles.PRANAYAMA_HATHA.pranayamaConfig!!
+        assertTrue("Tri-Bandha voice guidance must default to enabled", config.isTriBandhaVoiceEnabled)
+
+        // Disable Tri-Bandha voice guidance
+        val disabled = config.withStepDurations(tribandhaVoiceEnabled = false)
+        assertEquals(false, disabled.isTriBandhaVoiceEnabled)
+
+        // Re-enable Tri-Bandha voice guidance
+        val enabled = disabled.withStepDurations(tribandhaVoiceEnabled = true)
+        assertTrue(enabled.isTriBandhaVoiceEnabled)
     }
 
     /**
