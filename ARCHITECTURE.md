@@ -97,8 +97,8 @@ The audio architecture guarantees high-fidelity, boundary-free sound reproductio
   - Habit Bell eliminates jarring transitions through an unhurried, sweet, soft, high-frequency female voice profile matching the gentle, revered tonal swara of Bollywood singing legend **Lata Mangeshkar**.
 - **Voice Profile Standard & Mastered Assets**:
   - **Acoustic Profile**: Natural high-frequency swara (`pitch: +52Hz`), meditative cadence (`rate: -45%` / `0.55x`), clean yogic pronunciation, and whisper-soft default gain (`0.52f`).
-  - **Option 1 (Only Sanskrit)**: Traditional Sanskrit sacred cues (`R.raw.pranayama_purak_sanskrit`, `R.raw.pranayama_kumbhak_sanskrit`, `R.raw.pranayama_rechak_sanskrit`, `R.raw.pranayama_bahya_sanskrit`).
-  - **Option 2 (Sanskrit + English)**: Bilingual cues (`R.raw.pranayama_purak_bilingual`, `R.raw.pranayama_kumbhak_bilingual`, `R.raw.pranayama_rechak_bilingual`, `R.raw.pranayama_bahya_bilingual`).
+  - **Option 1 (Only Sanskrit)**: Traditional Sanskrit sacred cues (`R.raw.pranayama_purak_sanskrit`, `R.raw.pranayama_kumbhak_sanskrit`, `R.raw.pranayama_rechak_sanskrit`). Both internal (*Antar*) and external (*Bahya*) retention phases share the melodious *Kumbhak* cue per authentic yogic practice.
+  - **Option 2 (Sanskrit + English)**: Bilingual cues (`R.raw.pranayama_purak_bilingual`, `R.raw.pranayama_kumbhak_bilingual`, `R.raw.pranayama_rechak_bilingual`). Both retention phases articulate *Kumbhak... Hold*.
   - **Anti-Startle Lead Delay**: Inserts a 120ms gentle delay after ducking begins before audio playback, letting ambient music settle before the voice begins.
   - **Cross-Subsystem Reuse Guarantee**: This voice profile specification (`hi-IN-SwaraNeural`, `+52Hz`, `-45%` tempo, gentle soothing swara) is established as the architectural standard and will be reused across subsequent mindfulness routines, including the 12 classical mantras and breath cues of **Surya Namaskar**.
 
