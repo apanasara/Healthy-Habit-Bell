@@ -98,9 +98,10 @@ The audio architecture guarantees high-fidelity, boundary-free sound reproductio
 - **Voice Profile Standard & Mastered Assets**:
   - **Acoustic Profile**: Natural high-frequency swara (`pitch: +52Hz`), meditative cadence (`rate: -45%` / `0.55x`), clean yogic pronunciation, and whisper-soft default gain (`0.52f`).
   - **Option 1 (Only Sanskrit)**: Traditional Sanskrit sacred cues (`R.raw.pranayama_purak_sanskrit`, `R.raw.pranayama_kumbhak_sanskrit`, `R.raw.pranayama_rechak_sanskrit`). Both internal (*Antar*) and external (*Bahya*) retention phases share the melodious *Kumbhak* cue per authentic yogic practice.
-  - **Option 2 (Sanskrit + English)**: Bilingual cues (`R.raw.pranayama_purak_bilingual`, `R.raw.pranayama_kumbhak_bilingual`, `R.raw.pranayama_rechak_bilingual`). Both retention phases articulate *Kumbhak... Hold*.
+  - **Option 2 (Sanskrit + English)**: Bilingual cues (`R.raw.pranayama_purak_bilingual`, `R.raw.pranayama_kumbhak_bilingual`, `R.raw.pranayama_rechak_bilingual`). Spoken with a streamlined, natural gap between the Sanskrit term and the English directive (`rate: -30%`, ~2.8s–3.0s duration).
+  - **Anti-Clipping Step Duration Guard**: In `PranayamaVoiceGuide.kt`, when a phase's allocated duration is small (< 4 seconds, such as a 2s or 3s Puraka), Option 2 automatically falls back to the concise authentic Sanskrit cue (~2.0s). This guarantees that English phrases like "Inhale" or "Exhale" are never abruptly cut in half when the timer transitions to the subsequent step.
   - **Anti-Startle Lead Delay**: Inserts a 120ms gentle delay after ducking begins before audio playback, letting ambient music settle before the voice begins.
-  - **Cross-Subsystem Reuse Guarantee**: This voice profile specification (`hi-IN-SwaraNeural`, `+52Hz`, `-45%` tempo, gentle soothing swara) is established as the architectural standard and will be reused across subsequent mindfulness routines, including the 12 classical mantras and breath cues of **Surya Namaskar**.
+  - **Cross-Subsystem Reuse Guarantee**: This voice profile specification (`hi-IN-SwaraNeural`, `+52Hz`, gentle soothing swara) is established as the architectural standard and will be reused across subsequent mindfulness routines, including the 12 classical mantras and breath cues of **Surya Namaskar**.
 
 ---
 
