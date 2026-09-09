@@ -568,15 +568,34 @@ class TimerEngine(
                     currentRound = pranayamaRound,
                     currentPranayamaPhase = nextStep.phase,
                     phaseRemainingSeconds = nextStep.durationSeconds,
-                    phaseDurationSeconds = nextStep.durationSeconds
+                    phaseDurationSeconds = nextStep.durationSeconds,
+                    isVisualAlertActive = visualAlertRemainingTicks > 0,
+                    isDimmed = visualAlertRemainingTicks == 0
                 )
             }
         } else {
-            // Decrement active phase countdown
+            // Decrement active phase countdown with battery-optimized dimming
+            val visualAlert: Boolean
+            val dimmed: Boolean
+            if (visualAlertRemainingTicks > 0) {
+                visualAlertRemainingTicks--
+                visualAlert = true
+                dimmed = false
+            } else if (newPhaseSec == 1) {
+                // 1 second before next breath phase (Inhale -> Hold -> Exhale): un-dim as visual cue
+                visualAlert = true
+                dimmed = false
+            } else {
+                visualAlert = false
+                dimmed = true
+            }
+
             _state.update {
                 it.copy(
                     remainingSeconds = newRemaining,
-                    phaseRemainingSeconds = newPhaseSec
+                    phaseRemainingSeconds = newPhaseSec,
+                    isVisualAlertActive = visualAlert,
+                    isDimmed = dimmed
                 )
             }
         }
@@ -620,15 +639,34 @@ class TimerEngine(
                     remainingSeconds = newRemaining,
                     currentRound = compoundRound,
                     currentPose = nextPose,
-                    poseRemainingSeconds = nextPose.durationSeconds
+                    poseRemainingSeconds = nextPose.durationSeconds,
+                    isVisualAlertActive = visualAlertRemainingTicks > 0,
+                    isDimmed = visualAlertRemainingTicks == 0
                 )
             }
         } else {
-            // Decrement active pose countdown
+            // Decrement active pose countdown with battery-optimized dimming
+            val visualAlert: Boolean
+            val dimmed: Boolean
+            if (visualAlertRemainingTicks > 0) {
+                visualAlertRemainingTicks--
+                visualAlert = true
+                dimmed = false
+            } else if (newPoseSec == 1) {
+                // 1 second before next posture transition: un-dim as visual cue
+                visualAlert = true
+                dimmed = false
+            } else {
+                visualAlert = false
+                dimmed = true
+            }
+
             _state.update {
                 it.copy(
                     remainingSeconds = newRemaining,
-                    poseRemainingSeconds = newPoseSec
+                    poseRemainingSeconds = newPoseSec,
+                    isVisualAlertActive = visualAlert,
+                    isDimmed = dimmed
                 )
             }
         }

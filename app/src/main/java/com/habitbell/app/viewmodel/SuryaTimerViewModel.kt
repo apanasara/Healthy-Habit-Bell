@@ -113,16 +113,26 @@ class SuryaTimerViewModel(application: Application) : AndroidViewModel(applicati
                     )
                 }
 
-                // Seed presets (slow, moderate, fast)
+                // Seed presets (slow, moderate, fast, custom)
                 val presets = listOf(
                     PresetEntity("slow", JsonUtil.toJson(mapOf("default_duration" to 10))),
                     PresetEntity("moderate", JsonUtil.toJson(mapOf("default_duration" to 5))),
-                    PresetEntity("fast", JsonUtil.toJson(mapOf("default_duration" to 3)))
+                    PresetEntity("fast", JsonUtil.toJson(mapOf("default_duration" to 3))),
+                    PresetEntity("custom", JsonUtil.toJson(mapOf("default_duration" to 7)))
                 )
                 presets.forEach { presetDao.insert(it) }
             }
         }
     }
+
+    /**
+     * Public reactive stream exposing the current unified voice cue mode across all steps.
+     */
+    val currentVoiceCueMode: StateFlow<VoiceCueMode> = steps
+        .map { stepList ->
+            stepList.firstOrNull()?.voiceCueMode ?: VoiceCueMode.STEP_NAME
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), VoiceCueMode.STEP_NAME)
 
     /**
      * Updates an existing pose step in the persistent Room database.
@@ -156,6 +166,21 @@ class SuryaTimerViewModel(application: Application) : AndroidViewModel(applicati
             val allSteps = stepDao.getAllSteps().first()
             allSteps.forEach { step ->
                 stepDao.update(step.copy(durationSeconds = durationSeconds))
+            }
+        }
+    }
+
+    /**
+     * Applies a uniform voice guidance mode across all steps in the sequence.
+     * Ensures voice cues are not edited per-step, but uniformly across all 12 postures.
+     *
+     * @param mode Selected [VoiceCueMode] to apply globally to all steps.
+     */
+    fun applyVoiceCueModeToAllSteps(mode: VoiceCueMode) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val allSteps = stepDao.getAllSteps().first()
+            allSteps.forEach { step ->
+                stepDao.update(step.copy(voiceCueMode = mode))
             }
         }
     }

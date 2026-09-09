@@ -110,9 +110,10 @@ class MainActivity : FragmentActivity() {
                 }
             }
 
-            // Keep screen awake dynamically while session is running and Display Mode is enabled
-            LaunchedEffect(sessionState.status, uiState.isDisplayMode) {
-                val shouldKeepAwake = uiState.isDisplayMode && sessionState.status == SessionStatus.RUNNING
+            // Keep screen awake dynamically while session is running to prevent Android OS display sleep
+            // from terminating the real-time Screen Mirroring capture encoder or dropping Chromecast streams
+            LaunchedEffect(sessionState.status) {
+                val shouldKeepAwake = sessionState.status == SessionStatus.RUNNING
                 viewModel.batteryOptimizer.applyScreenAwake(this@MainActivity, shouldKeepAwake)
             }
 
@@ -286,7 +287,11 @@ class MainActivity : FragmentActivity() {
                             },
                             activeTab = uiState.settingsDrawerTab,
                             onTabSelected = { viewModel.setSettingsDrawerTab(it) },
-                            onToggleSunMoonTheme = { viewModel.toggleSunMoonTheme() }
+                            onToggleSunMoonTheme = { viewModel.toggleSunMoonTheme() },
+                            onOpenSuryaEditor = {
+                                viewModel.openSettingsDrawer(false)
+                                viewModel.navigateTo(AppScreen.SURYA_TIMER)
+                            }
                         )
                     }
 
@@ -376,6 +381,18 @@ class MainActivity : FragmentActivity() {
                 val timerName = intent.getStringExtra("timerName") ?: ""
                 val duration = intent.getStringExtra("timerDuration")?.toIntOrNull() ?: 0
                 viewModel.startVoiceTimer(duration, timerName)
+            }
+
+            intent.getStringExtra("screen") == "surya" ||
+            (dataUri != null && dataUri.scheme == "habitbell" && dataUri.host == "surya") -> {
+                viewModel.navigateTo(AppScreen.SURYA_TIMER)
+            }
+
+            intent.getStringExtra("screen") == "surya_settings" ||
+            (dataUri != null && dataUri.scheme == "habitbell" && dataUri.host == "surya_settings") -> {
+                val surya = com.habitbell.app.data.default.DefaultProfiles.SURYA_NAMASKAR
+                viewModel.startProfileSession(surya)
+                viewModel.openSettingsDrawer(true, com.habitbell.app.ui.viewmodel.SettingsDrawerTab.TIMER)
             }
         }
     }

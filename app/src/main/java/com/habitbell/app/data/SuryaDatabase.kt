@@ -25,6 +25,7 @@ import androidx.room.RoomDatabase
 import androidx.room.TypeConverter
 import androidx.room.TypeConverters
 import com.habitbell.app.audio.VoiceCueMode
+import kotlinx.coroutines.flow.first
 import com.habitbell.app.data.dao.PresetDao
 import com.habitbell.app.data.dao.SettingDao
 import com.habitbell.app.data.dao.StepDao
@@ -95,6 +96,51 @@ abstract class SuryaDatabase : RoomDatabase() {
                     .fallbackToDestructiveMigration()
                     .build()
                     .also { INSTANCE = it }
+            }
+        }
+
+        /**
+         * Pre-populates the 12 classical Sun Salutation postures and speed presets if database table is empty.
+         *
+         * Architectural Role: Initializes the Surya Namaskar sequence database upon initial access.
+         * Concurrency: Must be invoked within a coroutine context, querying and mutating Room on an IO dispatcher.
+         *
+         * @param context Application context used to obtain database instance.
+         */
+        suspend fun seedIfEmpty(context: Context) {
+            val db = getInstance(context)
+            val stepDao = db.stepDao()
+            val existing = stepDao.getAllSteps().first()
+            if (existing.isEmpty()) {
+                val defaultPoses = com.habitbell.app.data.default.DefaultProfiles.SURYA_NAMASKAR.compoundConfig?.poses ?: emptyList()
+                defaultPoses.forEachIndexed { idx, pose ->
+                    stepDao.insert(
+                        StepEntity(
+                            id = 0L,
+                            name = "${pose.name} (${pose.sanskritName})",
+                            orderIdx = idx,
+                            isEnabled = true,
+                            voiceCueMode = VoiceCueMode.STEP_NAME,
+                            audioCue = "surya_${idx + 1}",
+                            mantraEnabled = true,
+                            assetRef = if (idx == 0 || idx == 11) "avd_yoga_pranamasana" else "",
+                            durationSeconds = pose.durationSeconds,
+                            repetition = 1,
+                            puraka = 0,
+                            kumbhaka = 0,
+                            rekha = 0
+                        )
+                    )
+                }
+
+                val presetDao = db.presetDao()
+                val presets = listOf(
+                    PresetEntity("slow", com.habitbell.app.util.JsonUtil.toJson(mapOf("default_duration" to 10))),
+                    PresetEntity("moderate", com.habitbell.app.util.JsonUtil.toJson(mapOf("default_duration" to 5))),
+                    PresetEntity("fast", com.habitbell.app.util.JsonUtil.toJson(mapOf("default_duration" to 3))),
+                    PresetEntity("custom", com.habitbell.app.util.JsonUtil.toJson(mapOf("default_duration" to 7)))
+                )
+                presets.forEach { presetDao.insert(it) }
             }
         }
     }

@@ -153,10 +153,23 @@ The heartbeat of the mindfulness runtime is a deterministic finite state machine
 - **Host Activity Architecture**: `MainActivity` inherits from `androidx.fragment.app.FragmentActivity` to provide the `FragmentManager` required by `MediaRouteButton` to display native Google Cast route picker dialogs across all Android platforms without runtime crashes.
 - **`HabitBellChooserDialogFragment` & `HabitBellControllerDialogFragment`**: Public top-level subclasses of `MediaRouteChooserDialogFragment` and `MediaRouteControllerDialogFragment` implementing zero-arg public constructors and theme bundle arguments (`HabitBellMediaRouteTheme_Dark` / `Light`). This strictly complies with Android's `FragmentManager` contract and prevents `IllegalStateException: Fragment ... must be a public static class` crashes upon Cast icon taps.
 
-#### 3. Screen Mirroring Subsystem (Miracast / Wi-Fi Display / Any TV)
+#### 3. Screen Mirroring Subsystem (Miracast / Wi-Fi Display / Any TV / Chromecast)
 - **Universal Living Room Projection (FLAW-3)**: Provides 1-tap integration with Android OS Screen Mirroring (`android.provider.Settings.ACTION_CAST_SETTINGS` with fallback to `ACTION_WIRELESS_SETTINGS`) in `SettingsDrawer.kt`.
-- **Zero-Latency Display Fallback**: Bridges non-Chromecast devices (Miracast dongles, projectors, FireTV, Roku, smart monitors) where Google Cast protocol is unavailable.
+- **Zero-Internet Local Operation**: Unlike Google Cast SDK which mandates an active internet connection to download cloud receiver shells from Google servers, Screen Mirroring operates 100% peer-to-peer over local Wi-Fi, making it the bulletproof market standard for offline classes, studios, and living rooms without internet access.
 - **Full Visual Fidelity**: Projects the phone's full Compose canvas directly onto the TV screen, displaying real-time Pranayama breathing animations (blooming lotus, expanding breath ring), live countdowns, and Surya Namaskar posture cards with zero cloud reliance.
+- **Hardware Backlight Decoupling & Battery Conservation (Requirement C.1)**:
+  - During active countdowns across all profile types (Linear, Pranayama, Surya Namaskar, Compound), the app sets `WindowManager.LayoutParams.screenBrightness = 0.01f` (1% minimal hardware backlight).
+  - Crucially, setting `screenBrightness` modulates only the phone's physical display panel LED/OLED driver; it does **not** alter the GPU rendering buffer (`SurfaceFlinger`).
+  - As a result, the mirrored TV screen receives uncompromised pixel color and luminance, remaining at **100% full, vivid brightness**, while the smartphone draws minimal battery current and remains cool to the touch.
+- **Unconditional Screen Awake Lock (Prevents 3–4 Min "Connection Lost")**:
+  - `MainActivity` dynamically binds `FLAG_KEEP_SCREEN_ON` for the entire duration of `SessionStatus.RUNNING`.
+  - This prevents Android OS display sleep from turning the screen off and terminating the real-time H.264 screen capture encoder (`MediaProjection` / Cast Mirroring pipeline).
+- **Low-Latency Wi-Fi Lock (Prevents 26-Min Doze Disconnect)**:
+  - `CentralSessionHandler` acquires `WIFI_MODE_FULL_LOW_LATENCY` (`WifiLock`) via `BatteryOptimizer` on session start.
+  - This prevents the Wi-Fi radio from entering DTIM sleep during prolonged stationary sessions, eliminating packet loss and stream stalling beyond 25–30 minutes.
+- **Interactive Touch Grace Period**:
+  - Any tap on the Compose root window triggers `HabitBellViewModel.onUserTouchDisplay()`, which dispatches `TimerEngine.wakeScreenTemporarily(6)`.
+  - The phone screen physically brightens for 6 seconds for effortless user interaction, then automatically re-dims to 1% while the TV stays continuously illuminated.
 
 #### 4. Local TV WebCast (`LocalCastWebServer.kt` & `assets/tv/index.html`)
 - **Zero-Cloud Local Casting**: Embedded lightweight multi-threaded HTTP server running on port `8888`.
@@ -526,13 +539,21 @@ The Surya Namaskar subsystem provides comprehensive data persistence, animated v
   - `PresetDao`: CRUD access for speed preset entities.
   - `SettingDao`: Key-value query and mutation with reactive `getAllSettings(): Flow<List<SettingEntity>>`.
 
-#### 2. Presentation Layer & Animated Silhouette Visuals (`SuryaTimerScreen.kt`, `AnimatedPoseView.kt`)
-- **Reactive UI Flow**: `SuryaTimerViewModel` exposes `steps: StateFlow<List<StepUiModel>>` mapped directly from `StepDao.getAllSteps()`. On initial database creation, `seedDefaultDataIfEmpty()` automatically seeds all 12 classical postures from `DefaultProfiles.SURYA_NAMASKAR`.
-- **Speed Presets**: Integrated `FilterChip` selectors for Slow (10s), Moderate (5s), and Fast (3s) immediately recalculate all active posture durations across the sequence.
+#### 2. Presentation Layer, Settings Sheet & Animated Silhouette Visuals (`SuryaTimerScreen.kt`, `SettingsDrawer.kt`, `AnimatedPoseView.kt`)
+- **Reactive UI Flow**: `SuryaTimerViewModel` exposes `steps: StateFlow<List<StepUiModel>>` mapped directly from `StepDao.getAllSteps()`. On initial database creation, `SuryaDatabase.seedIfEmpty(context)` automatically seeds all 12 classical postures from `DefaultProfiles.SURYA_NAMASKAR`.
+- **Dedicated Settings Drawer Integration (`SuryaSettingsSheet`)**:
+  - Embedded within `SettingsDrawer.kt` when opening settings for `TimerType.COMPOUND` or profiles named "Surya Namaskar".
+  - **Speed Presets**: Fast 3s, Moderate 5s, and Slow 10s chips that immediately update all 12 posture durations in Room SQLite on `Dispatchers.IO`.
+  - **Target Practice Rounds**: Interactive steppers (`-1`, `+1`) and quick-select chips (`3`, `5`, `12`, `24`, `108` rounds), displaying total asanas count (e.g. 5 rounds = 60 asanas).
+  - **12 Posture Sequence Preview**: Illustrated list displaying the sequence of postures with duration tags and vector silhouette artwork (`R.drawable.avd_yoga_pranamasana`).
+  - **Fullscreen Editor Transition**: Direct button navigation to `AppScreen.SURYA_TIMER` (`SuryaTimerScreen`) for modifying per-posture Sanskrit voice cues, durations, and solar mantra audio playback.
+  - **Companion Watch Synchronization**: Quick-sync button invoking `SuryaSyncManager.pushSyncToWatch()` to send current sequence configuration to Wear OS devices over the Wearable Data Layer API.
+  - **Background Ambient Soundscape**: Toggle and source selectors (ॐ Aum drone, YouTube audio, custom audio file) with real-time volume slider.
+  - **Signature Acoustic Identity**: Audition buttons for Option C separator chime, Tibetan Singing Bowl / Temple Gong, and quick 10-second demo session.
 - **Animated Silhouette Rendering (`AnimatedPoseView.kt`)**:
   - Bridges Android's native `AnimatedVectorDrawable` (`avd_yoga_pranamasana.xml`) into Jetpack Compose via `AndroidView` with `ImageView`.
   - Employs `(drawable as? Animatable)?.start()` inside `DisposableEffect` for lifecycle-aware, zero-leak entrance animations.
-  - Two concurrent visual animations: 12dp vertical rise translation (`translateY` 12dp $\rightarrow$ 0dp over 800ms) paired with progressive fill opacity (`fillAlpha` 0.0 $\rightarrow$ 1.0 over 600ms) with quadratic deceleration.
+  - Two concurrent visual animations: 12dp vertical rise translation (`translateY` 12dp → 0dp over 800ms) paired with progressive fill opacity (`fillAlpha` 0.0 → 1.0 over 600ms) with quadratic deceleration.
 
 #### 3. Companion Wear OS Synchronization (`SuryaSyncManager.kt`)
 - **Wearable Data Layer Client**: Pushes serialized timer configuration payloads across the Google Play Services `Wearable.getDataClient(context)` bridge.

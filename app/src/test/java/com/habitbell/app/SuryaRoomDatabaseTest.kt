@@ -53,6 +53,17 @@ class SuryaRoomDatabaseTest {
     }
 
     /**
+     * Verifies that [VoiceCueMode] provides accurate user-facing display names for global selection.
+     */
+    @Test
+    fun testVoiceCueModeDisplayName() {
+        assertEquals("Silent / Bell", VoiceCueMode.NONE.displayName)
+        assertEquals("Breath Flow", VoiceCueMode.PRANIC.displayName)
+        assertEquals("Asana Name", VoiceCueMode.STEP_NAME.displayName)
+        assertEquals("Solar Mantra", VoiceCueMode.SLOKA.displayName)
+    }
+
+    /**
      * Verifies creation and default fields of [StepEntity].
      */
     @Test
@@ -81,17 +92,24 @@ class SuryaRoomDatabaseTest {
     }
 
     /**
-     * Verifies [PresetEntity] creation and JSON structure.
+     * Verifies all 4 [PresetEntity] presets (slow, moderate, fast, custom) creation and JSON serialization.
      */
     @Test
     fun testPresetEntitySerialization() {
-        val preset = PresetEntity(
-            name = "moderate",
-            jsonMap = JsonUtil.toJson(mapOf("default_duration" to 5))
-        )
+        val slow = PresetEntity("slow", JsonUtil.toJson(mapOf("default_duration" to 10)))
+        val moderate = PresetEntity("moderate", JsonUtil.toJson(mapOf("default_duration" to 5)))
+        val fast = PresetEntity("fast", JsonUtil.toJson(mapOf("default_duration" to 3)))
+        val custom = PresetEntity("custom", JsonUtil.toJson(mapOf("default_duration" to 7)))
 
-        assertEquals("moderate", preset.name)
-        assertTrue(preset.jsonMap.contains("\"default_duration\":5"))
+        assertEquals("slow", slow.name)
+        assertEquals("moderate", moderate.name)
+        assertEquals("fast", fast.name)
+        assertEquals("custom", custom.name)
+
+        assertTrue(slow.jsonMap.contains("\"default_duration\":10"))
+        assertTrue(moderate.jsonMap.contains("\"default_duration\":5"))
+        assertTrue(fast.jsonMap.contains("\"default_duration\":3"))
+        assertTrue(custom.jsonMap.contains("\"default_duration\":7"))
     }
 
     /**

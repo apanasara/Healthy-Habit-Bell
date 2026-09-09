@@ -331,10 +331,11 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     /**
-     * Notifies the display automation engine of user touch activity to reset the flat inactivity countdown.
+     * Notifies the display automation engine of user touch activity and un-dims the screen for 6 seconds.
      */
     fun onUserTouchDisplay() {
         displayAutomationManager.notifyUserTouched()
+        engine.wakeScreenTemporarily(6)
     }
 
     /**
