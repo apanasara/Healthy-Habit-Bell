@@ -2,6 +2,7 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
+    id("com.google.devtools.ksp")
 }
 
 android {
@@ -53,6 +54,8 @@ android {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
         }
     }
+
+    sourceSets["main"].res.srcDir("${buildDir}/generated/animated_vectors")
 }
 
 kotlin {
@@ -89,9 +92,21 @@ dependencies {
 
     implementation("androidx.datastore:datastore-preferences:1.1.1")
 
+    // Room Database (Surya Namaskar steps, presets, settings persistence)
+    val roomVersion = "2.6.1"
+    implementation("androidx.room:room-runtime:$roomVersion")
+    implementation("androidx.room:room-ktx:$roomVersion")
+    ksp("androidx.room:room-compiler:$roomVersion")
+
     // Android Auto Car App Library & Media Browser Service (User Requirement 4)
     implementation("androidx.car.app:app:1.4.0")
     implementation("androidx.media:media:1.7.0")
+
+    // Wear OS Data Layer & Companion Sync (Surya Namaskar phone ↔ watch)
+    implementation("com.google.android.gms:play-services-wearable:18.1.0")
+
+    // JSON serialization for cross-device sync payloads
+    implementation("com.google.code.gson:gson:2.10.1")
 
     // Google Cast Framework & MediaRouter for direct pure app TV streaming
     implementation("com.google.android.gms:play-services-cast-framework:22.0.0")
@@ -107,4 +122,20 @@ dependencies {
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
+}
+
+// Task to generate AnimatedVectorDrawable XML files from SVG resources
+tasks.register<Copy>("generateAnimatedVectors") {
+    description = "Generate AnimatedVectorDrawable XML from SVGs"
+    from("src/main/res/drawable") {
+        include("*.svg")
+    }
+    into("${buildDir}/generated/animated_vectors")
+}
+
+// Ensure the task runs before preBuild so generated resources are available
+tasks.whenTaskAdded {
+    if (name == "preBuild") {
+        dependsOn("generateAnimatedVectors")
+    }
 }

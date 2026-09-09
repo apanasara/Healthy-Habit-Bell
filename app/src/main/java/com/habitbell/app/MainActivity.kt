@@ -215,6 +215,15 @@ class MainActivity : FragmentActivity() {
                                 }
                             )
                         }
+
+                        AppScreen.SURYA_TIMER -> {
+                            val suryaViewModel: com.habitbell.app.viewmodel.SuryaTimerViewModel =
+                                androidx.lifecycle.viewmodel.compose.viewModel()
+                            com.habitbell.app.ui.SuryaTimerScreen(
+                                viewModel = suryaViewModel,
+                                onBack = { viewModel.navigateTo(AppScreen.HOME) }
+                            )
+                        }
                     }
 
                     // Settings Bottom Sheet Drawer

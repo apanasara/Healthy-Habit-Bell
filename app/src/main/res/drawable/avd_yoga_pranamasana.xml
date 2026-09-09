@@ -1,0 +1,79 @@
+<!--
+  avd_yoga_pranamasana.xml
+  ─────────────────────────────────────────────────────────────────────────────
+  Architectural Role:
+    AnimatedVectorDrawable (AVD) orchestrating a "reveal-rise" appearance
+    animation for the side-profile Pranamasana (Prayer Pose / प्रणामासन)
+    filled silhouette.
+
+  Animation Strategy:
+    For a filled silhouette (unlike the previous stroke-only version),
+    trimPathEnd draw-in is not applicable. Instead, two concurrent
+    animations produce an elegant entrance:
+
+    1. fillAlpha (on "silhouette" path):
+       0.0 → 1.0 over 600 ms with decelerate_quad interpolation.
+       The figure materialises from invisible to fully opaque.
+
+    2. translateY (on "figure" group):
+       12 → 0 over 800 ms with decelerate_quad interpolation.
+       A subtle 12 dp upward drift gives a grounded, rising-from-earth
+       quality befitting the Prayer Pose's meditative grounding.
+
+  Component Relationships:
+    - References: @drawable/yoga_pranamasana (base VectorDrawable).
+    - Used by: CompoundPoseCard / SessionScreen composables when the
+      Pranamasana pose becomes active in Surya Namaskar compound sequences.
+
+  Lifecycle:
+    - Compile-time resource; animation triggered programmatically via
+      (drawable as Animatable).start() in the presentation layer.
+  ─────────────────────────────────────────────────────────────────────────────
+-->
+<animated-vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:drawable="@drawable/yoga_pranamasana">
+
+    <!--
+      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      Animation 1 — RISE (group "figure")
+      Gentle upward translation: the silhouette rises 12 dp into its
+      final position, evoking the grounding stability of Pranamasana.
+      Duration: 800 ms with decelerate easing for a natural settle.
+      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    -->
+    <target android:name="figure">
+        <aapt:attr name="android:animation">
+            <objectAnimator
+                android:propertyName="translateY"
+                android:valueFrom="12"
+                android:valueTo="0"
+                android:valueType="floatType"
+                android:duration="800"
+                android:startOffset="0"
+                android:interpolator="@android:interpolator/decelerate_quad" />
+        </aapt:attr>
+    </target>
+
+    <!--
+      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      Animation 2 — MATERIALISE (path "silhouette")
+      Fill alpha fades from fully transparent (0) to fully opaque (1).
+      Duration: 600 ms, slightly shorter than the rise so the figure
+      is fully visible before the vertical settle completes.
+      ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    -->
+    <target android:name="silhouette">
+        <aapt:attr name="android:animation">
+            <objectAnimator
+                android:propertyName="fillAlpha"
+                android:valueFrom="0"
+                android:valueTo="1"
+                android:valueType="floatType"
+                android:duration="600"
+                android:startOffset="0"
+                android:interpolator="@android:interpolator/decelerate_quad" />
+        </aapt:attr>
+    </target>
+
+</animated-vector>

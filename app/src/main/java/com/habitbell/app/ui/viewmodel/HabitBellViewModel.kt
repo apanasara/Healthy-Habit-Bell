@@ -29,7 +29,10 @@ enum class AppScreen {
     SESSION,
 
     /** Custom profile creation and configuration editor screen. */
-    CREATE_TIMER
+    CREATE_TIMER,
+
+    /** Surya Namaskar sequence editor and companion synchronization screen. */
+    SURYA_TIMER
 }
 
 /**
