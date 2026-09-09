@@ -140,7 +140,7 @@ The heartbeat of the mindfulness runtime is a deterministic finite state machine
 
 #### 2. Google Cast Framework (`com.habitbell.app.cast`)
 - **Native Cast Integration**: Pure application TV streaming without screen mirroring using Google Play Services Cast Framework (`play-services-cast-framework:22.0.0`).
-- **`CastOptionsProvider.kt`**: Registers the official Default Media Receiver application ID (`CastMediaControlIntent.DEFAULT_MEDIA_RECEIVER_APPLICATION_ID` / `CC1AD845`).
+- **`CastOptionsProvider.kt`**: Configures Google Cast framework options, bound to the registered Habit Bell Custom Web Receiver Application ID (`4662865D`) targeting `https://apanasara.github.io/Healthy-Habit-Bell/`, with automatic fallback to Google's Default Media Receiver (`CC1AD845`).
 - **`HabitBellCastManager.kt`**: Singleton session manager coordinating discovery, device connection, and media metadata transmission to Chromecast, Sony Bravia, and Google Cast-enabled TVs.
 - **Cast Feedback Loop & 15-Second Reconnect Resolution (FLAW-2)**:
   - Decouples Cast player state from false pause events: In `RemoteMediaClient.Callback`, transient states (`PLAYER_STATE_BUFFERING`, `PLAYER_STATE_LOADING`, `PLAYER_STATE_IDLE`, `PLAYER_STATE_UNKNOWN`) are explicitly ignored. Only genuine user transitions (`PLAYER_STATE_PLAYING` and `PLAYER_STATE_PAUSED`) dispatch to `onRemotePlaybackAction`.
