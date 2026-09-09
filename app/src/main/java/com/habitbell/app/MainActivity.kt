@@ -56,6 +56,10 @@ class MainActivity : FragmentActivity() {
         }
 
         setContent {
+            // Direct launch check: bypass animated splash transition for voice commands and deep links
+            val isDirectIntent = intent?.action != null && intent?.action != android.content.Intent.ACTION_MAIN
+            var showSplashOverlay by remember { mutableStateOf(!isDirectIntent) }
+
             // Collect reactive state streams with lifecycle awareness to prevent unnecessary background recomposition
             val uiState by viewModel.uiState.collectAsStateWithLifecycle()
             val sessionState by viewModel.sessionState.collectAsStateWithLifecycle()
@@ -329,6 +333,19 @@ class MainActivity : FragmentActivity() {
                         } else {
                             viewModel.exitSessionToHome()
                         }
+                    }
+
+                    // In-App Branded Entry Splash Screen overlay with serene fade-out handoff
+                    androidx.compose.animation.AnimatedVisibility(
+                        visible = showSplashOverlay,
+                        enter = androidx.compose.animation.EnterTransition.None,
+                        exit = androidx.compose.animation.fadeOut(
+                            animationSpec = androidx.compose.animation.core.tween(durationMillis = 400)
+                        )
+                    ) {
+                        SplashScreen(
+                            onTimeout = { showSplashOverlay = false }
+                        )
                     }
                 }
             }

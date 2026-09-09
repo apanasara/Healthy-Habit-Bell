@@ -130,3 +130,11 @@ opt.disableIdleTimeout = true; // Prevents Chromecast from returning to ambient 
 opt.maxInactivity = 14400;      // 4 hours maximum session duration
 ```
 This ensures uninterrupted meditation, breathwork, and yoga sessions of any duration.
+
+---
+
+## Production Release Checklist: Publishing on Google Cast Console
+* **Development Phase**: Application ID `4662865D` operates in Developer Mode, verified on authorized test devices.
+* **On App Completion (MANDATORY)**: As soon as the final production build is completed, log into the [Google Cast Developer Console](https://cast.google.com/publish/#/overview) and click **`PUBLISH`** next to Application ID `4662865D`.
+* This activates global consumer access without device whitelisting, enabling any user downloading Habit Bell from Google Play to cast immediately to any TV worldwide.
+

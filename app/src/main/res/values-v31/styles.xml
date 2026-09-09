@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Architectural Role: Android 12+ (API 31+) Theme Overlay for Native SplashScreen API.
+  Lifecycle: Bound to application and activity lifecycles on API 31+.
+-->
+<resources>
+    <style name="Theme.HabitBell" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowBackground">@drawable/splash_background</item>
+        <item name="android:colorBackground">#FAF6EE</item>
+        <item name="colorBackgroundFloating">#FFFDF9</item>
+        <item name="colorPrimary">#D97706</item>
+        <item name="mediaRouteTheme">@style/Theme.MediaRouter.Light</item>
+
+        <!-- Android 12+ Native SplashScreen Configuration -->
+        <item name="android:windowSplashScreenBackground">#060709</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_splash_logo</item>
+        <item name="android:windowSplashScreenIconBackgroundColor">#060709</item>
+    </style>
+</resources>
