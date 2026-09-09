@@ -100,9 +100,13 @@ class CentralSessionHandler(private val application: Application) {
     /** Gentle lady voice guidance coordinator for Pranayama breathwork. */
     val voiceGuide: PranayamaVoiceGuide = PranayamaVoiceGuide(application, bgMusicManager)
 
+    /** Voice guidance player for Surya Namaskar Asana cues and Solar Mantras. */
+    val suryaVoicePlayer: com.habitbell.app.audio.SuryaVoicePlayer = com.habitbell.app.audio.SuryaVoicePlayer(application, bgMusicManager)
+
     /** Core 1Hz heartbeat finite state machine governing timer countdowns. */
     val engine: TimerEngine = TimerEngine(audioManager, hapticManager).apply {
         voiceGuide = this@CentralSessionHandler.voiceGuide
+        suryaVoicePlayer = this@CentralSessionHandler.suryaVoicePlayer
     }
 
     /** Unified screen display automation orchestrator (Pocket, Car, TV, and Watch modes). */

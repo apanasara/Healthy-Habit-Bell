@@ -681,6 +681,68 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     /**
+     * Persists and live-updates active Surya Namaskar timer sequence parameters, including
+     * 12 posture durations, target repetition rounds, speed preset, custom pace, and global voice guidance.
+     *
+     * If Surya Namaskar is the currently active or displayed session, the updated profile is immediately
+     * dynamically reloaded into the [TimerEngine] so the timer display, countdown, and voice cues reflect the changes instantly.
+     *
+     * @param steps List of [com.habitbell.app.data.model.StepEntity] representing the 12 postures and timings.
+     * @param targetRounds Total repetition cycles configured for the session.
+     * @param speedPreset Active speed preset identifier ("slow", "moderate", "fast", "custom").
+     * @param customPaceSeconds Custom pace seconds applied across postures.
+     * @param voiceCueMode Selected global voice guidance mode ([com.habitbell.app.audio.VoiceCueMode]).
+     */
+    fun updateActiveSuryaSettings(
+        steps: List<com.habitbell.app.data.model.StepEntity>,
+        targetRounds: Int,
+        speedPreset: String = "moderate",
+        customPaceSeconds: Int = 7,
+        voiceCueMode: com.habitbell.app.audio.VoiceCueMode = com.habitbell.app.audio.VoiceCueMode.STEP_NAME
+    ) {
+        val currentProfile = sessionState.value.profile
+        val suryaProfileId = if (currentProfile.id.contains("surya", ignoreCase = true)) currentProfile.id else "surya-namaskar-compound"
+        val baseConfig = com.habitbell.app.data.default.DefaultProfiles.SURYA_NAMASKAR.compoundConfig
+
+        val poses = steps.mapIndexed { idx, s ->
+            val defaultPose = baseConfig?.poses?.getOrNull(idx)
+            com.habitbell.app.data.model.CompoundPose(
+                index = idx + 1,
+                name = s.name,
+                sanskritName = defaultPose?.sanskritName ?: s.name,
+                durationSeconds = s.durationSeconds.coerceAtLeast(1),
+                breathCue = defaultPose?.breathCue ?: "",
+                mantra = defaultPose?.mantra ?: "",
+                voiceCueMode = voiceCueMode
+            )
+        }
+
+        repository.updateSuryaSettings(
+            profileId = suryaProfileId,
+            poses = poses,
+            targetRounds = targetRounds,
+            speedPreset = speedPreset,
+            customPaceSeconds = customPaceSeconds,
+            voiceCueMode = voiceCueMode
+        )
+
+        // If the active session is Surya Namaskar, dynamically reload into engine immediately
+        if (currentProfile.id == suryaProfileId || currentProfile.type == com.habitbell.app.data.model.TimerType.COMPOUND || currentProfile.name.contains("Surya", ignoreCase = true)) {
+            val updatedConfig = com.habitbell.app.data.model.CompoundConfig(
+                poses = poses,
+                targetRounds = targetRounds,
+                speedPreset = speedPreset,
+                voiceCueMode = voiceCueMode
+            )
+            val updatedProfile = currentProfile.copy(
+                compoundConfig = updatedConfig,
+                totalDurationSeconds = poses.sumOf { it.durationSeconds } * targetRounds
+            )
+            engine.loadProfile(updatedProfile)
+        }
+    }
+
+    /**
      * Switches the active health platform provider (e.g. Device Pedometer, Health Connect, Apple Health).
      *
      * @param provider Selected [com.habitbell.app.health.HealthProviderType].

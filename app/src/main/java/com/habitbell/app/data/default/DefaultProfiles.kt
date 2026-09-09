@@ -150,20 +150,22 @@ object DefaultProfiles {
         isFavorite = false,
         compoundConfig = CompoundConfig(
             poses = listOf(
-                CompoundPose(1, "Pranamasana", "Prayer Pose", 5, "Inhale & Exhale gently"),
-                CompoundPose(2, "Hastauttanasana", "Raised Arms Pose", 5, "Inhale, arch gently"),
-                CompoundPose(3, "Hastapadasana", "Standing Forward Bend", 5, "Exhale, fold down"),
-                CompoundPose(4, "Ashwa Sanchalanasana", "Equestrian Pose", 5, "Inhale right leg back"),
-                CompoundPose(5, "Dandasana", "Plank Pose", 5, "Hold breath in plank"),
-                CompoundPose(6, "Ashtanga Namaskara", "Salute with 8 Parts", 5, "Exhale chest to mat"),
-                CompoundPose(7, "Bhujangasana", "Cobra Pose", 5, "Inhale lift chest"),
-                CompoundPose(8, "Adho Mukha Svanasana", "Downward-Facing Dog", 5, "Exhale hips up"),
-                CompoundPose(9, "Ashwa Sanchalanasana", "Equestrian Pose", 5, "Inhale left leg forward"),
-                CompoundPose(10, "Hastapadasana", "Standing Forward Bend", 5, "Exhale fold to knees"),
-                CompoundPose(11, "Hastauttanasana", "Raised Arms Pose", 5, "Inhale reach upward"),
-                CompoundPose(12, "Tadasana", "Mountain Pose", 5, "Exhale hands to heart")
+                CompoundPose(1, "Pranamasana", "Prayer Pose", 5, "Inhale & Exhale gently", "ॐ मित्राय नमः"),
+                CompoundPose(2, "Hastauttanasana", "Raised Arms Pose", 5, "Inhale, arch gently", "ॐ रवये नमः"),
+                CompoundPose(3, "Hastapadasana", "Standing Forward Bend", 5, "Exhale, fold down", "ॐ सूर्याय नमः"),
+                CompoundPose(4, "Ashwa Sanchalanasana", "Equestrian Pose", 5, "Inhale right leg back", "ॐ भानवे नमः"),
+                CompoundPose(5, "Dandasana", "Plank Pose", 5, "Hold breath in plank", "ॐ खगाय नमः"),
+                CompoundPose(6, "Ashtanga Namaskara", "Salute with 8 Parts", 5, "Exhale chest to mat", "ॐ पूष्णे नमः"),
+                CompoundPose(7, "Bhujangasana", "Cobra Pose", 5, "Inhale lift chest", "ॐ हिरण्यगर्भाय नमः"),
+                CompoundPose(8, "Adho Mukha Svanasana", "Downward-Facing Dog", 5, "Exhale hips up", "ॐ मरीचये नमः"),
+                CompoundPose(9, "Ashwa Sanchalanasana", "Equestrian Pose", 5, "Inhale left leg forward", "ॐ आदित्याय नमः"),
+                CompoundPose(10, "Hastapadasana", "Standing Forward Bend", 5, "Exhale fold to knees", "ॐ सवित्रे नमः"),
+                CompoundPose(11, "Hastauttanasana", "Raised Arms Pose", 5, "Inhale reach upward", "ॐ अर्काय नमः"),
+                CompoundPose(12, "Tadasana", "Mountain Pose", 5, "Exhale hands to heart", "ॐ भास्कराय नमः")
             ),
-            targetRounds = 5
+            targetRounds = 5,
+            speedPreset = "moderate",
+            voiceCueMode = com.habitbell.app.audio.VoiceCueMode.STEP_NAME
         )
     )
 

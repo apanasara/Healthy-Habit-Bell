@@ -159,6 +159,9 @@ class TimerEngine(
     /** Voice guidance coordinator articulating gentle vocal cues for Pranayama phase transitions. */
     var voiceGuide: PranayamaVoiceGuide? = null
 
+    /** Voice guidance player articulating classical Asana cues and Solar Mantras for Surya Namaskar. */
+    var suryaVoicePlayer: com.habitbell.app.audio.SuryaVoicePlayer? = null
+
     /** Coroutine scope bound to Default dispatcher with a SupervisorJob to prevent cancellation cascading. */
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 
@@ -308,6 +311,15 @@ class TimerEngine(
             }
         }
 
+        // If initiating a Surya Namaskar compound session from start, articulate the initial posture cue
+        if (wasIdle && _state.value.profile.type == TimerType.COMPOUND) {
+            val config = _state.value.profile.compoundConfig
+            val firstPose = _state.value.currentPose
+            if (config != null && firstPose != null && !isPocketModeActive()) {
+                suryaVoicePlayer?.playPoseCue(firstPose, config.voiceCueMode)
+            }
+        }
+
         timerJob = scope.launch {
             // Heartbeat loop optimized for battery conservation: 1Hz tick rate
             while (isActive && _state.value.status == SessionStatus.RUNNING) {
@@ -327,6 +339,7 @@ class TimerEngine(
             visualAlertRemainingTicks = 0
             hapticManager.cancel()
             voiceGuide?.stop()
+            suryaVoicePlayer?.stop()
             _state.update { it.copy(status = SessionStatus.PAUSED, isDimmed = false, isVisualAlertActive = false) }
         }
     }
@@ -340,6 +353,7 @@ class TimerEngine(
         visualAlertRemainingTicks = 0
         hapticManager.cancel()
         voiceGuide?.stop()
+        suryaVoicePlayer?.stop()
         _state.update { it.copy(status = SessionStatus.IDLE, isDimmed = false, isVisualAlertActive = false) }
     }
 
@@ -350,6 +364,8 @@ class TimerEngine(
     fun destroy() {
         timerJob?.cancel()
         timerJob = null
+        voiceGuide?.shutdown()
+        suryaVoicePlayer?.release()
         hapticManager.cancel()
         scope.cancel()
     }
@@ -634,6 +650,9 @@ class TimerEngine(
             }
 
             val nextPose = config.poses[compoundPoseIndex]
+            if (!isPocketModeActive()) {
+                suryaVoicePlayer?.playPoseCue(nextPose, config.voiceCueMode)
+            }
             _state.update {
                 it.copy(
                     remainingSeconds = newRemaining,
@@ -679,6 +698,7 @@ class TimerEngine(
     private fun onSessionCompleted() {
         timerJob?.cancel()
         visualAlertRemainingTicks = 0
+        suryaVoicePlayer?.stop()
         _state.update {
             it.copy(
                 status = SessionStatus.COMPLETED,

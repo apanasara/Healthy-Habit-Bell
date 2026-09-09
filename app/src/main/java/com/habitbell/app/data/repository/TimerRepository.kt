@@ -111,10 +111,46 @@ class TimerRepository(private val context: Context) {
                 }
             }
 
+            // Restore any persistent Surya Namaskar customizations
+            val restoredCompound = defaultProfile.compoundConfig?.let { baseConfig ->
+                val sRounds = prefs.getInt("profile_surya_rounds_${defaultProfile.id}", -1)
+                val sPreset = prefs.getString("profile_surya_preset_${defaultProfile.id}", baseConfig.speedPreset) ?: baseConfig.speedPreset
+                val sVoiceModeStr = prefs.getString("profile_surya_voice_mode_${defaultProfile.id}", baseConfig.voiceCueMode.name)
+                val sVoiceMode = try {
+                    com.habitbell.app.audio.VoiceCueMode.valueOf(sVoiceModeStr ?: baseConfig.voiceCueMode.name)
+                } catch (_: Exception) {
+                    baseConfig.voiceCueMode
+                }
+
+                val restoredPoses = baseConfig.poses.mapIndexed { idx, basePose ->
+                    val savedDuration = prefs.getInt("profile_surya_pose_dur_${defaultProfile.id}_$idx", -1)
+                    val poseDur = if (savedDuration > 0) savedDuration else basePose.durationSeconds
+                    basePose.copy(
+                        durationSeconds = poseDur,
+                        voiceCueMode = sVoiceMode
+                    )
+                }
+
+                val finalRounds = if (sRounds > 0) sRounds else baseConfig.targetRounds
+                baseConfig.copy(
+                    poses = restoredPoses,
+                    targetRounds = finalRounds,
+                    speedPreset = sPreset,
+                    voiceCueMode = sVoiceMode
+                )
+            }
+
+            val finalTotalDuration = if (restoredCompound != null) {
+                restoredCompound.poses.sumOf { it.durationSeconds } * restoredCompound.targetRounds
+            } else {
+                dur
+            }
+
             defaultProfile.copy(
-                totalDurationSeconds = dur,
+                totalDurationSeconds = finalTotalDuration,
                 intervalDurationSeconds = inter,
-                pranayamaConfig = restoredPranayama
+                pranayamaConfig = restoredPranayama,
+                compoundConfig = restoredCompound
             )
         }
     }
@@ -336,6 +372,54 @@ class TimerRepository(private val context: Context) {
                     profile.copy(
                         pranayamaConfig = updatedConfig,
                         totalDurationSeconds = updatedConfig.totalSessionSeconds
+                    )
+                } else {
+                    profile
+                }
+            }
+        }
+    }
+
+    /**
+     * Persists and updates Surya Namaskar sequence posture durations, target rounds, speed presets, and voice mode.
+     *
+     * @param profileId Unique ID of the target Surya Namaskar profile (e.g. "surya-namaskar-compound").
+     * @param poses List of configured [CompoundPose] postures with custom or preset seconds.
+     * @param targetRounds Total repetition cycles configured for the session.
+     * @param speedPreset Active preset key ("slow", "moderate", "fast", "custom").
+     * @param customPaceSeconds Uniform custom pace seconds per posture.
+     * @param voiceCueMode Selected global voice guidance mode ([com.habitbell.app.audio.VoiceCueMode]).
+     */
+    fun updateSuryaSettings(
+        profileId: String,
+        poses: List<CompoundPose>,
+        targetRounds: Int,
+        speedPreset: String = "moderate",
+        customPaceSeconds: Int = 7,
+        voiceCueMode: com.habitbell.app.audio.VoiceCueMode = com.habitbell.app.audio.VoiceCueMode.STEP_NAME
+    ) {
+        val editor = prefs.edit()
+        editor.putInt("profile_surya_rounds_$profileId", targetRounds)
+        editor.putString("profile_surya_preset_$profileId", speedPreset)
+        editor.putInt("profile_surya_custom_pace_$profileId", customPaceSeconds)
+        editor.putString("profile_surya_voice_mode_$profileId", voiceCueMode.name)
+        poses.forEachIndexed { idx, pose ->
+            editor.putInt("profile_surya_pose_dur_${profileId}_$idx", pose.durationSeconds)
+        }
+        editor.apply()
+
+        val totalSec = poses.sumOf { it.durationSeconds } * targetRounds
+        _profiles.update { list ->
+            list.map { profile ->
+                if (profile.id == profileId) {
+                    profile.copy(
+                        totalDurationSeconds = totalSec,
+                        compoundConfig = CompoundConfig(
+                            poses = poses,
+                            targetRounds = targetRounds,
+                            speedPreset = speedPreset,
+                            voiceCueMode = voiceCueMode
+                        )
                     )
                 } else {
                     profile

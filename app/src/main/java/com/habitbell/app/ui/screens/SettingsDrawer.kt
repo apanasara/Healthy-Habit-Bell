@@ -159,7 +159,8 @@ fun SettingsDrawer(
     activeTab: SettingsDrawerTab = SettingsDrawerTab.TIMER,
     onTabSelected: (SettingsDrawerTab) -> Unit = {},
     onToggleSunMoonTheme: () -> Unit = {},
-    onOpenSuryaEditor: () -> Unit = {}
+    onOpenSuryaEditor: () -> Unit = {},
+    onUpdateSurya: (poses: List<CompoundPose>, targetRounds: Int, speedPreset: String, customPaceSeconds: Int, voiceCueMode: VoiceCueMode) -> Unit = { _, _, _, _, _ -> }
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -286,7 +287,8 @@ fun SettingsDrawer(
                             onBgMusicYouTubeUrlChange = onBgMusicYouTubeUrlChange,
                             onBgMusicVolumeChange = onBgMusicVolumeChange,
                             onPreviewBgMusic = onPreviewBgMusic,
-                            onOpenSuryaEditor = onOpenSuryaEditor
+                            onOpenSuryaEditor = onOpenSuryaEditor,
+                            onUpdateSurya = onUpdateSurya
                         )
                     }
                 } else {
@@ -353,7 +355,8 @@ private fun TimerSettingsContent(
     onBgMusicYouTubeUrlChange: (String) -> Unit,
     onBgMusicVolumeChange: (Float) -> Unit,
     onPreviewBgMusic: (Boolean) -> Unit,
-    onOpenSuryaEditor: () -> Unit = {}
+    onOpenSuryaEditor: () -> Unit = {},
+    onUpdateSurya: (poses: List<CompoundPose>, targetRounds: Int, speedPreset: String, customPaceSeconds: Int, voiceCueMode: VoiceCueMode) -> Unit = { _, _, _, _, _ -> }
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
         // -------------------------------------------------------------
@@ -493,7 +496,8 @@ private fun TimerSettingsContent(
                 onPickCustomAudio = onPickCustomAudio,
                 onBgMusicYouTubeUrlChange = onBgMusicYouTubeUrlChange,
                 onBgMusicVolumeChange = onBgMusicVolumeChange,
-                onPreviewBgMusic = onPreviewBgMusic
+                onPreviewBgMusic = onPreviewBgMusic,
+                onUpdateSurya = onUpdateSurya
             )
             return
         } else {
@@ -2376,7 +2380,8 @@ private fun SuryaSettingsSheet(
     onPickCustomAudio: () -> Unit,
     onBgMusicYouTubeUrlChange: (String) -> Unit,
     onBgMusicVolumeChange: (Float) -> Unit,
-    onPreviewBgMusic: (Boolean) -> Unit
+    onPreviewBgMusic: (Boolean) -> Unit,
+    onUpdateSurya: (poses: List<CompoundPose>, targetRounds: Int, speedPreset: String, customPaceSeconds: Int, voiceCueMode: VoiceCueMode) -> Unit = { _, _, _, _, _ -> }
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -2390,22 +2395,50 @@ private fun SuryaSettingsSheet(
     }
 
     val steps by stepDao.getAllSteps().collectAsState(initial = emptyList())
-    var selectedPreset by remember { mutableStateOf<String?>("moderate") }
+    var selectedPreset by remember { mutableStateOf<String?>(profile.compoundConfig?.speedPreset ?: "moderate") }
     var customPaceSeconds by remember { mutableStateOf(7) }
     var syncStatusMessage by remember { mutableStateOf<String?>(null) }
     var targetRounds by remember(profile.id) { mutableStateOf(profile.compoundConfig?.targetRounds ?: 5) }
+
+    fun dispatchSuryaUpdate(
+        newPreset: String = selectedPreset ?: "moderate",
+        newCustomPace: Int = customPaceSeconds,
+        newRounds: Int = targetRounds,
+        newVoiceMode: VoiceCueMode = steps.firstOrNull()?.voiceCueMode ?: profile.compoundConfig?.voiceCueMode ?: VoiceCueMode.STEP_NAME,
+        poseDurOverride: Int? = null
+    ) {
+        val basePoses = profile.compoundConfig?.poses
+            ?: com.habitbell.app.data.default.DefaultProfiles.SURYA_NAMASKAR.compoundConfig?.poses
+            ?: emptyList()
+        val currentSteps = steps
+        val updatedPoses = basePoses.mapIndexed { idx, basePose ->
+            val stepEntity = currentSteps.getOrNull(idx)
+            val dur = poseDurOverride ?: stepEntity?.durationSeconds ?: when (newPreset) {
+                "slow" -> 10
+                "fast" -> 3
+                "moderate" -> 5
+                else -> newCustomPace
+            }
+            basePose.copy(
+                durationSeconds = dur.coerceAtLeast(1),
+                voiceCueMode = newVoiceMode
+            )
+        }
+        onUpdateSurya(updatedPoses, newRounds, newPreset, newCustomPace, newVoiceMode)
+    }
 
     LaunchedEffect(steps) {
         if (steps.isNotEmpty() && selectedPreset != "custom") {
             val firstDur = steps.first().durationSeconds
             val allSame = steps.all { it.durationSeconds == firstDur }
-            selectedPreset = when {
+            val detectedPreset = when {
                 allSame && firstDur == 10 -> "slow"
                 allSame && firstDur == 5 -> "moderate"
                 allSame && firstDur == 3 -> "fast"
                 else -> "custom"
             }
-            if (selectedPreset == "custom") {
+            selectedPreset = detectedPreset
+            if (detectedPreset == "custom") {
                 customPaceSeconds = firstDur
             }
         }
@@ -2460,6 +2493,9 @@ private fun SuryaSettingsSheet(
                                             val all = stepDao.getAllSteps().first()
                                             all.forEach { stepDao.update(it.copy(durationSeconds = dur)) }
                                         }
+                                        dispatchSuryaUpdate(newPreset = presetKey, poseDurOverride = dur)
+                                    } else {
+                                        dispatchSuryaUpdate(newPreset = "custom", poseDurOverride = customPaceSeconds)
                                     }
                                 }
                         ) {
@@ -2500,6 +2536,7 @@ private fun SuryaSettingsSheet(
                                         val all = stepDao.getAllSteps().first()
                                         all.forEach { stepDao.update(it.copy(durationSeconds = customPaceSeconds)) }
                                     }
+                                    dispatchSuryaUpdate(newPreset = "custom", newCustomPace = customPaceSeconds, poseDurOverride = customPaceSeconds)
                                 }
                             },
                             contentPadding = PaddingValues(horizontal = 10.dp)
@@ -2526,6 +2563,7 @@ private fun SuryaSettingsSheet(
                                     val all = stepDao.getAllSteps().first()
                                     all.forEach { stepDao.update(it.copy(durationSeconds = customPaceSeconds)) }
                                 }
+                                dispatchSuryaUpdate(newPreset = "custom", newCustomPace = customPaceSeconds, poseDurOverride = customPaceSeconds)
                             },
                             contentPadding = PaddingValues(horizontal = 10.dp)
                         ) { Text("+1s") }
@@ -2543,6 +2581,7 @@ private fun SuryaSettingsSheet(
                                             val all = stepDao.getAllSteps().first()
                                             all.forEach { stepDao.update(it.copy(durationSeconds = sec)) }
                                         }
+                                        dispatchSuryaUpdate(newPreset = "custom", newCustomPace = sec, poseDurOverride = sec)
                                     }
                             ) {
                                 Text(
@@ -2591,17 +2630,28 @@ private fun SuryaSettingsSheet(
 
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         OutlinedButton(
-                            onClick = { if (targetRounds > 1) targetRounds-- },
+                            onClick = {
+                                if (targetRounds > 1) {
+                                    targetRounds--
+                                    dispatchSuryaUpdate(newRounds = targetRounds)
+                                }
+                            },
                             contentPadding = PaddingValues(horizontal = 12.dp)
                         ) { Text("-1") }
 
                         Button(
-                            onClick = { targetRounds++ },
+                            onClick = {
+                                targetRounds++
+                                dispatchSuryaUpdate(newRounds = targetRounds)
+                            },
                             contentPadding = PaddingValues(horizontal = 12.dp)
                         ) { Text("+1") }
 
                         Button(
-                            onClick = { targetRounds += 5 },
+                            onClick = {
+                                targetRounds += 5
+                                dispatchSuryaUpdate(newRounds = targetRounds)
+                            },
                             contentPadding = PaddingValues(horizontal = 12.dp)
                         ) { Text("+5") }
                     }
@@ -2619,7 +2669,10 @@ private fun SuryaSettingsSheet(
                             color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
                             modifier = Modifier
                                 .weight(1f)
-                                .clickable { targetRounds = r }
+                                .clickable {
+                                    targetRounds = r
+                                    dispatchSuryaUpdate(newRounds = r)
+                                }
                         ) {
                             Text(
                                 text = "$r",
@@ -2693,6 +2746,7 @@ private fun SuryaSettingsSheet(
                                         val all = stepDao.getAllSteps().first()
                                         all.forEach { stepDao.update(it.copy(voiceCueMode = mode)) }
                                     }
+                                    dispatchSuryaUpdate(newVoiceMode = mode)
                                 }
                         ) {
                             Text(
