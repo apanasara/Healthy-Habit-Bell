@@ -59,6 +59,5 @@ local.properties
 
 # AI Agent & Auxiliary Local Artifacts (kept in outer project folder)
 .agents/
-docs/
 AGENTS.md
 GEMINI.md

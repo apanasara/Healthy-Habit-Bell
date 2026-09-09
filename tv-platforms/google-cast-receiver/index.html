@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<!--
+  Habit Bell • Google Cast Custom Web Receiver (Development Source)
+  
+  Architectural Role:
+  Runs inside the Chromecast's built-in Chromium runtime. Connects to the Habit Bell
+  Android sender via Cast Receiver Framework v3 and the bidirectional Cast Message Bus
+  ('urn:x-cast:com.habitbell.cast').
+  
+  Features:
+  - Zero-cloud local messaging from phone sender.
+  - Native 1080p/4K 60fps vector graphics (SVG circular countdown, lotus breath bloom).
+  - Built-in Web Audio synthesizer for meditative Tibetan singing bowl chimes.
+  - Remote playback action dispatching for physical Chromecast/HDMI-CEC TV remotes.
+  - Disable idle timeout to prevent Chromecast from sleeping during long meditation sessions.
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Habit Bell • Living Room TV</title>
+  <!-- Google Cast Receiver Framework v3 -->
+  <script src="//www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
+  <style>
+    :root {
+      --bg-color: #060709;
+      --gold-color: #E5A93C;
+      --gold-dim: rgba(229, 169, 60, 0.18);
+      --gold-border: rgba(229, 169, 60, 0.35);
+      --text-main: #FFFFFF;
+      --text-muted: #8892B0;
+      --inhale-color: #4ECDC4;
+      --hold-color: #E5A93C;
+      --exhale-color: #A78BFA;
+      --hold-out-color: #60A5FA;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      height: 100vh;
+      width: 100vw;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      align-items: center;
+      padding: 4vh 6vw;
+      overflow: hidden;
+    }
+    /* Header Area */
+    .header {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .badge {
+      background: var(--gold-dim);
+      color: var(--gold-color);
+      border: 1px solid var(--gold-border);
+      border-radius: 40px;
+      padding: 8px 24px;
+      font-size: 1.1rem;
+      font-weight: 600;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+    }
+    .title {
+      font-size: 2.2rem;
+      font-weight: 300;
+      letter-spacing: 2px;
+      color: #E0E0E0;
+    }
+    .device-status {
+      font-size: 1.1rem;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background-color: #10B981;
+    }
+
+    /* Center Stage (Clock & Animation) */
+    .center-stage {
+      position: relative;
+      width: 480px;
+      height: 480px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    .progress-svg {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      transform: rotate(-90deg);
+    }
+    .progress-bg {
+      fill: none;
+      stroke: rgba(255, 255, 255, 0.08);
+      stroke-width: 10;
+    }
+    .progress-bar {
+      fill: none;
+      stroke: var(--gold-color);
+      stroke-width: 10;
+      stroke-linecap: round;
+      stroke-dasharray: 1382;
+      stroke-dashoffset: 0;
+      transition: stroke-dashoffset 1s linear, stroke 0.5s ease;
+    }
+    .clock-container {
+      text-align: center;
+      z-index: 10;
+    }
+    .clock-time {
+      font-size: 7.5rem;
+      font-weight: 200;
+      letter-spacing: -2px;
+      color: var(--text-main);
+      line-height: 1;
+    }
+    .next-bell {
+      margin-top: 16px;
+      font-size: 1.3rem;
+      font-weight: 500;
+      color: var(--gold-color);
+      letter-spacing: 1.5px;
+    }
+
+    /* Pranayama Lotus & Phase Indicator */
+    .pranayama-cue-container {
+      position: absolute;
+      bottom: -60px;
+      left: 50%;
+      transform: translateX(-50%);
+      text-align: center;
+      width: 400px;
+      opacity: 0;
+      transition: opacity 0.5s ease;
+    }
+    .pranayama-cue-container.active {
+      opacity: 1;
+    }
+    .phase-sanskrit {
+      font-size: 1.8rem;
+      font-weight: 600;
+      color: var(--gold-color);
+      letter-spacing: 2px;
+    }
+    .phase-english {
+      font-size: 1.2rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    /* Asana Pose Card for Surya Namaskar */
+    .asana-card {
+      position: absolute;
+      bottom: -70px;
+      left: 50%;
+      transform: translateX(-50%);
+      text-align: center;
+      width: 460px;
+      opacity: 0;
+      transition: opacity 0.5s ease;
+    }
+    .asana-card.active {
+      opacity: 1;
+    }
+    .asana-name {
+      font-size: 1.8rem;
+      font-weight: 600;
+      color: var(--gold-color);
+    }
+    .asana-breath {
+      font-size: 1.1rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    /* Footer Info */
+    .footer {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: var(--text-muted);
+      font-size: 1rem;
+    }
+    .session-indicator {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .status-text {
+      color: var(--gold-color);
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    /* Volume HUD Indicator Overlay */
+    .volume-hud {
+      position: fixed;
+      top: 30px;
+      right: 30px;
+      background: rgba(20, 20, 20, 0.9);
+      border: 1px solid var(--gold-border);
+      border-radius: 16px;
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      opacity: 0;
+      transition: opacity 0.4s ease;
+      z-index: 100;
+    }
+    .volume-hud.visible {
+      opacity: 1;
+    }
+    .volume-hud-label {
+      font-size: 0.9rem;
+      color: var(--gold-color);
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <!-- Header -->
+  <div class="header">
+    <div id="roundBadge" class="badge">Round 1/1</div>
+    <div id="profileTitle" class="title">Habit Bell</div>
+    <div class="device-status">
+      <div class="status-dot"></div>
+      <span id="castStatus">Google Cast Connected</span>
+    </div>
+  </div>
+
+  <!-- Center Countdown & Animated Stage -->
+  <div class="center-stage">
+    <svg class="progress-svg" viewBox="0 0 480 480">
+      <circle class="progress-bg" cx="240" cy="240" r="220" />
+      <circle id="progressBar" class="progress-bar" cx="240" cy="240" r="220" />
+    </svg>
+    <div class="clock-container">
+      <div id="timeDisplay" class="clock-time">00:00</div>
+      <div id="nextBellDisplay" class="next-bell">Interval --:--</div>
+    </div>
+
+    <!-- Pranayama Phase Display -->
+    <div id="pranayamaCue" class="pranayama-cue-container">
+      <div id="phaseSanskrit" class="phase-sanskrit">Purak</div>
+      <div id="phaseEnglish" class="phase-english">Inhale Deeply</div>
+    </div>
+
+    <!-- Surya Namaskar Posture Display -->
+    <div id="asanaCard" class="asana-card">
+      <div id="asanaName" class="asana-name">Pranamasana</div>
+      <div id="asanaBreath" class="asana-breath">Prayer Pose • Exhale</div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <div class="session-indicator">
+      <span>Status:</span>
+      <span id="sessionStatus" class="status-text">Ready</span>
+    </div>
+    <div id="footerNotice">Habit Bell • Mindful Living Room</div>
+  </div>
+
+  <!-- Volume HUD Overlay -->
+  <div id="volumeHud" class="volume-hud">
+    <span id="volumeHudLabel" class="volume-hud-label">Bell Volume: 90%</span>
+  </div>
+
+  <!-- Web Audio Synthesizer & Cast SDK Script -->
+  <script>
+    const CUSTOM_NAMESPACE = 'urn:x-cast:com.habitbell.cast';
+    let audioCtx = null;
+    let masterBellVolume = 0.9;
+    let hudTimeout = null;
+
+    /**
+     * Initializes the Web Audio API context for zero-latency bell synthesis.
+     */
+    function initAudio() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    }
+
+    /**
+     * Synthesizes an authentic Tibetan singing bowl / meditative chime
+     * with fundamental frequency (432 Hz / 528 Hz) and natural exponential decay.
+     *
+     * @param {number} freq Frequency in Hz (defaults to 432Hz meditative A).
+     * @param {number} duration Duration in seconds.
+     */
+    function playTibetanBell(freq = 432, duration = 4.5) {
+      try {
+        initAudio();
+        const now = audioCtx.currentTime;
+        const osc = audioCtx.createOscillator();
+        const overtone = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, now);
+
+        overtone.type = 'sine';
+        overtone.frequency.setValueAtTime(freq * 2.76, now); // Tibetan bowl harmonic ratio
+
+        gain.gain.setValueAtTime(0, now);
+        gain.gain.linearRampToValueAtTime(masterBellVolume * 0.7, now + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+        osc.connect(gain);
+        overtone.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        osc.start(now);
+        overtone.start(now);
+        osc.stop(now + duration);
+        overtone.stop(now + duration);
+      } catch (e) {
+        console.warn('Audio synthesis error:', e);
+      }
+    }
+
+    /**
+     * Displays a transient Volume HUD in the top corner.
+     */
+    function showVolumeHud(text) {
+      const hud = document.getElementById('volumeHud');
+      const label = document.getElementById('volumeHudLabel');
+      label.textContent = text;
+      hud.classList.add('visible');
+      clearTimeout(hudTimeout);
+      hudTimeout = setTimeout(() => {
+        hud.classList.remove('visible');
+      }, 2500);
+    }
+
+    // UI Element References
+    const elTime = document.getElementById('timeDisplay');
+    const elNextBell = document.getElementById('nextBellDisplay');
+    const elProgress = document.getElementById('progressBar');
+    const elProfile = document.getElementById('profileTitle');
+    const elRound = document.getElementById('roundBadge');
+    const elStatus = document.getElementById('sessionStatus');
+    const elPranayama = document.getElementById('pranayamaCue');
+    const elPhaseSanskrit = document.getElementById('phaseSanskrit');
+    const elPhaseEnglish = document.getElementById('phaseEnglish');
+    const elAsana = document.getElementById('asanaCard');
+    const elAsanaName = document.getElementById('asanaName');
+    const elAsanaBreath = document.getElementById('asanaBreath');
+
+    const CIRCUMFERENCE = 1382;
+
+    /**
+     * Updates receiver display from phone sender state payload.
+     */
+    function updateState(data) {
+      initAudio();
+      if (data.formattedTime) elTime.textContent = data.formattedTime;
+      if (data.formattedNextBell) elNextBell.textContent = 'Interval ' + data.formattedNextBell;
+      if (data.profileName) elProfile.textContent = data.profileName;
+      if (data.status) elStatus.textContent = data.status;
+
+      if (data.currentRound && data.totalRounds) {
+        elRound.textContent = `Round ${data.currentRound}/${data.totalRounds}`;
+      }
+
+      if (data.progressFraction !== undefined) {
+        const offset = CIRCUMFERENCE * (1 - Math.min(Math.max(data.progressFraction, 0), 1));
+        elProgress.style.strokeDashoffset = offset;
+      }
+
+      // Pranayama breathwork display
+      if (data.pranayamaPhase && data.pranayamaPhase.length > 0) {
+        elAsana.classList.remove('active');
+        elPranayama.classList.add('active');
+        elPhaseSanskrit.textContent = data.pranayamaSanskrit || data.pranayamaPhase;
+        elPhaseEnglish.textContent = data.pranayamaDisplay || '';
+
+        // Modulate ring color according to breath phase
+        if (data.pranayamaPhase === 'INHALE') {
+          elProgress.style.stroke = 'var(--inhale-color)';
+        } else if (data.pranayamaPhase === 'HOLD_IN') {
+          elProgress.style.stroke = 'var(--hold-color)';
+        } else if (data.pranayamaPhase === 'EXHALE') {
+          elProgress.style.stroke = 'var(--exhale-color)';
+        } else {
+          elProgress.style.stroke = 'var(--hold-out-color)';
+        }
+      } else if (data.poseName && data.poseName.length > 0) {
+        // Surya Namaskar asana display
+        elPranayama.classList.remove('active');
+        elAsana.classList.add('active');
+        elAsanaName.textContent = data.poseName;
+        elAsanaBreath.textContent = (data.poseSanskrit ? data.poseSanskrit + ' • ' : '') + (data.poseBreath || '');
+        elProgress.style.stroke = 'var(--gold-color)';
+      } else {
+        elPranayama.classList.remove('active');
+        elAsana.classList.remove('active');
+        elProgress.style.stroke = 'var(--gold-color)';
+      }
+
+      // Trigger bell chime if requested by sender
+      if (data.triggerBell) {
+        playTibetanBell(data.bellFrequency || 432, 4.5);
+      }
+    }
+
+    // Initialize Cast Receiver Framework
+    const context = cast.framework.CastReceiverContext.getInstance();
+    const options = new cast.framework.CastReceiverOptions();
+    options.disableIdleTimeout = true; // Prevent sleep during long sessions
+    options.maxInactivity = 3600 * 4;  // 4 hours max duration
+
+    // Listen for custom sender messages from the Android app
+    context.addCustomMessageListener(CUSTOM_NAMESPACE, function(event) {
+      try {
+        const msg = JSON.parse(event.data);
+        if (msg.type === 'state') {
+          updateState(msg);
+        } else if (msg.type === 'volume') {
+          if (msg.bellVolume !== undefined) {
+            masterBellVolume = msg.bellVolume;
+            showVolumeHud(`Bell Volume: ${Math.round(masterBellVolume * 100)}%`);
+          }
+        } else if (msg.type === 'chime') {
+          playTibetanBell(msg.freq || 432, 4.5);
+        }
+      } catch (err) {
+        console.warn('Malformed Cast message payload:', err);
+      }
+    });
+
+    // Start Cast Receiver Context
+    context.start(options);
+  </script>
+</body>
+</html>

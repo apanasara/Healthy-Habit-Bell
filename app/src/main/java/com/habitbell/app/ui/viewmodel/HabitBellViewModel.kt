@@ -384,6 +384,13 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
     fun setBellVolume(volume: Float) {
         _uiState.update { it.copy(bellVolume = volume) }
         audioManager.setVolume(volume)
+        if (castManager.isCasting.value) {
+            val json = org.json.JSONObject().apply {
+                put("type", "volume")
+                put("bellVolume", volume.toDouble())
+            }.toString()
+            castManager.sendCustomMessage(json)
+        }
     }
 
     /**
@@ -392,6 +399,13 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
     fun playTestBell() {
         audioManager.playIntervalBell()
         hapticManager.triggerIntervalHaptic()
+        if (castManager.isCasting.value) {
+            val json = org.json.JSONObject().apply {
+                put("type", "chime")
+                put("freq", 432)
+            }.toString()
+            castManager.sendCustomMessage(json)
+        }
     }
 
     /**
@@ -403,6 +417,13 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
     fun playOptionCPreview() {
         audioManager.playOptionCPreview()
         hapticManager.triggerIntervalHaptic()
+        if (castManager.isCasting.value) {
+            val json = org.json.JSONObject().apply {
+                put("type", "chime")
+                put("freq", 1024)
+            }.toString()
+            castManager.sendCustomMessage(json)
+        }
     }
 
     /**

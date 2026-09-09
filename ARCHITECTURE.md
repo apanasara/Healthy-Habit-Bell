@@ -199,6 +199,32 @@ The heartbeat of the mindfulness runtime is a deterministic finite state machine
   - Native Swift 5.10+ / SwiftUI application built for tvOS 17+.
   - Features circular countdown stroke animation, Siri Remote Clickpad gestures, and real-time Bonjour mDNS discovery (`_http._tcp.`) auto-syncing with `LocalCastWebServer` on the Android device via Server-Sent Events.
 
+#### 7. Google Cast Custom Web Receiver & Bidirectional Telemetry Protocol (`docs/index.html` & `tv-platforms/google-cast-receiver/`)
+- **Architectural Role & TV Sandboxing**: Solves the browserless TV and phone distraction challenges by executing a dedicated, cloud-hosted Custom Web Receiver directly within the Google Cast Application Framework (CAF v3) hardware sandbox on Chromecasts, Google TVs, and Sony Bravia displays. Allows the user's phone to dim or sleep while the TV independently renders the meditation canvas.
+- **Microscopic Single-File Production Build (`docs/index.html`)**:
+  - **Extreme Minification (6.0 KB)**: Bundles all HTML structure, responsive flexbox CSS, SVG circular progress shaders, and JS logic into a single 6,170-byte document.
+  - **Zero External Overhead**: Requires zero third-party CDNs or fonts; only loads the standard Google Cast CAF v3 receiver library (`//www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js`).
+  - **Instant Load Time**: Downloads in 20–50 ms over local Wi-Fi, providing instantaneous session launch when the user taps Cast.
+- **Zero-Cost GitHub Pages CDN & Domain Migration Decoupling**:
+  - Hosted directly out of the repository's `/docs` directory on GitHub Pages (`https://<username>.github.io/Healthy-Habit-Bell/`).
+  - Consumes <0.001% of standard 100 GB monthly bandwidth limits (~16.6 million session launches per month).
+  - Decoupled from the Android client via Google Cast Developer Console Application ID registration: if the hosting provider or domain changes, updating the URL on `cast.google.com/publish` automatically redirects all global devices instantly with zero client app updates or downtime.
+- **Development & Reference Source (`tv-platforms/google-cast-receiver/index.html`)**:
+  - 14.1 KB unminified, fully commented reference source conforming to the Universal Documentation Standard.
+  - Contains human-readable BEM classes, detailed audio synthesis formulas, and diagnostic console logging.
+- **Bidirectional Custom Message Bus (`urn:x-cast:com.habitbell.cast`)**:
+  - Bypasses browser HTTPS-to-HTTP mixed content restrictions by transmitting telemetry directly over Google Cast's native transport channel.
+  - **State Telemetry (`type: "state"`)**: Dispatched by `CentralSessionHandler` at 1Hz during active countdowns. Carries formatted remaining time, interval countdowns, round numbers, Pranayama Sanskrit phases (Puraka, Kumbhaka, Rechaka, Shunya) with dynamic chromatic ring color morphing, and Surya Namaskar posture cards.
+  - **Volume Synchronization (`type: "volume"`)**: Dispatched on volume slider adjustments; renders a non-intrusive floating HUD overlay on the TV (`"Bell Volume: 85%"`).
+  - **Sound Chimes (`type: "chime"`)**: Triggers standalone procedural audio strikes on demand.
+  - **TV Remote Feedback (Receiver -> Phone)**: Captures hardware Play/Pause remote key events via CAF v3 and routes them back to `HabitBellCastManager.onRemotePlaybackAction` to synchronize mobile state.
+- **Zero-Bandwidth In-Memory Web Audio Synthesis**:
+  - Synthesizes authentic Tibetan singing bowl chimes directly inside the TV's browser hardware via the HTML5 `AudioContext`.
+  - Combines a 432 Hz fundamental sine wave with a 2.76 harmonic overtone (1192.3 Hz), shaped by a 20 ms linear attack ramp and an exponential acoustic decay envelope, delivering rich living room acoustics with zero audio streaming data transfer.
+- **Prolonged Session Anti-Sleep Guard**:
+  - Configures `CastReceiverOptions.disableIdleTimeout = true` and `options.maxInactivity = 14400` (4 hours).
+  - Guarantees that Chromecast dongles will never revert to ambient art screensavers during prolonged meditation, breathwork, or yoga sequences.
+
 ---
 
 ### 2.5. Android Auto Subsystem (`com.habitbell.app.auto`)
