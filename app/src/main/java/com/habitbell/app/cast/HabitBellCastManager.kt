@@ -3,10 +3,12 @@ package com.habitbell.app.cast
 import android.content.Context
 import android.net.Uri
 import android.util.Log
+import com.google.android.gms.cast.Cast
 import com.google.android.gms.cast.MediaInfo
 import com.google.android.gms.cast.MediaLoadRequestData
 import com.google.android.gms.cast.MediaMetadata
 import com.google.android.gms.cast.MediaStatus
+import org.json.JSONObject
 import com.google.android.gms.cast.framework.CastContext
 import com.google.android.gms.cast.framework.CastSession
 import com.google.android.gms.cast.framework.CastState
@@ -55,6 +57,9 @@ class HabitBellCastManager private constructor(private val context: Context) {
 
         /** High-res sacred lotus artwork for Pranayama sessions. */
         const val PRANAYAMA_ARTWORK_URL = "https://images.unsplash.com/photo-1545205597-3d9d02c29597?w=1200&auto=format&fit=crop&q=80"
+
+        /** Custom Cast Message Bus namespace for Habit Bell live telemetry and control. */
+        const val CUSTOM_NAMESPACE = "urn:x-cast:com.habitbell.cast"
 
         /** Fallback online ambient stream if local server is unreachable. */
         const val DEFAULT_FALLBACK_STREAM_URL = "https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3?filename=meditation-bowl-ambient-60s.mp3"
@@ -233,7 +238,7 @@ class HabitBellCastManager private constructor(private val context: Context) {
     }
 
     /**
-     * Binds an active Cast session and registers media client observers.
+     * Binds an active Cast session, registers media client observers, and attaches custom message bus listener.
      *
      * @param session Active [CastSession] connected to the TV.
      */
@@ -244,13 +249,30 @@ class HabitBellCastManager private constructor(private val context: Context) {
         _isCasting.value = true
 
         session.remoteMediaClient?.registerCallback(remoteMediaClientCallback)
+
+        // Attach custom message channel for TV remote signals and live telemetry
+        try {
+            session.setMessageReceivedCallbacks(CUSTOM_NAMESPACE) { _, namespace, message ->
+                Log.d(TAG, "Custom message received on $namespace: $message")
+                handleIncomingCustomMessage(message)
+            }
+            Log.i(TAG, "Registered custom message channel for $CUSTOM_NAMESPACE")
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not register custom message channel on Cast session: ${e.message}")
+        }
+
         Log.i(TAG, "Bound Cast session to device: $deviceName")
     }
 
     /**
-     * Unbinds the active Cast session and clears device references.
+     * Unbinds the active Cast session, detaches custom message bus, and clears device references.
      */
     private fun unbindSession() {
+        try {
+            currentCastSession?.removeMessageReceivedCallbacks(CUSTOM_NAMESPACE)
+        } catch (e: Exception) {
+            Log.w(TAG, "Error removing custom message handler: ${e.message}")
+        }
         currentCastSession?.remoteMediaClient?.unregisterCallback(remoteMediaClientCallback)
         currentCastSession = null
         _castDeviceName.value = null
@@ -370,6 +392,61 @@ class HabitBellCastManager private constructor(private val context: Context) {
         scope.launch {
             delay(600)
             isDispatchingLocally = false
+        }
+    }
+
+    /**
+     * Dispatches a JSON string payload across the Google Cast Custom Message Bus to the Web Receiver.
+     *
+     * Enables continuous real-time transmission of countdown clock digits, interval boundaries,
+     * Sanskrit pranayama cues, Surya Namaskar asanas, and volume adjustments directly to TV screens.
+     *
+     * @param json Serialized JSON telemetry payload adhering to the Habit Bell Cast Protocol.
+     */
+    fun sendCustomMessage(json: String) {
+        val session = currentCastSession ?: return
+        if (!session.isConnected) return
+        try {
+            session.sendMessage(CUSTOM_NAMESPACE, json)?.setResultCallback { result ->
+                if (!result.status.isSuccess) {
+                    Log.w(TAG, "Failed to transmit Cast message: ${result.status.statusMessage}")
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Exception transmitting Cast message to receiver", e)
+        }
+    }
+
+    /**
+     * Handles incoming custom JSON messages received from the Google Cast Custom Web Receiver.
+     *
+     * Interprets TV remote control commands (play/pause/toggle) to maintain two-way synchronization
+     * between the living room TV and mobile phone state machine.
+     *
+     * @param message Raw JSON message string received across [CUSTOM_NAMESPACE].
+     */
+    private fun handleIncomingCustomMessage(message: String) {
+        try {
+            val json = JSONObject(message)
+            when (json.optString("type")) {
+                "play" -> {
+                    Log.i(TAG, "TV Custom Receiver requested PLAY")
+                    onRemotePlaybackAction?.invoke(true)
+                }
+                "pause" -> {
+                    Log.i(TAG, "TV Custom Receiver requested PAUSE")
+                    onRemotePlaybackAction?.invoke(false)
+                }
+                "toggle" -> {
+                    Log.i(TAG, "TV Custom Receiver requested TOGGLE")
+                    togglePlayPause()
+                }
+                else -> {
+                    Log.d(TAG, "Unhandled TV receiver message type: ${json.optString("type")}")
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to parse incoming Cast message: $message", e)
         }
     }
 

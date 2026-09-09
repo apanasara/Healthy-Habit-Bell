@@ -12,6 +12,7 @@ import com.habitbell.app.data.default.DefaultProfiles
 import com.habitbell.app.data.model.TimerProfile
 import com.habitbell.app.data.model.TimerType
 import com.habitbell.app.data.repository.TimerRepository
+import org.json.JSONObject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -184,6 +185,9 @@ class CentralSessionHandler(private val application: Application) {
                         durationSeconds = state.totalSeconds,
                         artworkUrl = artwork
                     )
+                    // Push initial telemetry snapshot immediately to TV receiver
+                    val initialTelemetry = buildCastTelemetryJson(state)
+                    castManager.sendCustomMessage(initialTelemetry)
                 }
             }
         }
@@ -330,6 +334,12 @@ class CentralSessionHandler(private val application: Application) {
                         }
                     }
                 }
+
+                // 5. Continuously synchronize live session countdown & telemetry to Google Cast receiver
+                if (castManager.isCasting.value) {
+                    val telemetryPayload = buildCastTelemetryJson(state)
+                    castManager.sendCustomMessage(telemetryPayload)
+                }
             }
         }
     }
@@ -374,6 +384,57 @@ class CentralSessionHandler(private val application: Application) {
             else ->
                 "${state.profile.totalDurationSeconds / 60}m Mindful Session • Habit Bell"
         }
+    }
+
+    /**
+     * Serializes live [TimerSessionState] into a compact JSON telemetry payload for the Google Cast Custom Web Receiver.
+     *
+     * Transmits countdown timing strings, interval offsets, Sanskrit breath cues, Surya Namaskar poses,
+     * and completion status across the native Google Cast message bus.
+     *
+     * @param state Active [TimerSessionState] snapshot.
+     * @param triggerBell Optional flag instructing the TV receiver to synthesize a Tibetan bell chime locally.
+     * @param bellFrequency Audio synthesis frequency in Hertz (default 432 Hz).
+     * @return Formatted JSON string adhering to the Habit Bell Cast protocol.
+     */
+    fun buildCastTelemetryJson(
+        state: TimerSessionState,
+        triggerBell: Boolean = false,
+        bellFrequency: Int = 432
+    ): String {
+        val json = JSONObject()
+        json.put("type", "state")
+        json.put("formattedTime", state.formattedRemainingTime)
+        json.put("formattedNextBell", state.formattedNextBellTime)
+        json.put("profileName", state.profile.name)
+        json.put("status", state.status.name)
+        json.put("currentRound", state.currentRound)
+        json.put("totalRounds", state.totalRounds)
+        json.put("progressFraction", state.progressFraction.toDouble())
+
+        // Multi-interval / Pranayama tracking
+        val pranayamaPhase = state.currentPranayamaPhase
+        if (pranayamaPhase != null) {
+            json.put("pranayamaPhase", pranayamaPhase.name)
+            json.put("pranayamaSanskrit", pranayamaPhase.sanskritName)
+            json.put("pranayamaDisplay", pranayamaPhase.displayName)
+        } else {
+            json.put("pranayamaPhase", "")
+        }
+
+        // Compound Sequencer / Surya Namaskar tracking
+        val currentPose = state.currentPose
+        if (currentPose != null) {
+            json.put("poseName", currentPose.name)
+            json.put("poseSanskrit", currentPose.sanskritName)
+            json.put("poseBreath", currentPose.breathCue)
+        } else {
+            json.put("poseName", "")
+        }
+
+        json.put("triggerBell", triggerBell)
+        json.put("bellFrequency", bellFrequency)
+        return json.toString()
     }
 
     /**
