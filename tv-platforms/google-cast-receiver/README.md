@@ -56,9 +56,9 @@ Open [`app/src/main/java/com/habitbell/app/cast/CastOptionsProvider.kt`](../../a
 
 ```kotlin
 companion object {
-    /** Set your registered 8-character Hex App ID from cast.google.com/publish */
+    /** Registered 8-character Hex App ID from cast.google.com/publish */
     @Volatile
-    var customReceiverAppId: String? = "YOUR_APP_ID"
+    var customReceiverAppId: String? = "4662865D"
 }
 ```
 *Note: If left null, Habit Bell automatically falls back to Google's universal **Default Media Receiver** (`CC1AD845`), which functions globally without registration.*

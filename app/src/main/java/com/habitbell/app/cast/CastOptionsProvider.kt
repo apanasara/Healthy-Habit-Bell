@@ -39,12 +39,11 @@ class CastOptionsProvider : OptionsProvider {
         const val DEFAULT_RECEIVER_APP_ID = CastMediaControlIntent.DEFAULT_MEDIA_RECEIVER_APPLICATION_ID
 
         /**
-         * Optional custom Web Receiver Application ID override.
-         * Set this to a 8-character hex string if an approved custom Web Receiver is registered
-         * on the Google Cast Developer Console to run `assets/tv/index.html`.
+         * Custom Web Receiver Application ID registered on Google Cast Developer Console.
+         * Directs Cast sessions to load https://apanasara.github.io/Healthy-Habit-Bell/.
          */
         @Volatile
-        var customReceiverAppId: String? = null
+        var customReceiverAppId: String? = "4662865D"
     }
 
     /**
