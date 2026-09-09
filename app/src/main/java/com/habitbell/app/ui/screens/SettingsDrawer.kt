@@ -304,6 +304,7 @@ fun SettingsDrawer(
                             isAutoDim = isAutoDim,
                             bellVolume = bellVolume,
                             bgMusicVolume = bgMusicVolume,
+                            isBgMusicEnabled = isBgMusicEnabled,
                             onThemeSelected = onThemeSelected,
                             onZenModeToggle = onZenModeToggle,
                             onPocketModeToggle = onPocketModeToggle,
@@ -311,6 +312,9 @@ fun SettingsDrawer(
                             onAutoDimToggle = onAutoDimToggle,
                             onVolumeChange = onVolumeChange,
                             onBgMusicVolumeChange = onBgMusicVolumeChange,
+                            onBgMusicToggle = onBgMusicToggle,
+                            onTestOptionC = onTestOptionC,
+                            onPreviewBgMusic = onPreviewBgMusic,
                             onToggleSunMoonTheme = onToggleSunMoonTheme,
                             selectedHealthProvider = selectedHealthProvider,
                             onHealthProviderSelected = onHealthProviderSelected,
@@ -783,31 +787,6 @@ private fun TimerSettingsContent(
                             }
                         }
                     }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    // Ambient Sound Volume Slider
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text("Ambient Volume", style = MaterialTheme.typography.bodyMedium)
-                        Text(
-                            text = "${(bgMusicVolume * 100).toInt()}%",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                    Slider(
-                        value = bgMusicVolume,
-                        onValueChange = onBgMusicVolumeChange,
-                        valueRange = 0f..1f,
-                        colors = SliderDefaults.colors(
-                            thumbColor = MaterialTheme.colorScheme.primary,
-                            activeTrackColor = MaterialTheme.colorScheme.primary
-                        )
-                    )
                 }
             }
         }
@@ -890,6 +869,7 @@ private fun TimerSettingsContent(
  * @param isAutoDim Whether auto-dimming during countdown is enabled.
  * @param bellVolume Master bell gain level (0.0f..1.0f).
  * @param bgMusicVolume Ambient background music gain level (0.0f..1.0f).
+ * @param isBgMusicEnabled Whether ambient soundscapes are globally enabled.
  * @param onThemeSelected Callback when theme profile is picked.
  * @param onZenModeToggle Callback to toggle DND.
  * @param onPocketModeToggle Callback to toggle pocket mode.
@@ -897,6 +877,9 @@ private fun TimerSettingsContent(
  * @param onAutoDimToggle Callback to toggle auto dim.
  * @param onVolumeChange Callback when bell master volume is adjusted (0.0f..1.0f).
  * @param onBgMusicVolumeChange Callback when ambient music volume slider is adjusted (0.0f..1.0f).
+ * @param onBgMusicToggle Callback to toggle global ambient background audio on or off.
+ * @param onTestOptionC Callback triggering test audition of signature Option C triple bell chime.
+ * @param onPreviewBgMusic Callback toggling temporary audition preview of selected ambient sound.
  * @param onToggleSunMoonTheme Callback to toggle between Sun Day and Moon Night eye-comfort modes.
  * @param selectedHealthProvider Currently active step provider bridge.
  * @param onHealthProviderSelected Callback when provider changes.
@@ -917,6 +900,7 @@ private fun GlobalConfigContent(
     isAutoDim: Boolean,
     bellVolume: Float,
     bgMusicVolume: Float,
+    isBgMusicEnabled: Boolean = true,
     onThemeSelected: (ThemeMode) -> Unit,
     onZenModeToggle: (Boolean) -> Unit,
     onPocketModeToggle: (Boolean) -> Unit,
@@ -924,6 +908,9 @@ private fun GlobalConfigContent(
     onAutoDimToggle: (Boolean) -> Unit,
     onVolumeChange: (Float) -> Unit,
     onBgMusicVolumeChange: (Float) -> Unit,
+    onBgMusicToggle: (Boolean) -> Unit = {},
+    onTestOptionC: () -> Unit = {},
+    onPreviewBgMusic: (Boolean) -> Unit = {},
     onToggleSunMoonTheme: () -> Unit,
     selectedHealthProvider: HealthProviderType,
     onHealthProviderSelected: (HealthProviderType) -> Unit,
@@ -1032,7 +1019,7 @@ private fun GlobalConfigContent(
         }
 
         // -------------------------------------------------------------
-        // 3. Master Audio Gain Levels
+        // 3. Master Audio Gain & Ambient Sound Controls
         // -------------------------------------------------------------
         Card(
             shape = RoundedCornerShape(14.dp),
@@ -1049,7 +1036,7 @@ private fun GlobalConfigContent(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text("Bell Master Volume", style = MaterialTheme.typography.bodyMedium)
+                    Text("Bell Master Volume", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
                     Text("${(bellVolume * 100).toInt()}%", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                 }
                 Slider(
@@ -1062,26 +1049,71 @@ private fun GlobalConfigContent(
                     )
                 )
 
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // 2. Background / Ambient Music Volume
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.End
                 ) {
-                    Text("Background Ambient Volume", style = MaterialTheme.typography.bodyMedium)
-                    Text("${(bgMusicVolume * 100).toInt()}%", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                    OutlinedButton(
+                        onClick = onTestOptionC,
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                    ) {
+                        Text("▶ Test Bell Chime", style = MaterialTheme.typography.labelSmall)
+                    }
                 }
-                Slider(
-                    value = bgMusicVolume,
-                    onValueChange = onBgMusicVolumeChange,
-                    valueRange = 0f..1f,
-                    colors = SliderDefaults.colors(
-                        thumbColor = MaterialTheme.colorScheme.primary,
-                        activeTrackColor = MaterialTheme.colorScheme.primary
-                    )
+
+                Spacer(modifier = Modifier.height(14.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // 2. Ambient Soundscape Mute Switch (Bug 2: ambient mute in Global setting)
+                SettingsToggleRow(
+                    title = "Background Ambient Sound",
+                    subtitle = "Continuous soothing frequency while timers run",
+                    checked = isBgMusicEnabled,
+                    onCheckedChange = onBgMusicToggle
                 )
+
+                if (isBgMusicEnabled) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Background Ambient Volume", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                        Text("${(bgMusicVolume * 100).toInt()}%", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                    }
+                    Slider(
+                        value = bgMusicVolume,
+                        onValueChange = onBgMusicVolumeChange,
+                        valueRange = 0f..1f,
+                        colors = SliderDefaults.colors(
+                            thumbColor = MaterialTheme.colorScheme.primary,
+                            activeTrackColor = MaterialTheme.colorScheme.primary
+                        )
+                    )
+
+                    var isPreviewingAmbient by remember { mutableStateOf(false) }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                isPreviewingAmbient = !isPreviewingAmbient
+                                onPreviewBgMusic(isPreviewingAmbient)
+                            },
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                        ) {
+                            Text(
+                                text = if (isPreviewingAmbient) "⏹ Stop Ambient Sound" else "▶ Test Ambient Sound",
+                                style = MaterialTheme.typography.labelSmall
+                            )
+                        }
+                    }
+                }
             }
         }
 
@@ -2305,31 +2337,6 @@ private fun PranayamaSettingsSheet(
                             }
                         }
                     }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    // Subtle Ambient Sound Volume Slider
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text("Subtle Ambient Volume", style = MaterialTheme.typography.bodyMedium)
-                        Text(
-                            text = "${(bgMusicVolume * 100).toInt()}%",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                    Slider(
-                        value = bgMusicVolume,
-                        onValueChange = onBgMusicVolumeChange,
-                        valueRange = 0f..1f,
-                        colors = SliderDefaults.colors(
-                            thumbColor = MaterialTheme.colorScheme.primary,
-                            activeTrackColor = MaterialTheme.colorScheme.primary
-                        )
-                    )
                 }
             }
         }
@@ -2929,29 +2936,6 @@ private fun SuryaSettingsSheet(
                             }
                         }
                     }
-
-                    Spacer(modifier = Modifier.height(14.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("Ambient Volume", style = MaterialTheme.typography.bodyMedium)
-                        Text(
-                            text = "${(bgMusicVolume * 100).toInt()}%",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                    Slider(
-                        value = bgMusicVolume,
-                        onValueChange = onBgMusicVolumeChange,
-                        valueRange = 0f..1f,
-                        colors = SliderDefaults.colors(
-                            thumbColor = MaterialTheme.colorScheme.primary,
-                            activeTrackColor = MaterialTheme.colorScheme.primary
-                        )
-                    )
                 }
             }
         }

@@ -79,12 +79,21 @@ class BackgroundMusicManager(private val context: Context) {
     /**
      * Normalized audio volume gain (0.0f to 1.0f).
      * Synchronously propagates volume changes to both [MediaPlayer] and the YouTube IFrame player.
+     * Cancels any active fade animator to provide immediate, responsive slider feedback.
      */
     var volume: Float = 0.35f
         set(value) {
-            field = value.coerceIn(0f, 1f)
-            if (!isDucked) {
-                applyVolumeToOutputs(field)
+            val safeGain = value.coerceIn(0f, 1f)
+            field = safeGain
+            // Immediate manual override: cancel smooth fade transitions so slider responds instantly
+            fadeAnimator?.let { mainHandler.removeCallbacks(it) }
+            fadeAnimator = null
+            if (isDucked) {
+                // If temporarily ducked for voice guidance, recompute attenuated gain from user's new base volume
+                val ducked = (safeGain * 0.20f).coerceIn(0.04f, 0.15f)
+                applyVolumeToOutputs(ducked)
+            } else {
+                applyVolumeToOutputs(safeGain)
             }
         }
 
@@ -231,6 +240,9 @@ class BackgroundMusicManager(private val context: Context) {
      */
     fun pause() {
         isPlaying = false
+        isDucked = false
+        fadeAnimator?.let { mainHandler.removeCallbacks(it) }
+        fadeAnimator = null
         try {
             if (mediaPlayer?.isPlaying == true) {
                 mediaPlayer?.pause()
@@ -246,6 +258,7 @@ class BackgroundMusicManager(private val context: Context) {
     fun resume() {
         if (!isEnabled || soundType == BackgroundSoundType.NONE) return
         isPlaying = true
+        isDucked = false
         when (soundType) {
             BackgroundSoundType.YOUTUBE_LINK -> {
                 sendYouTubeCommand("playVideo")
@@ -270,6 +283,7 @@ class BackgroundMusicManager(private val context: Context) {
      */
     fun stop() {
         isPlaying = false
+        isDucked = false
         fadeAnimator?.let { mainHandler.removeCallbacks(it) }
         fadeAnimator = null
         stopMediaPlayer()
@@ -322,7 +336,9 @@ class BackgroundMusicManager(private val context: Context) {
                     prepare()
                     setVolume(this@BackgroundMusicManager.volume, this@BackgroundMusicManager.volume)
                     start()
+                    setVolume(this@BackgroundMusicManager.volume, this@BackgroundMusicManager.volume)
                 }
+                currentOutputGain = this@BackgroundMusicManager.volume
                 Log.d(TAG, "Playing internal custom Aum background track (default)")
                 return
             } catch (e: Exception) {
@@ -341,7 +357,9 @@ class BackgroundMusicManager(private val context: Context) {
                     prepare()
                     setVolume(this@BackgroundMusicManager.volume, this@BackgroundMusicManager.volume)
                     start()
+                    setVolume(this@BackgroundMusicManager.volume, this@BackgroundMusicManager.volume)
                 }
+                currentOutputGain = this@BackgroundMusicManager.volume
                 return
             } catch (e: Exception) {
                 Log.w(TAG, "Failed playing custom file, falling back to bundled Aum", e)
@@ -354,7 +372,9 @@ class BackgroundMusicManager(private val context: Context) {
                 isLooping = true
                 setVolume(this@BackgroundMusicManager.volume, this@BackgroundMusicManager.volume)
                 start()
+                setVolume(this@BackgroundMusicManager.volume, this@BackgroundMusicManager.volume)
             }
+            currentOutputGain = this@BackgroundMusicManager.volume
             Log.d(TAG, "Playing bundled raw Aum ambient track")
         } catch (e: Exception) {
             Log.e(TAG, "Failed creating MediaPlayer with bundled R.raw.aum", e)
@@ -378,7 +398,7 @@ class BackgroundMusicManager(private val context: Context) {
                 }
 
                 activeVideoId = videoId
-                val targetVol = (volume * 100).toInt().coerceIn(10, 100)
+                val targetVol = (volume * 100).toInt().coerceIn(0, 100)
 
                 // Robust HTML using official YouTube IFrame Player API with auto ad-skipping and infinite loop
                 val embedHtml = """

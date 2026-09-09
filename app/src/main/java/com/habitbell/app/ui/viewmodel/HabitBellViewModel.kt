@@ -871,6 +871,10 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
         saveSettings()
     }
 
+    /**
+     * Loads persisted user settings from [SharedPreferences] into [_uiState], [audioManager], and [bgMusicManager].
+     * Restores background ambient settings, volume gains, active bell styles, and auto-dim preferences.
+     */
     private fun loadSettings() {
         val internalAumFile = java.io.File(getApplication<Application>().filesDir, "custom_aum.mp3")
         val hasInternalAum = internalAumFile.exists() && internalAumFile.length() > 0
@@ -897,6 +901,7 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
         }
 
         val savedAutoDim = prefs.getBoolean("is_auto_dim", true)
+        val savedBellVol = prefs.getFloat("bell_volume", 0.9f)
 
         _uiState.update {
             it.copy(
@@ -907,11 +912,13 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
                 bgMusicVolume = savedVol,
                 bgMusicYouTubeUrl = savedYt,
                 bellStyle = savedStyle,
+                bellVolume = savedBellVol,
                 isAutoDim = savedAutoDim
             )
         }
 
         audioManager.bellStyle = savedStyle
+        audioManager.setVolume(savedBellVol)
         bgMusicManager.isEnabled = savedEnabled
         bgMusicManager.soundType = savedType
         bgMusicManager.customAudioUri = savedUri
@@ -919,6 +926,9 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
         bgMusicManager.youtubeUrl = savedYt
     }
 
+    /**
+     * Persists current audio settings, volume levels, bell styles, and auto-dim preferences to [SharedPreferences].
+     */
     private fun saveSettings() {
         val state = _uiState.value
         prefs.edit()
@@ -927,6 +937,7 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
             .putString("bg_music_custom_uri", state.bgMusicCustomUri)
             .putString("bg_music_custom_name", state.bgMusicCustomName)
             .putFloat("bg_music_volume", state.bgMusicVolume)
+            .putFloat("bell_volume", state.bellVolume)
             .putString("bg_music_yt_url", state.bgMusicYouTubeUrl)
             .putString("bell_style", state.bellStyle.name)
             .putBoolean("is_auto_dim", state.isAutoDim)
