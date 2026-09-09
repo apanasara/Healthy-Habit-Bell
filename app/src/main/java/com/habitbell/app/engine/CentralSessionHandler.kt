@@ -258,6 +258,7 @@ class CentralSessionHandler(private val application: Application) {
                             updatePlaybackState(PlaybackStateCompat.STATE_PLAYING, elapsedMs)
                             updateMetadata(state.profile)
                             batteryOptimizer.acquireWakeLock()
+                            batteryOptimizer.acquireWifiLock()
                             displayAutomationManager.startMonitoring()
                             bgMusicManager.start()
                             startMediaService()

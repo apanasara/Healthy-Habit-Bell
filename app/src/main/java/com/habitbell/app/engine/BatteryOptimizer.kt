@@ -162,17 +162,22 @@ class BatteryOptimizer(private val context: Context) : SensorEventListener {
     }
 
     /**
-     * Adjusts the window screen brightness level for battery-dominant Display Mode.
+     * Adjusts the window screen brightness level for battery-dominant Display Mode and Screen Mirroring.
+     *
+     * Crucially, setting [WindowManager.LayoutParams.screenBrightness] modulates only the physical
+     * backlight/OLED emissive panel of the host smartphone. It does NOT alter the GPU rendering
+     * buffer (`SurfaceFlinger`), allowing external displays mirrored via Chromecast, Miracast,
+     * or Samsung Smart View to remain at 100% full, un-dimmed brightness while the phone conserves battery.
      *
      * @param activity Hosting Activity.
-     * @param dim If true, reduces brightness to minimal 3% (0.03f) for extreme battery savings;
+     * @param dim If true, reduces hardware panel brightness to minimal 1% (0.01f) for extreme battery savings;
      *            if false, restores system auto-brightness ([WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE]).
      */
     fun setScreenBrightness(activity: Activity, dim: Boolean) {
         try {
             activity.runOnUiThread {
                 val layout = activity.window.attributes
-                layout.screenBrightness = if (dim) 0.03f else WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+                layout.screenBrightness = if (dim) 0.01f else WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
                 activity.window.attributes = layout
                 _isScreenDimmed.value = dim
             }

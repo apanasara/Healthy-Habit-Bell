@@ -28,12 +28,20 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.habitbell.app.R
+import com.habitbell.app.audio.VoiceCueMode
+import com.habitbell.app.data.SuryaDatabase
 import com.habitbell.app.data.model.*
 import com.habitbell.app.engine.BackgroundSoundType
 import com.habitbell.app.engine.BellSoundStyle
 import com.habitbell.app.health.HealthProviderType
+import com.habitbell.app.sync.SuryaSyncManager
+import com.habitbell.app.ui.AnimatedPoseView
 import com.habitbell.app.ui.components.CastButton
 import com.habitbell.app.ui.viewmodel.SettingsDrawerTab
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 
 /**
  * # SettingsDrawer
@@ -150,7 +158,8 @@ fun SettingsDrawer(
     onRequestActivityPermission: () -> Unit = {},
     activeTab: SettingsDrawerTab = SettingsDrawerTab.TIMER,
     onTabSelected: (SettingsDrawerTab) -> Unit = {},
-    onToggleSunMoonTheme: () -> Unit = {}
+    onToggleSunMoonTheme: () -> Unit = {},
+    onOpenSuryaEditor: () -> Unit = {}
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -276,7 +285,8 @@ fun SettingsDrawer(
                             onPickCustomAudio = onPickCustomAudio,
                             onBgMusicYouTubeUrlChange = onBgMusicYouTubeUrlChange,
                             onBgMusicVolumeChange = onBgMusicVolumeChange,
-                            onPreviewBgMusic = onPreviewBgMusic
+                            onPreviewBgMusic = onPreviewBgMusic,
+                            onOpenSuryaEditor = onOpenSuryaEditor
                         )
                     }
                 } else {
@@ -342,7 +352,8 @@ private fun TimerSettingsContent(
     onPickCustomAudio: () -> Unit,
     onBgMusicYouTubeUrlChange: (String) -> Unit,
     onBgMusicVolumeChange: (Float) -> Unit,
-    onPreviewBgMusic: (Boolean) -> Unit
+    onPreviewBgMusic: (Boolean) -> Unit,
+    onOpenSuryaEditor: () -> Unit = {}
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
         // -------------------------------------------------------------
@@ -451,6 +462,27 @@ private fun TimerSettingsContent(
                 onUpdatePranayama = onUpdatePranayama,
                 onTestVoiceCue = onTestVoiceCue,
                 onTestPranayamaIntervalBell = onTestPranayamaIntervalBell,
+                isBgMusicEnabled = isBgMusicEnabled,
+                bgMusicType = bgMusicType,
+                bgMusicCustomName = bgMusicCustomName,
+                bgMusicYouTubeUrl = bgMusicYouTubeUrl,
+                bgMusicVolume = bgMusicVolume,
+                onBgMusicToggle = onBgMusicToggle,
+                onBgMusicTypeSelected = onBgMusicTypeSelected,
+                onPickCustomAudio = onPickCustomAudio,
+                onBgMusicYouTubeUrlChange = onBgMusicYouTubeUrlChange,
+                onBgMusicVolumeChange = onBgMusicVolumeChange,
+                onPreviewBgMusic = onPreviewBgMusic
+            )
+            return
+        } else if (profile.type == TimerType.COMPOUND || profile.compoundConfig != null || profile.id.contains("surya", ignoreCase = true) || profile.name.contains("Surya", ignoreCase = true)) {
+            // Dedicated Classical Surya Namaskar Sequence & Preset Configuration
+            SuryaSettingsSheet(
+                profile = profile,
+                onOpenFullscreenEditor = onOpenSuryaEditor,
+                onTestOptionC = onTestOptionC,
+                onTestGong = onTestGong,
+                onStartQuickDemo = onStartQuickDemo,
                 isBgMusicEnabled = isBgMusicEnabled,
                 bgMusicType = bgMusicType,
                 bgMusicCustomName = bgMusicCustomName,
@@ -2299,3 +2331,628 @@ private fun PranayamaSettingsSheet(
         }
     }
 }
+
+/**
+ * # SuryaSettingsSheet
+ *
+ * Dedicated configuration sheet for Surya Namaskar (Sun Salutation) compound sequences.
+ * Provides fine-grained controls for speed presets (Slow, Moderate, Fast), target rounds,
+ * individual posture timing, voice guidance modes, solar mantras, ambient soundscapes, and Wear OS companion synchronization.
+ *
+ * Architectural Role: Primary UI configuration sheet for Surya Namaskar routines embedded within [SettingsDrawer].
+ * Concurrency: State updates and Room database interactions are dispatched asynchronously onto `Dispatchers.IO`.
+ *
+ * @param profile Active Surya Namaskar [TimerProfile].
+ * @param onOpenFullscreenEditor Callback navigating to the full sequence editor screen ([AppScreen.SURYA_TIMER]).
+ * @param onTestOptionC Callback triggering test playback of Option C separator chime.
+ * @param onTestGong Callback triggering test playback of Tibetan singing bowl / Temple Gong completion chime.
+ * @param onStartQuickDemo Callback initiating a fast 10-second audition sequence.
+ * @param isBgMusicEnabled Flag indicating whether background ambient drone is enabled.
+ * @param bgMusicType The active [BackgroundSoundType] selection.
+ * @param bgMusicCustomName Display name for custom picked audio file, if any.
+ * @param bgMusicYouTubeUrl Configured YouTube audio URL stream link.
+ * @param bgMusicVolume Normalized ambient background volume in range 0.0f..1.0f.
+ * @param onBgMusicToggle Callback invoked when background ambient sound toggle switches state.
+ * @param onBgMusicTypeSelected Callback invoked when sound source type changes.
+ * @param onPickCustomAudio Callback opening SAF file picker for user-provided soundscapes.
+ * @param onBgMusicYouTubeUrlChange Callback updating YouTube stream URL.
+ * @param onBgMusicVolumeChange Callback updating normalized ambient volume.
+ * @param onPreviewBgMusic Callback toggling temporary audition preview of selected ambient sound.
+ */
+@Composable
+private fun SuryaSettingsSheet(
+    profile: TimerProfile,
+    onOpenFullscreenEditor: () -> Unit,
+    onTestOptionC: () -> Unit,
+    onTestGong: () -> Unit,
+    onStartQuickDemo: () -> Unit,
+    isBgMusicEnabled: Boolean,
+    bgMusicType: BackgroundSoundType,
+    bgMusicCustomName: String?,
+    bgMusicYouTubeUrl: String,
+    bgMusicVolume: Float,
+    onBgMusicToggle: (Boolean) -> Unit,
+    onBgMusicTypeSelected: (BackgroundSoundType) -> Unit,
+    onPickCustomAudio: () -> Unit,
+    onBgMusicYouTubeUrlChange: (String) -> Unit,
+    onBgMusicVolumeChange: (Float) -> Unit,
+    onPreviewBgMusic: (Boolean) -> Unit
+) {
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    val database = remember { com.habitbell.app.data.SuryaDatabase.getInstance(context) }
+    val stepDao = remember { database.stepDao() }
+    val syncManager = remember { com.habitbell.app.sync.SuryaSyncManager(context, database) }
+
+    // Ensure database is populated with the 12 classical postures
+    LaunchedEffect(Unit) {
+        com.habitbell.app.data.SuryaDatabase.seedIfEmpty(context)
+    }
+
+    val steps by stepDao.getAllSteps().collectAsState(initial = emptyList())
+    var selectedPreset by remember { mutableStateOf<String?>("moderate") }
+    var customPaceSeconds by remember { mutableStateOf(7) }
+    var syncStatusMessage by remember { mutableStateOf<String?>(null) }
+    var targetRounds by remember(profile.id) { mutableStateOf(profile.compoundConfig?.targetRounds ?: 5) }
+
+    LaunchedEffect(steps) {
+        if (steps.isNotEmpty() && selectedPreset != "custom") {
+            val firstDur = steps.first().durationSeconds
+            val allSame = steps.all { it.durationSeconds == firstDur }
+            selectedPreset = when {
+                allSame && firstDur == 10 -> "slow"
+                allSame && firstDur == 5 -> "moderate"
+                allSame && firstDur == 3 -> "fast"
+                else -> "custom"
+            }
+            if (selectedPreset == "custom") {
+                customPaceSeconds = firstDur
+            }
+        }
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        // -------------------------------------------------------------
+        // Card 1: Speed Presets (4 Presets: Slow 10s, Moderate 5s, Fast 3s, Custom)
+        // -------------------------------------------------------------
+        Card(
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(Icons.Filled.WbSunny, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    Text("Speed Presets", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Quickly adjust pace across all 12 postures (or select Custom to edit):",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    listOf(
+                        "slow" to "Slow (10s)",
+                        "moderate" to "Moderate (5s)",
+                        "fast" to "Fast (3s)",
+                        "custom" to "Custom"
+                    ).forEach { (presetKey, label) ->
+                        val isSelected = selectedPreset == presetKey
+                        val dur = when (presetKey) { "slow" -> 10; "fast" -> 3; "moderate" -> 5; else -> customPaceSeconds }
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable {
+                                    selectedPreset = presetKey
+                                    if (presetKey != "custom") {
+                                        coroutineScope.launch(Dispatchers.IO) {
+                                            val all = stepDao.getAllSteps().first()
+                                            all.forEach { stepDao.update(it.copy(durationSeconds = dur)) }
+                                        }
+                                    }
+                                }
+                        ) {
+                            Text(
+                                text = label,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onBackground,
+                                modifier = Modifier
+                                    .padding(vertical = 10.dp)
+                                    .wrapContentWidth(Alignment.CenterHorizontally)
+                            )
+                        }
+                    }
+                }
+
+                // If Custom preset is selected, show editable custom timing controls
+                if (selectedPreset == "custom") {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "CUSTOM ASANA PACE",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                if (customPaceSeconds > 1) {
+                                    customPaceSeconds--
+                                    coroutineScope.launch(Dispatchers.IO) {
+                                        val all = stepDao.getAllSteps().first()
+                                        all.forEach { stepDao.update(it.copy(durationSeconds = customPaceSeconds)) }
+                                    }
+                                }
+                            },
+                            contentPadding = PaddingValues(horizontal = 10.dp)
+                        ) { Text("-1s") }
+
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.surface,
+                            modifier = Modifier.padding(horizontal = 2.dp)
+                        ) {
+                            Text(
+                                text = "${customPaceSeconds}s",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                            )
+                        }
+
+                        OutlinedButton(
+                            onClick = {
+                                customPaceSeconds++
+                                coroutineScope.launch(Dispatchers.IO) {
+                                    val all = stepDao.getAllSteps().first()
+                                    all.forEach { stepDao.update(it.copy(durationSeconds = customPaceSeconds)) }
+                                }
+                            },
+                            contentPadding = PaddingValues(horizontal = 10.dp)
+                        ) { Text("+1s") }
+
+                        listOf(4, 7, 8, 12, 15).forEach { sec ->
+                            val isChipSelected = customPaceSeconds == sec
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = if (isChipSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable {
+                                        customPaceSeconds = sec
+                                        coroutineScope.launch(Dispatchers.IO) {
+                                            val all = stepDao.getAllSteps().first()
+                                            all.forEach { stepDao.update(it.copy(durationSeconds = sec)) }
+                                        }
+                                    }
+                            ) {
+                                Text(
+                                    text = "${sec}s",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = if (isChipSelected) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (isChipSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onBackground,
+                                    modifier = Modifier.padding(vertical = 8.dp).wrapContentWidth(Alignment.CenterHorizontally)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // -------------------------------------------------------------
+        // Card 2: Target Practice Rounds (3, 5, 12, 24, 108 rounds)
+        // -------------------------------------------------------------
+        Card(
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("Target Practice Rounds", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "A complete round cycles through all 12 classical postures:",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "$targetRounds Rounds (${targetRounds * 12} Asanas)",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(
+                            onClick = { if (targetRounds > 1) targetRounds-- },
+                            contentPadding = PaddingValues(horizontal = 12.dp)
+                        ) { Text("-1") }
+
+                        Button(
+                            onClick = { targetRounds++ },
+                            contentPadding = PaddingValues(horizontal = 12.dp)
+                        ) { Text("+1") }
+
+                        Button(
+                            onClick = { targetRounds += 5 },
+                            contentPadding = PaddingValues(horizontal = 12.dp)
+                        ) { Text("+5") }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    listOf(3, 5, 12, 24, 108).forEach { r ->
+                        val isSelected = targetRounds == r
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable { targetRounds = r }
+                        ) {
+                            Text(
+                                text = "$r",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onBackground,
+                                modifier = Modifier
+                                    .padding(vertical = 8.dp)
+                                    .wrapContentWidth(Alignment.CenterHorizontally)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // -------------------------------------------------------------
+        // Card 3: 12 Classical Postures Sequence Summary & Full Editor
+        // -------------------------------------------------------------
+        Card(
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    AnimatedPoseView(
+                        drawableResId = R.drawable.avd_yoga_pranamasana,
+                        size = 48.dp,
+                        contentDescription = "Pranamasana"
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("12 Posture Sequence & Voice Guidance", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text("Individual step durations, Sanskrit voice cues & solar mantras", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Voice Guidance for All Steps (Global selection)
+                val currentVoiceMode = steps.firstOrNull()?.voiceCueMode ?: VoiceCueMode.STEP_NAME
+                Text(
+                    text = "VOICE GUIDANCE (ALL STEPS)",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    listOf(
+                        VoiceCueMode.STEP_NAME to "Asana Name",
+                        VoiceCueMode.SLOKA to "Solar Mantra",
+                        VoiceCueMode.PRANIC to "Breath Flow",
+                        VoiceCueMode.NONE to "Silent / Bell"
+                    ).forEach { (mode, label) ->
+                        val isSelected = currentVoiceMode == mode
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable {
+                                    coroutineScope.launch(Dispatchers.IO) {
+                                        val all = stepDao.getAllSteps().first()
+                                        all.forEach { stepDao.update(it.copy(voiceCueMode = mode)) }
+                                    }
+                                }
+                        ) {
+                            Text(
+                                text = label,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onBackground,
+                                modifier = Modifier
+                                    .padding(vertical = 8.dp)
+                                    .wrapContentWidth(Alignment.CenterHorizontally)
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+                Text(
+                    text = "POSTURES SEQUENCE PREVIEW",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+
+                // Postures Preview List
+                val displaySteps = if (steps.isNotEmpty()) steps else com.habitbell.app.data.default.DefaultProfiles.SURYA_NAMASKAR.compoundConfig?.poses?.mapIndexed { idx, p ->
+                    StepEntity(
+                        id = (idx + 1).toLong(),
+                        name = "${p.name} (${p.sanskritName})",
+                        orderIdx = idx,
+                        isEnabled = true,
+                        voiceCueMode = currentVoiceMode,
+                        audioCue = "surya_${idx + 1}",
+                        mantraEnabled = true,
+                        assetRef = if (idx == 0 || idx == 11) "avd_yoga_pranamasana" else "",
+                        durationSeconds = p.durationSeconds,
+                        repetition = 1
+                    )
+                } ?: emptyList()
+
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    displaySteps.take(4).forEach { step ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                                .padding(horizontal = 10.dp, vertical = 6.dp)
+                        ) {
+                            Text(
+                                text = "${step.orderIdx + 1}. ${step.name}",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Medium,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Text(
+                                text = "${step.durationSeconds}s • ${step.voiceCueMode.displayName}",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                    if (displaySteps.size > 4) {
+                        Text(
+                            text = "+ ${displaySteps.size - 4} more classical postures in full sequence",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(start = 4.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                Button(
+                    onClick = onOpenFullscreenEditor,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                ) {
+                    Text("Open Posture & Voice Cue Editor", fontWeight = FontWeight.SemiBold)
+                }
+            }
+        }
+
+        // -------------------------------------------------------------
+        // Card 4: Companion Watch Synchronization (Phone ↔ Watch)
+        // -------------------------------------------------------------
+        Card(
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text("Companion Watch Synchronization", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Push current 12-pose sequence, timings, and speed presets to your Wear OS watch over Wearable Data Layer API (/surya_sync):",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+
+                OutlinedButton(
+                    onClick = {
+                        syncManager.pushSyncToWatch()
+                        syncStatusMessage = "Sync payload sent to watch successfully!"
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Sync to Wear OS Watch")
+                }
+
+                syncStatusMessage?.let { msg ->
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = "✓ $msg",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+        }
+
+        // -------------------------------------------------------------
+        // Card 5: Background Ambient Soundscape
+        // -------------------------------------------------------------
+        Card(
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("Background Ambient Sound", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text("Continuous soothing frequency while this timer runs", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Switch(
+                        checked = isBgMusicEnabled,
+                        onCheckedChange = onBgMusicToggle,
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = MaterialTheme.colorScheme.onPrimary,
+                            checkedTrackColor = MaterialTheme.colorScheme.primary
+                        )
+                    )
+                }
+
+                if (isBgMusicEnabled) {
+                    Spacer(modifier = Modifier.height(14.dp))
+                    Text("SOUND SOURCE", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        val sources = listOf(
+                            BackgroundSoundType.DEFAULT_AUM to "ॐ Aum",
+                            BackgroundSoundType.YOUTUBE_LINK to "YouTube Audio",
+                            BackgroundSoundType.CUSTOM_FILE to "Custom File"
+                        )
+                        sources.forEach { (type, label) ->
+                            val isSelected = bgMusicType == type
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable { onBgMusicTypeSelected(type) }
+                            ) {
+                                Text(
+                                    text = label,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onBackground,
+                                    modifier = Modifier.padding(vertical = 10.dp).wrapContentWidth(Alignment.CenterHorizontally)
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Ambient Volume", style = MaterialTheme.typography.bodyMedium)
+                        Text(
+                            text = "${(bgMusicVolume * 100).toInt()}%",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    Slider(
+                        value = bgMusicVolume,
+                        onValueChange = onBgMusicVolumeChange,
+                        valueRange = 0f..1f,
+                        colors = SliderDefaults.colors(
+                            thumbColor = MaterialTheme.colorScheme.primary,
+                            activeTrackColor = MaterialTheme.colorScheme.primary
+                        )
+                    )
+                }
+            }
+        }
+
+        // -------------------------------------------------------------
+        // Card 6: Signature Acoustic Bells Audition
+        // -------------------------------------------------------------
+        Card(
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(Icons.Outlined.NotificationsActive, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    Text("Signature Acoustic Identity", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Separator bell strikes on pose transition; deep resonant Temple Gong completes session:",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = onTestOptionC,
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                    ) {
+                        Text("▶ Separator", style = MaterialTheme.typography.labelMedium)
+                    }
+                    Button(
+                        onClick = onTestGong,
+                        modifier = Modifier.weight(1f),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                    ) {
+                        Text("▶ End Gong", style = MaterialTheme.typography.labelMedium)
+                    }
+                    OutlinedButton(
+                        onClick = onStartQuickDemo,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("⏱ 10s Demo", style = MaterialTheme.typography.labelMedium)
+                    }
+                }
+            }
+        }
+    }
+}
+

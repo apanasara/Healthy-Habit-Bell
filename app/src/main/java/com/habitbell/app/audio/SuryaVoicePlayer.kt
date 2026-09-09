@@ -31,13 +31,26 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
- * Enum representing the supported voice-cue modes for Surya Namaskar.
+ * Enum representing the supported voice-cue modes for Surya Namaskar sequences.
+ *
+ * @property mode Numeric identifier persisted in SQLite Room database.
  */
 enum class VoiceCueMode(val mode: Int) {
     NONE(0),
     PRANIC(1),
     STEP_NAME(2),
-    SLOKA(3)
+    SLOKA(3);
+
+    /**
+     * User-facing localized display name for UI chips and badges.
+     */
+    val displayName: String
+        get() = when (this) {
+            NONE -> "Silent / Bell"
+            PRANIC -> "Breath Flow"
+            STEP_NAME -> "Asana Name"
+            SLOKA -> "Solar Mantra"
+        }
 }
 
 /**
