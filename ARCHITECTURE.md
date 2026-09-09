@@ -509,6 +509,42 @@ Grounded in *Hatha Yoga Pradipika* (2.12) & *Gheranda Samhita* (5.49):
 
 ---
 
+### 2.13. Surya Namaskār Timer & Room Persistence Subsystem (`com.habitbell.app.data`, `com.habitbell.app.ui`, `com.habitbell.app.sync`, `com.habitbell.app.audio`)
+
+The Surya Namaskar subsystem provides comprehensive data persistence, animated vector visualization, speed presets, audio guidance, and companion Wear OS synchronization for classical Sun Salutation practices:
+
+#### 1. Room Database Architecture (`SuryaDatabase.kt`)
+- **Single Source of Local Schema**: Implements an offline-first SQLite database managed via AndroidX Room (`androidx.room:room-runtime:2.6.1`, `room-ktx`, with `ksp` compiler).
+- **Process Singleton Pattern**: Thread-safe initialization using double-checked locking in `SuryaDatabase.getInstance(context)`. Configured with `fallbackToDestructiveMigration()` for streamlined schema evolution.
+- **Relational Entity Model**:
+  - `StepEntity`: Stored under table `"steps"`. Models individual postures with `@PrimaryKey(autoGenerate = true) val id: Long`, `name`, `orderIdx`, `isEnabled`, `voiceCueMode: VoiceCueMode`, `audioCue: String`, `mantraEnabled: Boolean`, `assetRef: String`, and timing fields (`durationSeconds`, `repetition`, `puraka`, `kumbhaka`, `rekha`).
+  - `PresetEntity`: Stored under table `"presets"`. Maps preset identifiers (`"slow"`, `"moderate"`, `"fast"`) to JSON-serialized duration configurations.
+  - `SettingEntity`: Stored under table `"settings"`. Key-value store for user-configured audio styles and companion sync preferences.
+- **Type Converters (`SuryaTypeConverters`)**: Serializes non-primitive enum types like `VoiceCueMode` (`NONE(0)`, `PRANIC(1)`, `STEP_NAME(2)`, `SLOKA(3)`) to/from integer columns.
+- **Data Access Objects (DAOs)**:
+  - `StepDao`: Exposes reactive `getAllSteps(): Flow<List<StepEntity>>`, `getStepById(id)`, `insert()`, `update()`, and `delete()`.
+  - `PresetDao`: CRUD access for speed preset entities.
+  - `SettingDao`: Key-value query and mutation with reactive `getAllSettings(): Flow<List<SettingEntity>>`.
+
+#### 2. Presentation Layer & Animated Silhouette Visuals (`SuryaTimerScreen.kt`, `AnimatedPoseView.kt`)
+- **Reactive UI Flow**: `SuryaTimerViewModel` exposes `steps: StateFlow<List<StepUiModel>>` mapped directly from `StepDao.getAllSteps()`. On initial database creation, `seedDefaultDataIfEmpty()` automatically seeds all 12 classical postures from `DefaultProfiles.SURYA_NAMASKAR`.
+- **Speed Presets**: Integrated `FilterChip` selectors for Slow (10s), Moderate (5s), and Fast (3s) immediately recalculate all active posture durations across the sequence.
+- **Animated Silhouette Rendering (`AnimatedPoseView.kt`)**:
+  - Bridges Android's native `AnimatedVectorDrawable` (`avd_yoga_pranamasana.xml`) into Jetpack Compose via `AndroidView` with `ImageView`.
+  - Employs `(drawable as? Animatable)?.start()` inside `DisposableEffect` for lifecycle-aware, zero-leak entrance animations.
+  - Two concurrent visual animations: 12dp vertical rise translation (`translateY` 12dp $\rightarrow$ 0dp over 800ms) paired with progressive fill opacity (`fillAlpha` 0.0 $\rightarrow$ 1.0 over 600ms) with quadratic deceleration.
+
+#### 3. Companion Wear OS Synchronization (`SuryaSyncManager.kt`)
+- **Wearable Data Layer Client**: Pushes serialized timer configuration payloads across the Google Play Services `Wearable.getDataClient(context)` bridge.
+- **Payload Contract (`/surya_sync`)**: Packs step models, presets, and settings into a unified JSON descriptor via `JsonUtil` (Google Gson) transferred as an urgent `PutDataMapRequest`.
+- **Zero-Latency Push**: Executed asynchronously on `Dispatchers.IO` when the user taps "Sync Watch" on the phone interface.
+
+#### 4. Audio Guidance & Voice Player (`SuryaVoicePlayer.kt`)
+- **Melodious Vocal Delivery**: Aligned with the Lata Mangeshkar high-frequency swara standard (`+52Hz`, sweet calming tone).
+- **Anti-Startle Lead Delay & Smooth Ducking**: Inserts a 120ms lead delay after smooth background music ducking (`duckVolume(duckedRatio = 0.20f, durationMs = 350L)`) before speech starts, and gently restores background audio over 500ms upon completion.
+
+---
+
 ## 3. Concurrency & Threading Architecture
 
 | Component | Scope / Execution Context | Dispatcher | Architectural Rationale |
@@ -526,6 +562,10 @@ Grounded in *Hatha Yoga Pradipika* (2.12) & *Gheranda Samhita* (5.49):
 | `DisplayAutomationManager` | `CoroutineScope(SupervisorJob())` + Sensor Thread | `Dispatchers.Default` | Processes multi-sensor fusion (proximity, lux, gravity, significant motion), orchestrates 10s flat countdowns, and emits atomic `DisplayCurtainState`. |
 | `BackgroundMusicManager` | Main Thread + Background Decode | `Dispatchers.Main` / Media | Coordinates headless WebView audio rendering, MediaPlayer playback, and audio focus ducking. |
 | `PranayamaVoiceGuide` | System TTS Engine Callback Thread | `Dispatchers.Main` / AudioTrack | Coordinates offline Android TextToSpeech synthesis, gentle female voice selection, and dynamic background music ducking. |
+| `SuryaDatabase` | Process Singleton / Room Pool | `Dispatchers.IO` | Manages SQLite connection pooling, schema migrations, and async DAO query executions. |
+| `SuryaTimerViewModel` | `viewModelScope` | `Dispatchers.Main.immediate` | Observes reactive step StateFlows and dispatches preset updates and background seeding to IO. |
+| `SuryaSyncManager` | Dedicated Sync Scope | `Dispatchers.IO` | Serializes configuration JSON payloads and pushes them over Wearable DataClient asynchronously. |
+| `SuryaVoicePlayer` | Main Thread Coroutine Scope | `Dispatchers.Main` / AudioTrack | Manages speech cue MediaPlayer instances, 120ms lead delay, and background music ducking. |
 
 ---
 

@@ -212,7 +212,11 @@
             <button class="btn btn-active" id="btnBgMusic" onclick="toggleBgSound()">ॐ Music: ON (M)</button>
             <button class="btn" onclick="adjustTime(-5)">-5 Min</button>
             <button class="btn" onclick="adjustTime(5)">+5 Min</button>
-        </div>
+            <label for="bellVolume">Bell Volume:</label>
+    <input type="range" id="bellVolume" min="0" max="1" step="0.01" value="0.45">
+    <label for="bgVolume">Music Volume:</label>
+    <input type="range" id="bgVolume" min="0" max="1" step="0.01" value="0.35">
+</div>
         <div class="hint">Use TV Remote [OK / Enter] to Play/Pause • Mobile phone can now be locked or turned off</div>
     </div>
 
@@ -251,27 +255,41 @@
             }
             return audioCtx;
         }
-// Helper to get current bell volume from UI slider (0.0–1.0)
+
+/**
+ * Retrieves the current bell volume from the UI slider.
+ *
+ * @returns {number} Volume in the range [0.0, 1.0].
+ *                    Falls back to 0.45 if the slider is missing or unparsable.
+ */
 function getBellVolume() {
     const slider = document.getElementById('bellVolume');
     if (slider) {
         const val = parseFloat(slider.value);
-        return isNaN(val) ? 0.45 : val; // fallback to default
+        return isNaN(val) ? 0.45 : val;
     }
     return 0.45;
 }
 
-// Helper to get current background music volume from UI slider (0.0–1.0)
+/**
+ * Retrieves the current background music volume from the UI slider.
+ *
+ * @returns {number} Volume in the range [0.0, 1.0].
+ *                    Falls back to 0.35 if the slider is missing or unparsable.
+ */
 function getBgVolume() {
     const slider = document.getElementById('bgVolume');
     if (slider) {
         const val = parseFloat(slider.value);
-        return isNaN(val) ? 0.35 : val; // fallback to default
+        return isNaN(val) ? 0.35 : val;
     }
     return 0.35;
 }
 
-// Update AUM drone gain and YouTube volume when background volume slider changes
+/**
+ * Listens for changes on the background volume slider and propagates the new
+ * value to both the AUM drone gain node and the YouTube iframe player.
+ */
 document.getElementById('bgVolume').addEventListener('input', () => {
     const vol = getBgVolume();
     if (aumGain) {
@@ -279,7 +297,7 @@ document.getElementById('bgVolume').addEventListener('input', () => {
     }
     const frame = document.getElementById('ytFrame');
     if (frame && frame.contentWindow) {
-        // YouTube iframe API: setVolume expects 0-100
+        // YouTube iframe API expects volume 0‑100.
         frame.contentWindow.postMessage(JSON.stringify({event:"command",func:"setVolume",args:[vol * 100]}), '*');
     }
 });
