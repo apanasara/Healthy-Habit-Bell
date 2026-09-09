@@ -169,9 +169,13 @@ class PranayamaVoiceGuide(
     /**
      * Resolves the high-definition studio-mastered audio resource corresponding to [phase] and [style].
      *
-     * If [style] is [VoiceCueStyle.BILINGUAL] but [stepDurationSeconds] is too short (less than 4s),
-     * it gracefully falls back to the concise authentic Sanskrit cue to guarantee that voice prompts
-     * like "Inhale" or "Exhale" are never abruptly cut in half when the subsequent phase starts.
+     * ## Step Timing vs. Voice Timing Law:
+     * High-fidelity, melodious bilingual cues ("Purak... Inhale", "Kumbhak... Hold") require ~5.6s–5.9s
+     * to articulate fully in an unhurried, sweet, meditative Lata-style swara without feeling rushed.
+     * If [style] is [VoiceCueStyle.BILINGUAL] but [stepDurationSeconds] is less than 6 seconds (e.g., a 4s
+     * or 2s/3s Purak step), the engine automatically falls back to the clean single-language Sanskrit cue
+     * ("Purak", 2.2s). This strictly prevents mid-word audio clipping (e.g. "Purak... In-") while
+     * preserving genuine soothing pacing for steps that can accommodate it (e.g., 8s or 16s Kumbhak).
      *
      * @param phase Active breathwork phase ([PranayamaPhase]).
      * @param style Linguistic delivery style ([VoiceCueStyle]).
@@ -183,9 +187,10 @@ class PranayamaVoiceGuide(
         style: VoiceCueStyle,
         stepDurationSeconds: Int? = null
     ): Int? {
-        // When step duration is less than 4 seconds, bilingual cue (~3.0s) would collide with the next step.
-        // Fall back to clean single-word Sanskrit cue (~2.0s) so speech is never clipped mid-word.
-        val effectiveStyle = if (style == VoiceCueStyle.BILINGUAL && stepDurationSeconds != null && stepDurationSeconds < 4) {
+        // Enforce Step Timing vs. Voice Timing Law:
+        // Bilingual audio requires ~5.6s-5.9s. When a step is under 6 seconds, fall back to
+        // the concise 2.2s Sanskrit cue so "Inhale" or "Exhale" is never cut off mid-word.
+        val effectiveStyle = if (style == VoiceCueStyle.BILINGUAL && stepDurationSeconds != null && stepDurationSeconds < 6) {
             VoiceCueStyle.SANSKRIT
         } else {
             style
@@ -310,7 +315,7 @@ class PranayamaVoiceGuide(
     ) {
         if (!isInitialized || tts == null) return
 
-        val effectiveStyle = if (style == VoiceCueStyle.BILINGUAL && stepDurationSeconds != null && stepDurationSeconds < 4) {
+        val effectiveStyle = if (style == VoiceCueStyle.BILINGUAL && stepDurationSeconds != null && stepDurationSeconds < 6) {
             VoiceCueStyle.SANSKRIT
         } else {
             style
