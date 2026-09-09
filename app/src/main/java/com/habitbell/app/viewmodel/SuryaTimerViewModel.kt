@@ -26,8 +26,13 @@ import com.habitbell.app.data.SuryaDatabase
 import com.habitbell.app.data.dao.PresetDao
 import com.habitbell.app.data.dao.StepDao
 import com.habitbell.app.data.default.DefaultProfiles
+import com.habitbell.app.data.model.CompoundConfig
+import com.habitbell.app.data.model.CompoundPose
 import com.habitbell.app.data.model.PresetEntity
 import com.habitbell.app.data.model.StepEntity
+import com.habitbell.app.data.model.TimerType
+import com.habitbell.app.data.repository.TimerRepository
+import com.habitbell.app.engine.CentralSessionHandler
 import com.habitbell.app.sync.SuryaSyncManager
 import com.habitbell.app.ui.model.StepUiModel
 import com.habitbell.app.util.JsonUtil
@@ -58,9 +63,63 @@ class SuryaTimerViewModel(application: Application) : AndroidViewModel(applicati
     /** Companion sync manager for Wear OS watch devices. */
     private val syncManager: SuryaSyncManager = SuryaSyncManager(application, database)
 
+    /** Central timer repository handle for synchronized profile persistence. */
+    private val repository: TimerRepository = TimerRepository(application)
+
+    /** Central session handler for live timer engine synchronization. */
+    private val sessionHandler: CentralSessionHandler = CentralSessionHandler.getInstance(application)
+
     init {
         // Pre-populate classical 12 poses and speed presets if database is freshly created
         seedDefaultDataIfEmpty()
+    }
+
+    /**
+     * Synchronizes the updated list of Room step entities directly to the [TimerRepository]
+     * and live [CentralSessionHandler.engine] so modifications immediately reflect in the running timer.
+     *
+     * @param steps Current list of [StepEntity] from Room.
+     * @param voiceModeOverride Optional explicit [VoiceCueMode] to enforce.
+     */
+    private fun syncStepsToEngineAndRepository(steps: List<StepEntity>, voiceModeOverride: VoiceCueMode? = null) {
+        val baseConfig = DefaultProfiles.SURYA_NAMASKAR.compoundConfig
+        val targetRounds = repository.getProfileById("surya-namaskar-compound")?.compoundConfig?.targetRounds ?: 5
+        val finalVoiceMode = voiceModeOverride ?: steps.firstOrNull()?.voiceCueMode ?: VoiceCueMode.STEP_NAME
+
+        val poses = steps.mapIndexed { idx, s ->
+            val defaultPose = baseConfig?.poses?.getOrNull(idx)
+            CompoundPose(
+                index = idx + 1,
+                name = s.name,
+                sanskritName = defaultPose?.sanskritName ?: s.name,
+                durationSeconds = s.durationSeconds.coerceAtLeast(1),
+                breathCue = defaultPose?.breathCue ?: "",
+                mantra = defaultPose?.mantra ?: "",
+                voiceCueMode = finalVoiceMode
+            )
+        }
+
+        repository.updateSuryaSettings(
+            profileId = "surya-namaskar-compound",
+            poses = poses,
+            targetRounds = targetRounds,
+            voiceCueMode = finalVoiceMode
+        )
+
+        val currentProfile = sessionHandler.sessionState.value.profile
+        if (currentProfile.id.contains("surya", ignoreCase = true) || currentProfile.type == TimerType.COMPOUND) {
+            val updatedConfig = CompoundConfig(
+                poses = poses,
+                targetRounds = targetRounds,
+                voiceCueMode = finalVoiceMode
+            )
+            sessionHandler.engine.loadProfile(
+                currentProfile.copy(
+                    compoundConfig = updatedConfig,
+                    totalDurationSeconds = poses.sumOf { it.durationSeconds } * targetRounds
+                )
+            )
+        }
     }
 
     /**
@@ -153,6 +212,8 @@ class SuryaTimerViewModel(application: Application) : AndroidViewModel(applicati
                 rekha = updatedModel.rekha
             )
             stepDao.update(updatedEntity)
+            val allSteps = stepDao.getAllSteps().first()
+            syncStepsToEngineAndRepository(allSteps)
         }
     }
 
@@ -164,9 +225,12 @@ class SuryaTimerViewModel(application: Application) : AndroidViewModel(applicati
     fun applyPresetDuration(durationSeconds: Int) {
         viewModelScope.launch(Dispatchers.IO) {
             val allSteps = stepDao.getAllSteps().first()
-            allSteps.forEach { step ->
-                stepDao.update(step.copy(durationSeconds = durationSeconds))
+            val updated = allSteps.map { step ->
+                val modified = step.copy(durationSeconds = durationSeconds)
+                stepDao.update(modified)
+                modified
             }
+            syncStepsToEngineAndRepository(updated)
         }
     }
 
@@ -179,9 +243,12 @@ class SuryaTimerViewModel(application: Application) : AndroidViewModel(applicati
     fun applyVoiceCueModeToAllSteps(mode: VoiceCueMode) {
         viewModelScope.launch(Dispatchers.IO) {
             val allSteps = stepDao.getAllSteps().first()
-            allSteps.forEach { step ->
-                stepDao.update(step.copy(voiceCueMode = mode))
+            val updated = allSteps.map { step ->
+                val modified = step.copy(voiceCueMode = mode)
+                stepDao.update(modified)
+                modified
             }
+            syncStepsToEngineAndRepository(updated, voiceModeOverride = mode)
         }
     }
 

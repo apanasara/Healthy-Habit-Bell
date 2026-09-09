@@ -569,8 +569,9 @@ The Surya Namaskar subsystem provides comprehensive data persistence, animated v
 - **Reactive UI Flow**: `SuryaTimerViewModel` exposes `steps: StateFlow<List<StepUiModel>>` mapped directly from `StepDao.getAllSteps()`. On initial database creation, `SuryaDatabase.seedIfEmpty(context)` automatically seeds all 12 classical postures from `DefaultProfiles.SURYA_NAMASKAR`.
 - **Dedicated Settings Drawer Integration (`SuryaSettingsSheet`)**:
   - Embedded within `SettingsDrawer.kt` when opening settings for `TimerType.COMPOUND` or profiles named "Surya Namaskar".
-  - **Speed Presets**: Fast 3s, Moderate 5s, and Slow 10s chips that immediately update all 12 posture durations in Room SQLite on `Dispatchers.IO`.
-  - **Target Practice Rounds**: Interactive steppers (`-1`, `+1`) and quick-select chips (`3`, `5`, `12`, `24`, `108` rounds), displaying total asanas count (e.g. 5 rounds = 60 asanas).
+  - **4 Speed Presets**: Slow 10s, Moderate 5s, Fast 3s, and Custom [X]s. Selecting Custom reveals a dedicated pace editor with `-1s` / `+1s` micro-steppers and quick chips (`4s`, `7s`, `8s`, `12s`, `15s`).
+  - **Target Practice Rounds**: Interactive steppers (`-1`, `+1`) and quick-select chips (`3`, `5`, `12`, `24`, `108` rounds), displaying total asanas count (e.g. 12 rounds = 144 asanas).
+  - **Global Voice Guidance Modes**: Single-tap global selector across all 12 steps for `Asana Name`, `Solar Mantra`, `Breath Flow`, and `Silent / Bell`.
   - **12 Posture Sequence Preview**: Illustrated list displaying the sequence of postures with duration tags and vector silhouette artwork (`R.drawable.avd_yoga_pranamasana`).
   - **Fullscreen Editor Transition**: Direct button navigation to `AppScreen.SURYA_TIMER` (`SuryaTimerScreen`) for modifying per-posture Sanskrit voice cues, durations, and solar mantra audio playback.
   - **Companion Watch Synchronization**: Quick-sync button invoking `SuryaSyncManager.pushSyncToWatch()` to send current sequence configuration to Wear OS devices over the Wearable Data Layer API.
@@ -586,9 +587,43 @@ The Surya Namaskar subsystem provides comprehensive data persistence, animated v
 - **Payload Contract (`/surya_sync`)**: Packs step models, presets, and settings into a unified JSON descriptor via `JsonUtil` (Google Gson) transferred as an urgent `PutDataMapRequest`.
 - **Zero-Latency Push**: Executed asynchronously on `Dispatchers.IO` when the user taps "Sync Watch" on the phone interface.
 
-#### 4. Audio Guidance & Voice Player (`SuryaVoicePlayer.kt`)
-- **Melodious Vocal Delivery**: Aligned with the Lata Mangeshkar high-frequency swara standard (`+52Hz`, sweet calming tone).
+#### 4. Audio Guidance & Offline TTS Voice Engine (`SuryaVoicePlayer.kt`)
+- **Offline Android TextToSpeech Synthesis**: Built-in Android `TextToSpeech` engine tuned to high-frequency meditative swara (`+52Hz` pitch shift) and calm yogic cadence (`rate: 0.70x`), ensuring 100% offline functionality without network dependencies.
+- **Dynamic Mode Cues**:
+  - `VoiceCueMode.STEP_NAME`: Articulates classical Sanskrit Asana name (e.g. "Pranamasana", "Hastauttanasana").
+  - `VoiceCueMode.SLOKA`: Chants the respective classical Solar Mantra (e.g. "ॐ मित्राय नमः", "ॐ रवये नमः", "ॐ सूर्याय नमः").
+  - `VoiceCueMode.PRANIC`: Guides yogic breath flow (e.g. "Inhale & Exhale gently", "Inhale, stretch arms up").
+  - `VoiceCueMode.NONE`: Silent / Bell mode emitting no spoken cues, preserving meditative silence.
 - **Anti-Startle Lead Delay & Smooth Ducking**: Inserts a 120ms lead delay after smooth background music ducking (`duckVolume(duckedRatio = 0.20f, durationMs = 350L)`) before speech starts, and gently restores background audio over 500ms upon completion.
+
+#### 5. Live Timer Reflection & Bidirectional Persistence Pipeline
+- **Problem Solved**: Historically, adjusting Surya Namaskar settings in `SuryaSettingsSheet` or `SuryaTimerScreen` only mutated Room SQLite tables, while `CentralSessionHandler` and `TimerEngine` executed against immutable `TimerProfile` models stored in `TimerRepository`. As a result, modified pose timings and round counts failed to reflect into active countdowns.
+- **Bidirectional Event Pipeline**:
+  ```
+  SuryaSettingsSheet / SuryaTimerScreen
+               |
+               v (onUpdateSurya / syncStepsToEngineAndRepository)
+       HabitBellViewModel.updateActiveSuryaSettings(...)
+               |
+               +--------------------------------------------+
+               |                                            |
+               v (writes SharedPreferences + Room)          v (live-reloads active profile)
+       TimerRepository.updateSuryaSettings(...)      TimerEngine.loadProfile(updatedProfile)
+               |                                            |
+               v                                            v
+     _profiles StateFlow                        StateFlow<TimerSessionState>
+               |                                            |
+               v                                            v
+     HomeScreen & Drawer UI                      SessionScreen Active Countdown
+                                                 - Remaining Pose Seconds (${remainingSeconds}s)
+                                                 - Total Session Countdown (MM:SS)
+                                                 - Round Counter (ROUND X OF Y • POSE Z / 12)
+                                                 - Solar Mantra (☀️ ॐ मित्राय नमः)
+  ```
+- **Real-Time Dynamic Recalculation**:
+  - Immediately recalculates total session duration: `totalDurationSeconds = targetRounds * poses.sumOf { it.durationSeconds }`.
+  - Re-evaluates pose countdown intervals and displays the active pose remaining seconds badge dynamically inside `CompoundPoseCard`.
+  - Seamlessly persists across application restarts via SharedPreferences key `"surya_config_v1"` and Room `StepDao` updates.
 
 ---
 

@@ -291,6 +291,23 @@ class MainActivity : FragmentActivity() {
                             onOpenSuryaEditor = {
                                 viewModel.openSettingsDrawer(false)
                                 viewModel.navigateTo(AppScreen.SURYA_TIMER)
+                            },
+                            onUpdateSurya = { poses, targetRounds, speedPreset, customPace, voiceMode ->
+                                viewModel.updateActiveSuryaSettings(
+                                    steps = poses.mapIndexed { idx, p ->
+                                        com.habitbell.app.data.model.StepEntity(
+                                            id = (idx + 1).toLong(),
+                                            name = p.name,
+                                            orderIdx = idx,
+                                            durationSeconds = p.durationSeconds,
+                                            voiceCueMode = voiceMode
+                                        )
+                                    },
+                                    targetRounds = targetRounds,
+                                    speedPreset = speedPreset,
+                                    customPaceSeconds = customPace,
+                                    voiceCueMode = voiceMode
+                                )
                             }
                         )
                     }
