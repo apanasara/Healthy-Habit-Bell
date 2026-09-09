@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  System Window Splash Background for Habit Bell.
+  Architectural Role: Pre-render splash window drawable displayed instantaneously during cold boot.
+  Single Responsibility: Prevents white flash and renders deep obsidian slate (#060709) with centered golden lotus-bell logo.
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Solid obsidian dark background -->
+    <item>
+        <color android:color="#060709" />
+    </item>
+
+    <!-- Centered Official Golden Lotus & Bell Logo -->
+    <item
+        android:width="160dp"
+        android:height="160dp"
+        android:gravity="center"
+        android:drawable="@drawable/ic_splash_logo" />
+</layer-list>

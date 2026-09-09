@@ -3,7 +3,7 @@
     <style name="Theme.HabitBell" parent="Theme.AppCompat.DayNight.NoActionBar">
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
-        <item name="android:windowBackground">#FAF6EE</item>
+        <item name="android:windowBackground">@drawable/splash_background</item>
         <item name="android:colorBackground">#FAF6EE</item>
         <item name="colorBackgroundFloating">#FFFDF9</item>
         <item name="colorPrimary">#D97706</item>

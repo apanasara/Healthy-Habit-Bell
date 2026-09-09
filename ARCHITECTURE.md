@@ -224,6 +224,9 @@ The heartbeat of the mindfulness runtime is a deterministic finite state machine
 - **Prolonged Session Anti-Sleep Guard**:
   - Configures `CastReceiverOptions.disableIdleTimeout = true` and `options.maxInactivity = 14400` (4 hours).
   - Guarantees that Chromecast dongles will never revert to ambient art screensavers during prolonged meditation, breathwork, or yoga sequences.
+- **Production Release Mandate (Cast Console Publishing)**:
+  - Application ID `4662865D` operates in Unpublished / Developer Mode during active engineering and device validation on registered hardware.
+  - **MANDATORY RELEASE ACTION**: Upon final completion of the Habit Bell product build and prior to Google Play Store public release, this application MUST be published via the Google Cast Developer Console (`https://cast.google.com/publish/#/overview`) by clicking **`PUBLISH`** next to App ID `4662865D`. This eliminates the need for device serial number registration, allowing all consumer Chromecasts, Google TVs, and Sony Bravia displays worldwide to run the custom receiver out of the box.
 
 ---
 
@@ -434,6 +437,45 @@ Habit Bell enforces a consistent, centralized visual theme hierarchy governed ex
 Native `MediaRouteButton` interactions in Jetpack Compose require strict background opacity to comply with AndroidX `MediaRouterThemeHelper` contrast calculations:
 - **Crash Prevention**: Inheriting translucent window backgrounds causes `androidx.core.graphics.ColorUtils.calculateContrast` to throw `IllegalArgumentException: background can not be translucent: #0`.
 - **HabitBellMediaRouteDialogFactory**: Wraps `MediaRouteChooserDialog` and `MediaRouteControllerDialog` instantiation within an explicit, non-translucent `ContextThemeWrapper` applying `R.style.HabitBellMediaRouteTheme_Dark` or `R.style.HabitBellMediaRouteTheme_Light`.
+
+---
+
+### 2.7. Unified Visual Identity, Adaptive Icons & Splash Screen Architecture
+
+Habit Bell enforces a unified, high-contrast visual identity centered on the sacred blooming lotus flower cradling a resonant Tibetan mindfulness bell.
+
+#### 1. Canonical Branding Asset Repository (`branding/`)
+Authoritative vector artwork and multi-platform raster source files are permanently tracked in version control under `Healthy-Habit-Bell/branding/`:
+- **`HabitBell_Inkscape.svg` & `HabitBell.svg`**: Master Inkscape scalable vector graphics containing coordinate-exact path nodes and drop shadow filter definitions.
+- **`HabitBell_ChromeCast.png`**: Production 512×512 32-bit RGBA raster icon formatted specifically for the **Google Cast SDK Developer Console** and Google Play Store listings.
+- **`HabitBell_Transparent.png`**: High-resolution 1027×893 transparent PNG master representing the glowing golden lotus and bell silhouette.
+- **`HabitBell_Black.webp`**: Lossless WebP asset for web and companion application distribution.
+
+#### 2. Automated Multi-Density Asset Pipeline (`scripts/generate_branding_assets.js`)
+An automated Node.js automation pipeline utilizing headless Google Chrome and macOS `sips` renders subpixel-accurate graphics across all target platforms:
+- **Android Adaptive Icons (`mipmap-*/ic_launcher_foreground.png`)**:
+  - Rendered across `mdpi` (108px), `hdpi` (162px), `xhdpi` (216px), `xxhdpi` (324px), and `xxxhdpi` (432px).
+  - Scaled strictly to 50% of the adaptive canvas width with a 25% boundary safety margin. This guarantees 0% visual clipping regardless of OEM launcher shape masking (circles, rounded rectangles, squircles, or teardrops).
+- **Legacy Square & Circular Icons (`ic_launcher.png`, `ic_launcher_round.png`)**:
+  - Direct hardware-clipped circular and square raster outputs across all density tiers (48px to 192px).
+- **Android TV / Google TV Leanback Launcher (`tv_banner.png`)**:
+  - 320×180 16:9 widescreen launcher banner featuring radial amber-gold glow and high-legibility typography.
+- **Smart TV Ecosystems**:
+  - LG webOS: 1920×1080 Full HD splash screen (`splash.png`) and tray icons (80×80 and 130×130).
+  - Samsung Tizen: 117×117 app tile icon (`icon.png`).
+  - Google Cast Receiver: 512×512 receiver app icon and transparent backdrop logo.
+
+#### 3. Dual-Stage Splash Screen Architecture
+To eliminate cold-boot latency and white screen flashes on both modern and legacy Android runtimes:
+- **Stage 1 — Native OS Window Splash (`splash_background.xml` & `values-v31/styles.xml`)**:
+  - Renders a lightweight `<layer-list>` drawable with solid obsidian dark background (`#060709`) and centered 160dp `@drawable/ic_splash_logo` during initial process fork and JVM warm-up.
+  - On Android 12+ (API 31+), `Theme.HabitBell` binds `android:windowSplashScreenBackground`, `android:windowSplashScreenAnimatedIcon`, and `android:windowSplashScreenIconBackgroundColor`.
+- **Stage 2 — In-App Serene Compose Handoff (`SplashScreen.kt`)**:
+  - Hosted within `MainActivity`'s root `Box` as an `AnimatedVisibility` overlay.
+  - Executes a subtle breathing scale (0.92f → 1.0f) and alpha fade-in (650ms) using `FastOutSlowInEasing`.
+  - Automatically fades out smoothly (400ms) to reveal `ModernHomeScreenSample` on cold boot.
+  - **Voice & Deep Link Bypass**: Automated intents (`ACTION_SET_TIMER`, `SURYA_TIMER`, `ACTION_VIEW`) immediately bypass the in-app splash animation (`showSplashOverlay = false`) to guarantee zero-latency execution for Google Assistant commands.
+
 ---
 
 ### 2.12. Classical Hatha Yoga Pranayama Subsystem (`com.habitbell.app.engine`, `com.habitbell.app.ui.components.BreathIndicator`)
