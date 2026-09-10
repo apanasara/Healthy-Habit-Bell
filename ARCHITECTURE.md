@@ -205,28 +205,53 @@ The heartbeat of the mindfulness runtime is a deterministic finite state machine
 
 #### 7. Google Cast Custom Web Receiver & Bidirectional Telemetry Protocol (`docs/index.html` & `tv-platforms/google-cast-receiver/`)
 - **Architectural Role & TV Sandboxing**: Solves the browserless TV and phone distraction challenges by executing a dedicated, cloud-hosted Custom Web Receiver directly within the Google Cast Application Framework (CAF v3) hardware sandbox on Chromecasts, Google TVs, and Sony Bravia displays. Allows the user's phone to dim or sleep while the TV independently renders the meditation canvas.
-- **Microscopic Single-File Production Build (`docs/index.html`)**:
-  - **Extreme Minification (6.0 KB)**: Bundles all HTML structure, responsive flexbox CSS, SVG circular progress shaders, and JS logic into a single 6,170-byte document.
-  - **Zero External Overhead**: Requires zero third-party CDNs or fonts; only loads the standard Google Cast CAF v3 receiver library (`//www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js`).
-  - **Instant Load Time**: Downloads in 20–50 ms over local Wi-Fi, providing instantaneous session launch when the user taps Cast.
-- **Zero-Cost GitHub Pages CDN & Domain Migration Decoupling**:
-  - Hosted directly out of the repository's `/docs` directory on GitHub Pages (`https://<username>.github.io/Healthy-Habit-Bell/`).
-  - Consumes <0.001% of standard 100 GB monthly bandwidth limits (~16.6 million session launches per month).
-  - Decoupled from the Android client via Google Cast Developer Console Application ID registration: if the hosting provider or domain changes, updating the URL on `cast.google.com/publish` automatically redirects all global devices instantly with zero client app updates or downtime.
-- **Development & Reference Source (`tv-platforms/google-cast-receiver/index.html`)**:
-  - 14.1 KB unminified, fully commented reference source conforming to the Universal Documentation Standard.
-  - Contains human-readable BEM classes, detailed audio synthesis formulas, and diagnostic console logging.
-- **Bidirectional Custom Message Bus (`urn:x-cast:com.habitbell.cast`)**:
-  - Bypasses browser HTTPS-to-HTTP mixed content restrictions by transmitting telemetry directly over Google Cast's native transport channel.
-  - **State Telemetry (`type: "state"`)**: Dispatched by `CentralSessionHandler` at 1Hz during active countdowns. Carries formatted remaining time, interval countdowns, round numbers, Pranayama Sanskrit phases (Puraka, Kumbhaka, Rechaka, Shunya) with dynamic chromatic ring color morphing, and Surya Namaskar posture cards.
-  - **Volume Synchronization (`type: "volume"`)**: Dispatched on volume slider adjustments; renders a non-intrusive floating HUD overlay on the TV (`"Bell Volume: 85%"`).
-  - **Sound Chimes (`type: "chime"`)**: Triggers standalone procedural audio strikes on demand.
+- **CAF v3 Compliance & Media Player Architecture**:
+  - Embedded `<cast-media-player style="display:none;"></cast-media-player>` enables CAF v3 `PlayerManager` to bind cleanly, preventing session initialization crashes when the Android sender attaches `RemoteMediaClient` and `CastMediaOptions`.
+  - Custom namespace declaration: Explicitly pre-registers `options.customNamespaces = { ['urn:x-cast:com.habitbell.cast']: cast.framework.system.MessageType.JSON }` prior to `context.start(options)`.
+  - Safe payload deserialization: Handles both pre-parsed JSON objects and raw string transmissions via `const msg = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;`, eliminating `SyntaxError: Unexpected token o in JSON at position 1` crashes that previously dropped all sender state packets.
+- **Multi-Screen Receiver Presentation Engine**:
+  1. **SPLASH Screen (Standby / Idle / Connected)**:
+     - Ambient golden prana aura with breathing animation.
+     - Vector Habit Bell & Lotus sacred crest with gentle living respiration scale.
+     - Dual-state connection indicator: pulsing amber beacon in standby ("Waiting for phone...") transitioning to emerald beacon when bound to the sender ("Connected to Habit Bell • Ready to begin").
+     - Live Queued Routine Preview card displaying the selected mobile profile name, duration, and start prompt even while the session is idle.
+  2. **MINDFUL EATING Screen**:
+     - Warm ambient candlelight color palette (`#E5A93C`, `#D97706`).
+     - **Concentric Dual SVG Rings**:
+       - Outer ring (radius 220, circumference 1382px): Tracks total meal countdown progress (e.g. 45 minutes).
+       - Inner ring (radius 175, circumference 1099px): Tracks the active bite pacing interval cycle (e.g. 60-second bite pacing bell) with glowing amber stroke.
+     - Zen dining bowl and chopsticks vector icon centered within the rings.
+     - Ultra-crisp, extra-large countdown numerals (`45:00`) readable from 15 feet away across dining tables or living rooms.
+     - Bite pacing pill: `"🔔 Bite Bell in 00:42 • CHEW & SAVOR"`.
+     - Dynamic mindful eating prompts carousel rotating evidence-based eating guidelines every 12 seconds ("Chew each bite 30–40 times", "Rest fork between bites", "Tune in to satiety cues").
+     - Radial chime ripple wave expanding outwards from the center bowl upon interval bell completion.
+  3. **PRANAYAMA Screen (Heroic Blooming Lotus)**:
+     - **Heroic 13-Petal Side-View Blooming Lotus SVG** across 7 depth tiers (outer wings, mid-lateral wings, chalice petals, central erect spine, and emerald `#10B981` calyx/stem).
+     - **Smooth Kinematic Bloom Physics**:
+       - *Pūraka (Inhale)*: Petals lift and unfurl organically into full bloom with cubic bezier expansion.
+       - *Antar Kumbhaka (Hold In)*: Sustained open flower floating gently on calm aquatic waves.
+       - *Recaka (Exhale)*: Petals fold softly inward into a serene closed bud.
+       - *Bāhya Kumbhaka (Hold Out / Void)*: Slender resting bud suspended in stillness.
+     - **Dynamic Breath-Phase Color Harmony**:
+       - Pūraka (Inhale): Luminous Cyan (`#4ECDC4`)
+       - Antar Kumbhaka (Hold In): Radiant Golden Amber (`#E5A93C`)
+       - Recaka (Exhale): Meditative Lavender (`#A78BFA`)
+       - Bāhya Kumbhaka (Hold Out): Celestial Azure (`#60A5FA`)
+     - **Upper Sanskrit HUD**: Elevated above the flower to ensure zero visual overlap. Displays Sanskrit phase (`PŪRAKA`), English guidance (`Inhale Deeply`), and large countdown numeral (`4`).
+     - Round milestone tracker (`"Round 3 of 12"`) and total remaining countdown.
+  4. **GENERAL Screen (Surya Namaskar & Meditation Fallback)**:
+     - Posture card displaying active asana names in Sanskrit and English with breath cues (`"Pranamasana • Prayer Pose • Exhale"`).
+- **Bidirectional Custom Message Bus (`urn:x-cast:com.habitbell.cast`) & Handshake Protocol**:
+  - **Receiver Readiness Handshake**: Receiver emits `{ type: 'ready' }` upon startup (`EventType.READY`) and upon sender connection (`EventType.SENDER_CONNECTED`). Android `HabitBellCastManager` triggers `onReceiverReady`, causing `CentralSessionHandler` to immediately dispatch the current session snapshot (even if `IDLE`).
+  - **Immediate Telemetry Synchronization**: Binds telemetry push to `castManager.isCasting.collect` regardless of session running status, instantly updating the TV from standby to active profile preview when the user taps Cast from the mobile home screen.
+  - **Extended Telemetry Contract**: Carries `screenMode` (`'SPLASH' | 'EATING' | 'PRANAYAMA' | 'GENERAL'`), `isEating`, `isPranayama`, `isSurya`, `intervalDurationSeconds`, `nextBellSeconds`, `phaseDurationSeconds`, `phaseRemainingSeconds`, and `remainingSeconds`.
+  - **Mixed Content Protection**: Guaranteed HTTPS media stream resolution in `HabitBellCastManager` when targeting custom web receivers to satisfy Chromium security constraints.
   - **TV Remote Feedback (Receiver -> Phone)**: Captures hardware Play/Pause remote key events via CAF v3 and routes them back to `HabitBellCastManager.onRemotePlaybackAction` to synchronize mobile state.
 - **Zero-Bandwidth In-Memory Web Audio Synthesis**:
-  - Synthesizes authentic Tibetan singing bowl chimes directly inside the TV's browser hardware via the HTML5 `AudioContext`.
-  - Combines a 432 Hz fundamental sine wave with a 2.76 harmonic overtone (1192.3 Hz), shaped by a 20 ms linear attack ramp and an exponential acoustic decay envelope, delivering rich living room acoustics with zero audio streaming data transfer.
+  - Synthesizes authentic Tibetan singing bowl chimes directly inside the TV's browser hardware via HTML5 `AudioContext`.
+  - Combines 432 Hz fundamental sine wave with 2.76 harmonic overtone (1192.3 Hz), shaped by a 20 ms linear attack ramp and an exponential acoustic decay envelope, delivering rich living room acoustics with zero audio streaming data transfer.
 - **Prolonged Session Anti-Sleep Guard**:
-  - Configures `CastReceiverOptions.disableIdleTimeout = true` and `options.maxInactivity = 14400` (4 hours).
+  - Configures `CastReceiverOptions.disableIdleTimeout = true` and `options.maxInactivity = 21600` (6 hours).
   - Guarantees that Chromecast dongles will never revert to ambient art screensavers during prolonged meditation, breathwork, or yoga sequences.
 - **Production Release Mandate (Cast Console Publishing)**:
   - Application ID `4662865D` operates in Unpublished / Developer Mode during active engineering and device validation on registered hardware.
