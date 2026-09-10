@@ -50,6 +50,7 @@ logs
 
 # Android & Gradle
 .gradle/
+.kotlin/
 build/
 app/build/
 *.apk

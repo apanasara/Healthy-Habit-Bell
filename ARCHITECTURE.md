@@ -54,7 +54,7 @@ Habit Bell is an offline-first, distraction-free wellness operating system engin
 ## 2. Layered Responsibilities & Core Subsystems
 
 ### 2.1. Central Session Handler (`CentralSessionHandler.kt`)
-The `CentralSessionHandler` is the **process-level single source of truth** and authoritative orchestrator across the entire application runtime. It initializes and synchronizes the central `MediaSessionCompat` (`"HabitBellMediaSession"`), `TimerEngine`, `AudioBellManager`, `BackgroundMusicManager`, `BatteryOptimizer`, and `HabitBellCastManager`.
+The `CentralSessionHandler` is the **process-level single source of truth** and authoritative orchestrator across the entire application runtime. It initializes and synchronizes the central `MediaSessionCompat` (`"HabitBellMediaSession"`), `TimerEngine`, `AudioBellManager`, `BackgroundMusicManager`, `BluetoothAudioDisconnectionManager`, `BatteryOptimizer`, and `HabitBellCastManager`.
 
 #### Multi-Surface Bidirectional Synchronization
 The central session coordinates transport controls and metadata across **6 distinct control surfaces**:
@@ -112,6 +112,16 @@ The audio architecture guarantees high-fidelity, boundary-free sound reproductio
       python3 scripts/generate_surya_namaskar_voice.py
       ```
       This will autonomously synthesize all 24 Surya Namaskar audio assets (12 Asanas with sacred solar mantras `ॐ मित्राय नमः...` + 12 bilingual flow cues) directly into `app/src/main/res/raw/` matching the exact tonal swara and acoustic characteristics of the Pranayama voice cues.
+
+#### 4. Peripheral & Bluetooth Disconnection Auto-Pause Subsystem (`BluetoothAudioDisconnectionManager.kt`)
+- **Industry Media Player Parity**: Replicates standard Android media playback conventions (e.g. Spotify, YouTube Music, Audible) where external audio output disconnection immediately pauses playback, protecting users against sudden acoustic exposure through the mobile device's speaker.
+- **Multi-Vector Disconnect Detection**:
+  - **`AudioDeviceCallback` (API 26+)**: Registered on `AudioManager` to intercept endpoint hardware removals for `TYPE_BLUETOOTH_A2DP`, `TYPE_BLUETOOTH_SCO`, `TYPE_BLE_HEADSET`, `TYPE_BLE_SPEAKER`, `TYPE_BLE_BROADCAST`, `TYPE_HEARING_AID`, and wired/USB headsets. Delivers unconditional hardware disconnect detection even when no sound is currently playing during a silent rest interval.
+  - **`ACTION_AUDIO_BECOMING_NOISY` BroadcastReceiver**: Registered dynamically during `SessionStatus.RUNNING` with `ContextCompat.RECEIVER_EXPORTED` on Android 13+ to catch instantaneous system audio route flips from external peripherals to phone speakers.
+  - **Automotive Host Lifecycle**: Bound to `HabitBellCarSession.onDestroy()` via `onCarDisconnected()` to guarantee running in-car sessions safely pause when leaving the vehicle.
+- **Monotonic Debounce Guard**: Employs a 1000ms (`DEBOUNCE_THRESHOLD_MS`) gate via `SystemClock.elapsedRealtime()` to cleanly throttle near-simultaneous callback and broadcast dispatches.
+- **Lifecycle & Power Optimization**: Active hardware and broadcast listeners are registered strictly during `SessionStatus.RUNNING` and unregistered upon pause, completion, or idle to ensure zero background battery drain.
+- **Zero-Permission Privacy & Settings Integration**: Operates without requiring dangerous `BLUETOOTH_CONNECT` runtime permissions. Configurable via **Settings Drawer > Global Config** (`isPauseOnBluetoothDisconnect`, default `true`).
 
 ---
 

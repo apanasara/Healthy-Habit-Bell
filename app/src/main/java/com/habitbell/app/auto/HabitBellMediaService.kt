@@ -123,6 +123,7 @@ class HabitBellMediaService : MediaBrowserServiceCompat() {
                         } else {
                             notificationManager.cancel(NOTIFICATION_ID)
                         }
+                        stopSelf()
                     }
                 }
             }
@@ -132,6 +133,33 @@ class HabitBellMediaService : MediaBrowserServiceCompat() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         MediaButtonReceiver.handleIntent(sessionHandler.mediaSession, intent)
         return START_NOT_STICKY
+    }
+
+    /**
+     * Responds to the removal of the app task from the Android Recents screen ("Clear All" / swipe away).
+     *
+     * Halts the active timer session across all subsystems, silences ambient soundscapes,
+     * releases wake locks, dismisses the ongoing foreground media notification, and terminates
+     * this service cleanly to prevent runaway background timers.
+     *
+     * @param rootIntent Intent that started the task that is now removed, if available.
+     */
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        super.onTaskRemoved(rootIntent)
+        // Cleanly halt active session across audio, haptics, wake locks, and timers
+        sessionHandler.stop()
+
+        // Dismiss and remove ongoing foreground notification
+        if (isForeground) {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            isForeground = false
+        } else {
+            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.cancel(NOTIFICATION_ID)
+        }
+
+        // Terminate background service completely
+        stopSelf()
     }
 
     /**
@@ -151,6 +179,7 @@ class HabitBellMediaService : MediaBrowserServiceCompat() {
             0,
             Intent(this, MainActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
+                putExtra("EXTRA_NAVIGATE_TO_SESSION", true)
             },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )

@@ -109,6 +109,7 @@
         <service
             android:name=".engine.TimerService"
             android:exported="false"
+            android:stopWithTask="true"
             android:foregroundServiceType="mediaPlayback" />
 
         <!-- Android Auto Integration (User Requirement 4) -->
@@ -145,6 +146,7 @@
         <service
             android:name=".auto.HabitBellMediaService"
             android:exported="true"
+            android:stopWithTask="true"
             android:foregroundServiceType="mediaPlayback"
             android:icon="@mipmap/ic_launcher"
             android:label="@string/app_name">

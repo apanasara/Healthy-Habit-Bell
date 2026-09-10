@@ -56,13 +56,16 @@ class MainActivity : FragmentActivity() {
         }
 
         setContent {
-            // Direct launch check: bypass animated splash transition for voice commands and deep links
-            val isDirectIntent = intent?.action != null && intent?.action != android.content.Intent.ACTION_MAIN
-            var showSplashOverlay by remember { mutableStateOf(!isDirectIntent) }
-
             // Collect reactive state streams with lifecycle awareness to prevent unnecessary background recomposition
             val uiState by viewModel.uiState.collectAsStateWithLifecycle()
             val sessionState by viewModel.sessionState.collectAsStateWithLifecycle()
+            val isSessionOngoing = sessionState.status == SessionStatus.RUNNING || sessionState.status == SessionStatus.PAUSED
+
+            // Direct launch check: bypass animated splash transition for voice commands, deep links, notification navigation, or ongoing sessions
+            val isDirectIntent = (intent?.action != null && intent?.action != android.content.Intent.ACTION_MAIN) ||
+                (intent?.getBooleanExtra("EXTRA_NAVIGATE_TO_SESSION", false) == true) ||
+                isSessionOngoing
+            var showSplashOverlay by remember { mutableStateOf(!isDirectIntent) }
             val profiles by viewModel.profiles.collectAsStateWithLifecycle()
             val favorites by viewModel.favorites.collectAsStateWithLifecycle()
             val recentProfiles by viewModel.recentProfiles.collectAsStateWithLifecycle()
@@ -186,6 +189,13 @@ class MainActivity : FragmentActivity() {
                                 },
                                 onOpenSettings = {
                                     viewModel.openSettingsDrawer(true, com.habitbell.app.ui.viewmodel.SettingsDrawerTab.GLOBAL)
+                                },
+                                sessionState = sessionState,
+                                onResumeSession = {
+                                    viewModel.navigateTo(AppScreen.SESSION)
+                                },
+                                onStopSession = {
+                                    viewModel.stopTimer()
                                 }
                             )
                         }
@@ -292,6 +302,8 @@ class MainActivity : FragmentActivity() {
                             activeTab = uiState.settingsDrawerTab,
                             onTabSelected = { viewModel.setSettingsDrawerTab(it) },
                             onToggleSunMoonTheme = { viewModel.toggleSunMoonTheme() },
+                            isPauseOnBluetoothDisconnect = uiState.isPauseOnBluetoothDisconnect,
+                            onPauseOnBluetoothDisconnectToggle = { viewModel.setPauseOnBluetoothDisconnect(it) },
                             onOpenSuryaEditor = {
                                 viewModel.openSettingsDrawer(false)
                                 viewModel.navigateTo(AppScreen.SURYA_TIMER)
@@ -351,6 +363,9 @@ class MainActivity : FragmentActivity() {
             }
         }
 
+        // Check and restore active ongoing session if present
+        viewModel.checkAndRestoreOngoingSession()
+
         // Handle Google Assistant & Voice Action on initial activity launch
         handleVoiceIntent(intent)
     }
@@ -363,6 +378,7 @@ class MainActivity : FragmentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        viewModel.checkAndRestoreOngoingSession()
         handleVoiceIntent(intent)
     }
 
@@ -377,6 +393,10 @@ class MainActivity : FragmentActivity() {
         val dataUri = intent.data
 
         when {
+            // Notification tap / direct session restore action
+            intent.getBooleanExtra("EXTRA_NAVIGATE_TO_SESSION", false) -> {
+                viewModel.checkAndRestoreOngoingSession()
+            }
             // Google Assistant / System Voice: "OK Google, set timer on Habit Bell"
             action == android.provider.AlarmClock.ACTION_SET_TIMER -> {
                 val lengthSec = intent.getIntExtra(android.provider.AlarmClock.EXTRA_LENGTH, 0)
@@ -455,10 +475,11 @@ class MainActivity : FragmentActivity() {
     }
 
     /**
-     * Synchronizes status bar visibility whenever the activity returns to the foreground.
+     * Synchronizes status bar visibility and active session navigation whenever the activity returns to the foreground.
      */
     override fun onResume() {
         super.onResume()
+        viewModel.checkAndRestoreOngoingSession()
         val isTimerScreen = viewModel.uiState.value.currentScreen == AppScreen.SESSION
         setStatusBarHidden(isTimerScreen)
     }

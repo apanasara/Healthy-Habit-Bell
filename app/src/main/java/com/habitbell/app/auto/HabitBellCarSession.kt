@@ -28,6 +28,7 @@ class HabitBellCarSession : Session() {
         lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onDestroy(owner: LifecycleOwner) {
                 sessionHandler.displayAutomationManager.setCarConnected(false)
+                sessionHandler.bluetoothDisconnectionManager.onCarDisconnected()
             }
         })
 

@@ -86,7 +86,8 @@ data class AppUiState(
     val bgMusicCustomUri: String? = null,
     val bgMusicCustomName: String? = null,
     val bgMusicYouTubeUrl: String = "https://youtu.be/x6UITRjhijI",
-    val bgMusicVolume: Float = 0.35f
+    val bgMusicVolume: Float = 0.35f,
+    val isPauseOnBluetoothDisconnect: Boolean = true
 )
 
 /**
@@ -138,7 +139,17 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
     val castServer = com.habitbell.app.cast.LocalCastWebServer(application)
 
     /** Mutable state flow holding the reactive application UI state. */
-    private val _uiState = MutableStateFlow(AppUiState())
+    private val _uiState = MutableStateFlow(
+        run {
+            val currentSession = sessionHandler.sessionState.value
+            val isSessionOngoing = currentSession.status == SessionStatus.RUNNING || currentSession.status == SessionStatus.PAUSED
+            AppUiState(
+                currentScreen = if (isSessionOngoing) AppScreen.SESSION else AppScreen.HOME,
+                isDisplayMode = if (isSessionOngoing) currentSession.profile.displayMode else true,
+                isPocketModeManual = if (isSessionOngoing) currentSession.profile.pocketMode else false
+            )
+        }
+    )
 
     /** Public read-only stream emitting application UI state changes. */
     val uiState: StateFlow<AppUiState> = _uiState.asStateFlow()
@@ -217,6 +228,30 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
                     batteryOptimizer.startProximityMonitoring()
                 } else if (state.status != SessionStatus.RUNNING) {
                     batteryOptimizer.stopProximityMonitoring()
+                }
+            }
+        }
+    }
+
+    /**
+     * Inspects current process session state and synchronizes navigation directly to [AppScreen.SESSION]
+     * if a timer session is actively running or paused.
+     *
+     * Invoked during [com.habitbell.app.MainActivity] lifecycle restarts, re-entry from the app switcher,
+     * or when navigating via ongoing notification intents.
+     */
+    fun checkAndRestoreOngoingSession() {
+        val currentSession = sessionState.value
+        if (currentSession.status == SessionStatus.RUNNING || currentSession.status == SessionStatus.PAUSED) {
+            _uiState.update { current ->
+                if (current.currentScreen != AppScreen.SESSION) {
+                    current.copy(
+                        currentScreen = AppScreen.SESSION,
+                        isDisplayMode = currentSession.profile.displayMode,
+                        isPocketModeManual = currentSession.profile.pocketMode
+                    )
+                } else {
+                    current
                 }
             }
         }
@@ -364,6 +399,18 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
      */
     fun setAutoDim(enabled: Boolean) {
         _uiState.update { it.copy(isAutoDim = enabled) }
+        saveSettings()
+    }
+
+    /**
+     * Toggles automatic pausing of active timer countdowns when Bluetooth audio peripherals
+     * (car, headphones, earbuds, speakers) or headsets disconnect.
+     *
+     * @param enabled True to automatically pause on peripheral disconnect, false to keep running.
+     */
+    fun setPauseOnBluetoothDisconnect(enabled: Boolean) {
+        _uiState.update { it.copy(isPauseOnBluetoothDisconnect = enabled) }
+        sessionHandler.bluetoothDisconnectionManager.isEnabled = enabled
         saveSettings()
     }
 
@@ -902,6 +949,7 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
 
         val savedAutoDim = prefs.getBoolean("is_auto_dim", true)
         val savedBellVol = prefs.getFloat("bell_volume", 0.9f)
+        val savedPauseOnBluetooth = prefs.getBoolean("is_pause_on_bluetooth_disconnect", true)
 
         _uiState.update {
             it.copy(
@@ -913,12 +961,14 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
                 bgMusicYouTubeUrl = savedYt,
                 bellStyle = savedStyle,
                 bellVolume = savedBellVol,
-                isAutoDim = savedAutoDim
+                isAutoDim = savedAutoDim,
+                isPauseOnBluetoothDisconnect = savedPauseOnBluetooth
             )
         }
 
         audioManager.bellStyle = savedStyle
         audioManager.setVolume(savedBellVol)
+        sessionHandler.bluetoothDisconnectionManager.isEnabled = savedPauseOnBluetooth
         bgMusicManager.isEnabled = savedEnabled
         bgMusicManager.soundType = savedType
         bgMusicManager.customAudioUri = savedUri
@@ -927,7 +977,7 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     /**
-     * Persists current audio settings, volume levels, bell styles, and auto-dim preferences to [SharedPreferences].
+     * Persists current audio settings, volume levels, bell styles, auto-dim, and Bluetooth disconnect preferences to [SharedPreferences].
      */
     private fun saveSettings() {
         val state = _uiState.value
@@ -941,6 +991,7 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
             .putString("bg_music_yt_url", state.bgMusicYouTubeUrl)
             .putString("bell_style", state.bellStyle.name)
             .putBoolean("is_auto_dim", state.isAutoDim)
+            .putBoolean("is_pause_on_bluetooth_disconnect", state.isPauseOnBluetoothDisconnect)
             .apply()
     }
 
