@@ -160,7 +160,9 @@ fun SettingsDrawer(
     onTabSelected: (SettingsDrawerTab) -> Unit = {},
     onToggleSunMoonTheme: () -> Unit = {},
     onOpenSuryaEditor: () -> Unit = {},
-    onUpdateSurya: (poses: List<CompoundPose>, targetRounds: Int, speedPreset: String, customPaceSeconds: Int, voiceCueMode: VoiceCueMode) -> Unit = { _, _, _, _, _ -> }
+    onUpdateSurya: (poses: List<CompoundPose>, targetRounds: Int, speedPreset: String, customPaceSeconds: Int, voiceCueMode: VoiceCueMode) -> Unit = { _, _, _, _, _ -> },
+    isPauseOnBluetoothDisconnect: Boolean = true,
+    onPauseOnBluetoothDisconnectToggle: (Boolean) -> Unit = {}
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -324,7 +326,9 @@ fun SettingsDrawer(
                             isCasting = isCasting,
                             castDeviceName = castDeviceName,
                             onDisconnectCast = onDisconnectCast,
-                            tvCastUrl = tvCastUrl
+                            tvCastUrl = tvCastUrl,
+                            isPauseOnBluetoothDisconnect = isPauseOnBluetoothDisconnect,
+                            onPauseOnBluetoothDisconnectToggle = onPauseOnBluetoothDisconnectToggle
                         )
                     }
                 }
@@ -920,7 +924,9 @@ private fun GlobalConfigContent(
     isCasting: Boolean,
     castDeviceName: String?,
     onDisconnectCast: () -> Unit,
-    tvCastUrl: String
+    tvCastUrl: String,
+    isPauseOnBluetoothDisconnect: Boolean = true,
+    onPauseOnBluetoothDisconnectToggle: (Boolean) -> Unit = {}
 ) {
     val context = LocalContext.current
 
@@ -1357,6 +1363,12 @@ private fun GlobalConfigContent(
                     subtitle = "Reduces brightness after 15s of stillness",
                     checked = isAutoDim,
                     onCheckedChange = onAutoDimToggle
+                )
+                SettingsToggleRow(
+                    title = "Pause on Bluetooth Disconnect",
+                    subtitle = "Automatically pause active timer when car or Bluetooth headphones disconnect",
+                    checked = isPauseOnBluetoothDisconnect,
+                    onCheckedChange = onPauseOnBluetoothDisconnectToggle
                 )
             }
         }

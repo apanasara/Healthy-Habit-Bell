@@ -103,6 +103,19 @@ class TimerService : Service() {
     }
 
     /**
+     * Handles app task dismissal from Recents ("Clear All" / swipe away).
+     *
+     * Ensures ongoing foreground notification is removed and the service stopped cleanly.
+     *
+     * @param rootIntent Intent that launched the task being cleared, if present.
+     */
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        super.onTaskRemoved(rootIntent)
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        stopSelf()
+    }
+
+    /**
      * Builds an ongoing notification with low priority to eliminate alert sounds or vibrations.
      *
      * @param title Session profile title displayed in the notification content header.
@@ -112,6 +125,7 @@ class TimerService : Service() {
     private fun buildNotification(title: String, timeText: String): Notification {
         val openIntent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
+            putExtra("EXTRA_NAVIGATE_TO_SESSION", true)
         }
         val pendingOpenIntent = PendingIntent.getActivity(
             this, 0, openIntent,

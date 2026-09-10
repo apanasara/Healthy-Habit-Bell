@@ -117,6 +117,16 @@ class CentralSessionHandler(private val application: Application) {
         airPlayManager = airPlayManager
     )
 
+    /**
+     * Subsystem detecting Bluetooth peripheral, car, and headset disconnections,
+     * automatically pausing the active timer to match media player behavior.
+     */
+    val bluetoothDisconnectionManager: BluetoothAudioDisconnectionManager = BluetoothAudioDisconnectionManager(
+        context = application,
+        sessionStateProvider = { engine.state.value },
+        onPauseRequested = { pause() }
+    )
+
     /** Authoritative Android media session shared by Car HUD, notifications, and Wear OS. */
     val mediaSession: MediaSessionCompat = MediaSessionCompat(application, "HabitBellMediaSession").apply {
         setFlags(
@@ -278,6 +288,7 @@ class CentralSessionHandler(private val application: Application) {
                             batteryOptimizer.acquireWakeLock()
                             batteryOptimizer.acquireWifiLock()
                             displayAutomationManager.startMonitoring()
+                            bluetoothDisconnectionManager.startMonitoring()
                             bgMusicManager.start()
                             startMediaService()
 
@@ -304,6 +315,7 @@ class CentralSessionHandler(private val application: Application) {
                         SessionStatus.PAUSED -> {
                             updatePlaybackState(PlaybackStateCompat.STATE_PAUSED, elapsedMs)
                             bgMusicManager.pause()
+                            bluetoothDisconnectionManager.stopMonitoring()
                             startMediaService()
 
                             if (state.profile.isStepTrackingEnabled) {
@@ -318,6 +330,7 @@ class CentralSessionHandler(private val application: Application) {
                             updatePlaybackState(PlaybackStateCompat.STATE_STOPPED, 0L)
                             batteryOptimizer.releaseWakeLock()
                             displayAutomationManager.stopMonitoring()
+                            bluetoothDisconnectionManager.stopMonitoring()
                             bgMusicManager.stop()
                             repository.recordSessionCompleted(state.profile.id)
                             lastCastProfileId = null
@@ -338,6 +351,7 @@ class CentralSessionHandler(private val application: Application) {
                             updatePlaybackState(PlaybackStateCompat.STATE_STOPPED, 0L)
                             batteryOptimizer.releaseWakeLock()
                             displayAutomationManager.stopMonitoring()
+                            bluetoothDisconnectionManager.stopMonitoring()
                             bgMusicManager.stop()
                             healthStepManager.resetSession()
                             lastCastProfileId = null
@@ -660,6 +674,7 @@ class CentralSessionHandler(private val application: Application) {
         audioManager.release()
         batteryOptimizer.releaseWakeLock()
         batteryOptimizer.stopProximityMonitoring()
+        bluetoothDisconnectionManager.destroy()
         mediaSession.release()
         castManager.destroy()
     }

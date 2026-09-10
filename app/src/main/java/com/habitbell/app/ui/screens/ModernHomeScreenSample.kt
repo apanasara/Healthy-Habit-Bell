@@ -13,7 +13,9 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -29,6 +31,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.habitbell.app.R
 import com.habitbell.app.data.model.*
+import com.habitbell.app.engine.SessionStatus
+import com.habitbell.app.engine.TimerSessionState
 
 /**
  * Architectural Role: Visual-first, low-cognitive-load Home Screen prototype for Habit Bell.
@@ -62,6 +66,9 @@ private data class IntentCategory(
  * @param onCycleTheme Callback to cycle active theme variants.
  * @param onCreateNewClick Callback to launch custom profile creation.
  * @param onOpenSettings Callback to open the settings drawer.
+ * @param sessionState Reactive snapshot of ongoing timer session state, or null if uninitialized.
+ * @param onResumeSession Callback navigating the user back to the fullscreen session screen.
+ * @param onStopSession Callback immediately halting the ongoing session and silencing audio.
  * @param modifier Composable layout modifier.
  */
 @Composable
@@ -75,6 +82,9 @@ fun ModernHomeScreenSample(
     onCycleTheme: () -> Unit,
     onCreateNewClick: () -> Unit,
     onOpenSettings: () -> Unit,
+    sessionState: TimerSessionState? = null,
+    onResumeSession: () -> Unit = {},
+    onStopSession: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var selectedCategory by remember { mutableStateOf("All") }
@@ -117,6 +127,17 @@ fun ModernHomeScreenSample(
                 .padding(horizontal = 20.dp),
             verticalArrangement = Arrangement.spacedBy(22.dp)
         ) {
+            // 0. Ongoing Active Session Banner (Instant visibility and 1-tap stop/resume)
+            if (sessionState != null && (sessionState.status == SessionStatus.RUNNING || sessionState.status == SessionStatus.PAUSED)) {
+                item {
+                    ActiveSessionBanner(
+                        sessionState = sessionState,
+                        onResumeSession = onResumeSession,
+                        onStopSession = onStopSession
+                    )
+                }
+            }
+
             // 1. Hero Atmospheric Focus Card (Visual-first mindful anchor)
             item {
                 val heroProfile = favorites.firstOrNull() ?: profiles.firstOrNull()
@@ -556,6 +577,185 @@ private fun ModernZenTopBar(
                     tint = onSurfaceVariant,
                     modifier = Modifier.size(18.dp)
                 )
+            }
+        }
+    }
+}
+
+/**
+ * Prominent ongoing session notification banner rendered at the top of the Home screen
+ * when a mindful practice is actively running or paused in the background.
+ *
+ * Provides immediate 1-tap visibility into elapsed progress and quick action controls
+ * to directly resume fullscreen focus or cleanly terminate the session without opening submenus.
+ *
+ * @param sessionState Reactive snapshot of the active [TimerSessionState].
+ * @param onResumeSession Callback navigating the user back to the fullscreen [SessionScreen].
+ * @param onStopSession Callback immediately halting the active session and silencing audio engines.
+ * @param modifier Composable layout modifier.
+ */
+@Composable
+fun ActiveSessionBanner(
+    sessionState: TimerSessionState,
+    onResumeSession: () -> Unit,
+    onStopSession: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val isRunning = sessionState.status == SessionStatus.RUNNING
+    val primaryColor = MaterialTheme.colorScheme.primary
+    val surfaceColor = MaterialTheme.colorScheme.surface
+    val onSurfaceColor = MaterialTheme.colorScheme.onSurface
+    val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
+    val iconRes = resolvePhosphorIcon(sessionState.profile)
+
+    Card(
+        shape = RoundedCornerShape(20.dp),
+        border = BorderStroke(1.5.dp, primaryColor.copy(alpha = 0.6f)),
+        colors = CardDefaults.cardColors(containerColor = surfaceColor),
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable { onResumeSession() }
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(
+                    Brush.horizontalGradient(
+                        colors = listOf(
+                            primaryColor.copy(alpha = 0.15f),
+                            surfaceColor
+                        )
+                    )
+                )
+                .padding(16.dp)
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(44.dp)
+                                .background(primaryColor.copy(alpha = 0.18f), CircleShape)
+                                .border(1.dp, primaryColor.copy(alpha = 0.4f), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                painter = painterResource(id = iconRes),
+                                contentDescription = null,
+                                tint = primaryColor,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+
+                        Column {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(7.dp)
+                                        .background(if (isRunning) primaryColor else onSurfaceVariant, CircleShape)
+                                )
+                                Text(
+                                    text = if (isRunning) "SESSION IN PROGRESS" else "SESSION PAUSED",
+                                    fontSize = 11.sp,
+                                    letterSpacing = 1.2.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isRunning) primaryColor else onSurfaceVariant
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = sessionState.profile.name,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = onSurfaceColor
+                            )
+                        }
+                    }
+
+                    // Remaining time display
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.background,
+                        border = BorderStroke(1.dp, primaryColor.copy(alpha = 0.3f))
+                    ) {
+                        Text(
+                            text = sessionState.formattedRemainingTime,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = primaryColor,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                        )
+                    }
+                }
+
+                // Action buttons: Stop and Resume/Open
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedButton(
+                        onClick = onStopSession,
+                        shape = CircleShape,
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.6f)),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error
+                        ),
+                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
+                        modifier = Modifier.height(36.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Stop,
+                            contentDescription = "Stop Session",
+                            modifier = Modifier.size(15.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Stop",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(10.dp))
+
+                    Button(
+                        onClick = onResumeSession,
+                        shape = CircleShape,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = primaryColor,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
+                        ),
+                        contentPadding = PaddingValues(horizontal = 18.dp, vertical = 6.dp),
+                        modifier = Modifier.height(36.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (isRunning) Icons.Default.ArrowForward else Icons.Default.PlayArrow,
+                            contentDescription = if (isRunning) "Open Session" else "Resume Session",
+                            modifier = Modifier.size(15.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = if (isRunning) "Open" else "Resume",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
             }
         }
     }
