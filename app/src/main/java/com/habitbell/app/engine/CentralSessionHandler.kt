@@ -175,21 +175,31 @@ class CentralSessionHandler(private val application: Application) {
             if (isPlay) resume() else pause()
         }
 
-        // Auto-load running session onto TV if Cast connection is established mid-session
+        castManager.onReceiverReady = {
+            // Push full telemetry immediately upon TV receiver online readiness
+            val state = engine.state.value
+            val initialTelemetry = buildCastTelemetryJson(state)
+            castManager.sendCustomMessage(initialTelemetry)
+        }
+
+        // Auto-load running session onto TV if Cast connection is established mid-session,
+        // and immediately dispatch current profile telemetry across the custom bus (even when IDLE)
         scope.launch {
             castManager.isCasting.collect { isCasting ->
-                if (isCasting && engine.state.value.status == SessionStatus.RUNNING) {
+                if (isCasting) {
                     val state = engine.state.value
-                    lastCastProfileId = state.profile.id
-                    val subtitle = buildSessionSubtitle(state)
-                    val artwork = resolveArtworkForProfile(state.profile)
-                    castManager.loadSession(
-                        profileName = state.profile.name,
-                        subtitle = subtitle,
-                        durationSeconds = state.totalSeconds,
-                        artworkUrl = artwork
-                    )
-                    // Push initial telemetry snapshot immediately to TV receiver
+                    if (state.status == SessionStatus.RUNNING) {
+                        lastCastProfileId = state.profile.id
+                        val subtitle = buildSessionSubtitle(state)
+                        val artwork = resolveArtworkForProfile(state.profile)
+                        castManager.loadSession(
+                            profileName = state.profile.name,
+                            subtitle = subtitle,
+                            durationSeconds = state.totalSeconds,
+                            artworkUrl = artwork
+                        )
+                    }
+                    // Always push initial telemetry snapshot immediately to TV receiver
                     val initialTelemetry = buildCastTelemetryJson(state)
                     castManager.sendCustomMessage(initialTelemetry)
                 }
@@ -411,10 +421,32 @@ class CentralSessionHandler(private val application: Application) {
         json.put("formattedTime", state.formattedRemainingTime)
         json.put("formattedNextBell", state.formattedNextBellTime)
         json.put("profileName", state.profile.name)
+        json.put("profileCategory", state.profile.category)
         json.put("status", state.status.name)
         json.put("currentRound", state.currentRound)
         json.put("totalRounds", state.totalRounds)
         json.put("progressFraction", state.progressFraction.toDouble())
+        json.put("remainingSeconds", state.remainingSeconds)
+        json.put("totalSeconds", state.totalSeconds)
+        json.put("intervalDurationSeconds", state.profile.intervalDurationSeconds)
+        json.put("nextBellSeconds", state.nextBellSeconds)
+
+        val isEating = state.profile.category.contains("Eating", ignoreCase = true) ||
+            state.profile.id.contains("eating", ignoreCase = true) ||
+            state.profile.name.contains("Eating", ignoreCase = true)
+        val isPranayama = state.profile.type == TimerType.MULTI_INTERVAL || state.profile.pranayamaConfig != null
+        val isSurya = state.profile.type == TimerType.COMPOUND || state.profile.name.contains("Surya", ignoreCase = true)
+
+        val screenMode = when {
+            state.status == SessionStatus.IDLE -> "SPLASH"
+            isEating -> "EATING"
+            isPranayama -> "PRANAYAMA"
+            else -> "GENERAL"
+        }
+        json.put("screenMode", screenMode)
+        json.put("isEating", isEating)
+        json.put("isPranayama", isPranayama)
+        json.put("isSurya", isSurya)
 
         // Multi-interval / Pranayama tracking
         val pranayamaPhase = state.currentPranayamaPhase
@@ -422,8 +454,14 @@ class CentralSessionHandler(private val application: Application) {
             json.put("pranayamaPhase", pranayamaPhase.name)
             json.put("pranayamaSanskrit", pranayamaPhase.sanskritName)
             json.put("pranayamaDisplay", pranayamaPhase.displayName)
+            json.put("phaseDurationSeconds", state.phaseDurationSeconds)
+            json.put("phaseRemainingSeconds", state.phaseRemainingSeconds)
         } else {
             json.put("pranayamaPhase", "")
+            json.put("pranayamaSanskrit", "")
+            json.put("pranayamaDisplay", "")
+            json.put("phaseDurationSeconds", 0)
+            json.put("phaseRemainingSeconds", 0)
         }
 
         // Compound Sequencer / Surya Namaskar tracking
@@ -434,6 +472,8 @@ class CentralSessionHandler(private val application: Application) {
             json.put("poseBreath", currentPose.breathCue)
         } else {
             json.put("poseName", "")
+            json.put("poseSanskrit", "")
+            json.put("poseBreath", "")
         }
 
         json.put("triggerBell", triggerBell)

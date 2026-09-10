@@ -115,6 +115,9 @@ class HabitBellCastManager private constructor(private val context: Context) {
     /** Callback interface notifying central session orchestration of TV remote interactions. */
     var onRemotePlaybackAction: ((isPlay: Boolean) -> Unit)? = null
 
+    /** Callback interface notifying central session orchestration that the TV web receiver is ready for immediate telemetry sync. */
+    var onReceiverReady: (() -> Unit)? = null
+
     /** Guard flag preventing local mobile play/pause/load dispatches from echoing back as TV remote commands. */
     @Volatile
     private var isDispatchingLocally = false
@@ -262,6 +265,7 @@ class HabitBellCastManager private constructor(private val context: Context) {
         }
 
         Log.i(TAG, "Bound Cast session to device: $deviceName")
+        onReceiverReady?.invoke()
     }
 
     /**
@@ -312,10 +316,12 @@ class HabitBellCastManager private constructor(private val context: Context) {
                 addImage(WebImage(Uri.parse(finalArtwork)))
             }
 
-            // Prioritize local webserver authentic mindful stream over external CDN
+            // Custom Web Receiver is hosted via HTTPS (GitHub Pages). Insecure HTTP media streams
+            // will be blocked by Chromium's mixed-content security policy.
+            val isCustomReceiver = CastOptionsProvider.customReceiverAppId != null
             val localServer = LocalCastWebServer(context)
             val localIp = localServer.getLocalIpAddress()
-            val mediaUrl = streamUrl ?: if (localIp != null) {
+            val mediaUrl = streamUrl ?: if (!isCustomReceiver && localIp != null) {
                 "http://$localIp:8888/media/aum.mp3"
             } else {
                 DEFAULT_FALLBACK_STREAM_URL
@@ -440,6 +446,10 @@ class HabitBellCastManager private constructor(private val context: Context) {
                 "toggle" -> {
                     Log.i(TAG, "TV Custom Receiver requested TOGGLE")
                     togglePlayPause()
+                }
+                "ready", "ping" -> {
+                    Log.i(TAG, "TV Custom Receiver signaled ready/ping; synchronizing session state")
+                    onReceiverReady?.invoke()
                 }
                 else -> {
                     Log.d(TAG, "Unhandled TV receiver message type: ${json.optString("type")}")

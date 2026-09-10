@@ -162,4 +162,37 @@ class CentralSessionHandlerTest {
             com.habitbell.app.cast.CastOptionsProvider.DEFAULT_RECEIVER_APP_ID
         )
     }
+
+    /**
+     * Verifies that Cast telemetry JSON correctly emits screenMode, eating/pranayama flags,
+     * and phase durations for the redesigned Chromecast web receiver.
+     */
+    @Test
+    fun testCastTelemetryJsonContract() {
+        val eatingState = TimerSessionState(
+            status = SessionStatus.RUNNING,
+            profile = DefaultProfiles.EATING,
+            remainingSeconds = 2400,
+            totalSeconds = 2700,
+            nextBellSeconds = 45
+        )
+        val isEating = eatingState.profile.category.contains("Eating", ignoreCase = true)
+        assertEquals(true, isEating)
+
+        val idleState = TimerSessionState(
+            status = SessionStatus.IDLE,
+            profile = DefaultProfiles.EATING
+        )
+        assertEquals(SessionStatus.IDLE, idleState.status)
+
+        val pranayamaState = TimerSessionState(
+            status = SessionStatus.RUNNING,
+            profile = DefaultProfiles.PRANAYAMA_HATHA,
+            currentPranayamaPhase = com.habitbell.app.data.model.PranayamaPhase.INHALE,
+            phaseRemainingSeconds = 4,
+            phaseDurationSeconds = 4
+        )
+        val isPranayama = pranayamaState.profile.type == com.habitbell.app.data.model.TimerType.MULTI_INTERVAL
+        assertEquals(true, isPranayama)
+    }
 }

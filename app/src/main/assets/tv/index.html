@@ -1,653 +1,1257 @@
 <!DOCTYPE html>
+<!--
+  # Habit Bell • Google Cast Custom Web Receiver
+  
+  ## Architectural Role & Runtime Lifecycle
+  Executes inside the Chromecast/Google TV Chromium runtime (hosted via GitHub Pages HTTPS
+  at https://apanasara.github.io/Healthy-Habit-Bell/). Communicates bi-directionally with the
+  Habit Bell Android sender via Google Cast Application Framework (CAF) v3 and the custom
+  message channel ('urn:x-cast:com.habitbell.cast').
+
+  ## Screen Modes
+  - SPLASH: Standby & Connected welcome screen with golden prana aura, habit bell emblem,
+    connection beacons, and queued profile preview.
+  - EATING: Mindful Eating visualizer with concentric dual rings (total mealtime and 60s bite
+    pacing arc), orbital bead marker, Zen dining bowl crest, big legible countdown, next-bell
+    capsule, rotating chew cues, and radial chime ripple.
+  - PRANAYAMA: Heroic 13-petal organic blooming lotus with dynamic breath-phase color harmonies
+    (Inhale=Cyan, Hold-In=Amber, Exhale=Lavender, Hold-Out=Azure), upper Sanskrit HUD,
+    phase countdown numeral, and round milestone tracker.
+  - GENERAL: Compound sequencer posture card for Surya Namaskar and standard meditation timers.
+
+  ## Concurrency & Performance
+  - 60fps vector animations (SVG transforms and requestAnimationFrame).
+  - Built-in zero-latency Web Audio Tibetan singing bowl synthesizer (432 Hz fundamental
+    and 1192 Hz Tibetan bowl overtone with exponential decay).
+  - Remote playback controls for HDMI-CEC and physical TV remote buttons.
+-->
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Habit Bell • TV Dashboard</title>
-    <style>
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            user-select: none;
-        }
-        body {
-            background-color: #060709;
-            color: #FFFFFF;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            height: 100vh;
-            width: 100vw;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            align-items: center;
-            padding: 40px 60px;
-            overflow: hidden;
-        }
-        .header {
-            width: 100%;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .badge {
-            background: rgba(229, 169, 60, 0.15);
-            color: #E5A93C;
-            border: 1px solid rgba(229, 169, 60, 0.3);
-            border-radius: 30px;
-            padding: 10px 24px;
-            font-size: 1.1rem;
-            font-weight: 600;
-            letter-spacing: 1.5px;
-            text-transform: uppercase;
-        }
-        .title {
-            font-size: 2.2rem;
-            font-weight: 300;
-            letter-spacing: 2px;
-            color: #E0E0E0;
-        }
-        .tv-status {
-            font-size: 1.1rem;
-            color: #8892B0;
-        }
-        .center-stage {
-            position: relative;
-            width: 480px;
-            height: 480px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-        .progress-svg {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            transform: rotate(-90deg);
-        }
-        .progress-bg {
-            fill: none;
-            stroke: rgba(255, 255, 255, 0.08);
-            stroke-width: 10;
-        }
-        .progress-bar {
-            fill: none;
-            stroke: #E5A93C;
-            stroke-width: 10;
-            stroke-linecap: round;
-            stroke-dasharray: 1382;
-            stroke-dashoffset: 0;
-            transition: stroke-dashoffset 1s linear;
-        }
-        .clock-container {
-            text-align: center;
-            z-index: 10;
-        }
-        .clock-time {
-            font-size: 7.5rem;
-            font-weight: 200;
-            letter-spacing: -2px;
-            color: #FFFFFF;
-            line-height: 1;
-        }
-        .next-bell {
-            margin-top: 20px;
-            font-size: 1.3rem;
-            font-weight: 500;
-            color: #E5A93C;
-            letter-spacing: 1.5px;
-        }
-        .controls {
-            display: flex;
-            gap: 16px;
-            justify-content: center;
-            align-items: center;
-        }
-        .btn {
-            background: rgba(255, 255, 255, 0.08);
-            color: #FFFFFF;
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            border-radius: 16px;
-            padding: 14px 32px;
-            font-size: 1.2rem;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            outline: none;
-        }
-        .btn:hover, .btn:focus {
-            background: rgba(229, 169, 60, 0.25);
-            border-color: #E5A93C;
-            transform: scale(1.05);
-        }
-        .btn-primary {
-            background: #E5A93C;
-            color: #060709;
-            font-weight: 600;
-            border-color: #E5A93C;
-        }
-        .btn-primary:hover, .btn-primary:focus {
-            background: #f3b64c;
-            color: #060709;
-        }
-        .btn-active {
-            background: rgba(229, 169, 60, 0.3);
-            border-color: #E5A93C;
-            color: #E5A93C;
-        }
-        .hint {
-            color: #6C7A9C;
-            font-size: 1rem;
-            letter-spacing: 1px;
-            text-align: center;
-            margin-top: 10px;
-        }
-        .breath-ring {
-            position: absolute;
-            width: 320px;
-            height: 320px;
-            border-radius: 50%;
-            pointer-events: none;
-            transition: all 1.2s cubic-bezier(0.4, 0, 0.2, 1);
-            opacity: 0;
-            z-index: 2;
-        }
-        .breath-ring.inhale {
-            transform: scale(1.22);
-            background: radial-gradient(circle, rgba(229,169,60,0.35) 0%, rgba(229,169,60,0.06) 70%, transparent 100%);
-            border: 2px solid #E5A93C;
-            opacity: 0.85;
-        }
-        .breath-ring.hold-in {
-            transform: scale(1.22);
-            background: radial-gradient(circle, rgba(245,158,11,0.45) 0%, rgba(245,158,11,0.1) 70%, transparent 100%);
-            border: 2px dashed #F59E0B;
-            opacity: 0.95;
-        }
-        .breath-ring.exhale {
-            transform: scale(0.72);
-            background: radial-gradient(circle, rgba(56,189,248,0.3) 0%, rgba(56,189,248,0.05) 70%, transparent 100%);
-            border: 2px solid #38BDF8;
-            opacity: 0.75;
-        }
-        .breath-ring.hold-out {
-            transform: scale(0.65);
-            background: radial-gradient(circle, rgba(99,102,241,0.25) 0%, transparent 70%);
-            border: 1px dotted #818CF8;
-            opacity: 0.5;
-        }
-        #ytFrame {
-            position: absolute;
-            width: 1px;
-            height: 1px;
-            opacity: 0.01;
-            pointer-events: none;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Habit Bell • Living Room TV</title>
+  <!-- Google Cast Application Framework (CAF) Receiver v3 -->
+  <script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
+  <style>
+    :root {
+      --bg-color: #060709;
+      --gold-color: #E5A93C;
+      --gold-dim: rgba(229, 169, 60, 0.18);
+      --gold-border: rgba(229, 169, 60, 0.35);
+      --text-main: #FFFFFF;
+      --text-muted: #8892B0;
+      --text-dim: #4B5563;
+      --inhale-color: #4ECDC4;
+      --hold-color: #E5A93C;
+      --exhale-color: #A78BFA;
+      --hold-out-color: #60A5FA;
+      --eating-inner-track: rgba(229, 169, 60, 0.18);
+      --eating-inner-stroke: #F59E0B;
+      --emerald: #10B981;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      height: 100vh;
+      width: 100vw;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      align-items: center;
+      padding: 4vh 6vw;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Ambient Background Aura */
+    .ambient-aura {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 800px;
+      height: 800px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(229, 169, 60, 0.08) 0%, rgba(6, 7, 9, 0) 70%);
+      pointer-events: none;
+      z-index: 0;
+      transition: background 1.2s ease;
+    }
+
+    /* Global Header */
+    .header {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 10;
+    }
+
+    .badge {
+      background: var(--gold-dim);
+      color: var(--gold-color);
+      border: 1px solid var(--gold-border);
+      border-radius: 40px;
+      padding: 8px 24px;
+      font-size: 1.1rem;
+      font-weight: 600;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      transition: all 0.5s ease;
+    }
+
+    .header-center-info {
+      font-size: 1.4rem;
+      font-weight: 400;
+      letter-spacing: 1.5px;
+      color: #E0E0E0;
+    }
+
+    .device-status {
+      font-size: 1.1rem;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .status-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background-color: var(--gold-color);
+      box-shadow: 0 0 10px rgba(229, 169, 60, 0.6);
+      transition: all 0.4s ease;
+    }
+
+    .status-dot.connected {
+      background-color: var(--emerald);
+      box-shadow: 0 0 12px rgba(16, 185, 129, 0.8);
+    }
+
+    /* View Containers */
+    .view-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      align-items: center;
+      padding: 4vh 6vw;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+      z-index: 5;
+    }
+
+    .view-container.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    /* ==========================================================================
+       SCREEN 1: SPLASH SCREEN (Standby / Waiting / Connected)
+       ========================================================================== */
+    .splash-center {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      margin: auto;
+      z-index: 10;
+    }
+
+    .splash-emblem {
+      width: 130px;
+      height: 130px;
+      margin-bottom: 24px;
+      animation: gentleBreathing 4s ease-in-out infinite;
+      filter: drop-shadow(0 0 24px rgba(229, 169, 60, 0.35));
+    }
+
+    @keyframes gentleBreathing {
+      0%, 100% { transform: scale(1); filter: drop-shadow(0 0 20px rgba(229, 169, 60, 0.25)); }
+      50% { transform: scale(1.05); filter: drop-shadow(0 0 35px rgba(229, 169, 60, 0.5)); }
+    }
+
+    .splash-title {
+      font-size: 3.2rem;
+      font-weight: 300;
+      letter-spacing: 5px;
+      color: #FFFFFF;
+      margin-bottom: 8px;
+    }
+
+    .splash-subtitle {
+      font-size: 1.3rem;
+      font-weight: 400;
+      color: var(--text-muted);
+      letter-spacing: 2px;
+      margin-bottom: 32px;
+    }
+
+    .splash-connection-pill {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 40px;
+      padding: 12px 28px;
+      font-size: 1.15rem;
+      color: #D1D5DB;
+      letter-spacing: 0.5px;
+      margin-bottom: 24px;
+    }
+
+    .splash-preview-card {
+      background: rgba(229, 169, 60, 0.08);
+      border: 1px solid var(--gold-border);
+      border-radius: 20px;
+      padding: 16px 36px;
+      text-align: center;
+      opacity: 0;
+      transform: translateY(10px);
+      transition: all 0.5s ease;
+    }
+
+    .splash-preview-card.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .splash-preview-name {
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: var(--gold-color);
+      letter-spacing: 1px;
+    }
+
+    .splash-preview-hint {
+      font-size: 1.05rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    /* ==========================================================================
+       SCREEN 2: MINDFUL EATING SCREEN
+       ========================================================================== */
+    .eating-stage {
+      position: relative;
+      width: 520px;
+      height: 520px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin: auto;
+    }
+
+    .eating-svg {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      transform: rotate(-90deg);
+    }
+
+    /* Outer Ring: Total Meal Duration */
+    .outer-bg {
+      fill: none;
+      stroke: rgba(255, 255, 255, 0.06);
+      stroke-width: 8;
+    }
+
+    .outer-bar {
+      fill: none;
+      stroke: var(--gold-color);
+      stroke-width: 8;
+      stroke-linecap: round;
+      stroke-dasharray: 1382; /* 2 * PI * 220 */
+      stroke-dashoffset: 0;
+      transition: stroke-dashoffset 1s linear;
+    }
+
+    /* Inner Ring: Bite Pacing Interval Arc */
+    .inner-bg {
+      fill: none;
+      stroke: var(--eating-inner-track);
+      stroke-width: 8;
+    }
+
+    .inner-bar {
+      fill: none;
+      stroke: var(--eating-inner-stroke);
+      stroke-width: 8;
+      stroke-linecap: round;
+      stroke-dasharray: 1099; /* 2 * PI * 175 */
+      stroke-dashoffset: 0;
+      transition: stroke-dashoffset 0.8s ease;
+      filter: drop-shadow(0 0 6px rgba(245, 158, 11, 0.6));
+    }
+
+    .eating-center-content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      z-index: 10;
+    }
+
+    .eating-bowl-icon {
+      width: 60px;
+      height: 60px;
+      margin-bottom: 12px;
+      fill: var(--gold-color);
+      filter: drop-shadow(0 0 12px rgba(229, 169, 60, 0.4));
+    }
+
+    .eating-countdown {
+      font-size: 6.2rem;
+      font-weight: 200;
+      letter-spacing: -2px;
+      line-height: 1;
+      color: #FFFFFF;
+    }
+
+    .eating-bite-capsule {
+      margin-top: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(229, 169, 60, 0.14);
+      border: 1px solid var(--gold-border);
+      border-radius: 24px;
+      padding: 8px 20px;
+      font-size: 1.15rem;
+      font-weight: 600;
+      color: var(--gold-color);
+      letter-spacing: 1px;
+    }
+
+    .eating-guidance-bar {
+      position: absolute;
+      bottom: 10vh;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 80%;
+      text-align: center;
+      background: rgba(20, 22, 28, 0.75);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 20px;
+      padding: 14px 28px;
+      backdrop-filter: blur(12px);
+      z-index: 10;
+    }
+
+    .eating-guidance-text {
+      font-size: 1.35rem;
+      font-weight: 400;
+      color: #E2E8F0;
+      letter-spacing: 0.8px;
+      transition: opacity 0.5s ease;
+    }
+
+    /* Chime Ripple Wave */
+    .chime-ripple {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) scale(0.1);
+      width: 500px;
+      height: 500px;
+      border-radius: 50%;
+      border: 3px solid rgba(229, 169, 60, 0.8);
+      opacity: 0;
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    .chime-ripple.active {
+      animation: rippleExpand 1.5s cubic-bezier(0.1, 0.8, 0.3, 1) forwards;
+    }
+
+    @keyframes rippleExpand {
+      0% { transform: translate(-50%, -50%) scale(0.2); opacity: 0.9; }
+      100% { transform: translate(-50%, -50%) scale(2.2); opacity: 0; }
+    }
+
+    /* ==========================================================================
+       SCREEN 3: PRANAYAMA SCREEN (Heroic Blooming Lotus)
+       ========================================================================== */
+    .pranayama-stage {
+      position: relative;
+      width: 700px;
+      height: 540px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      margin: auto;
+    }
+
+    /* Upper Sanskrit HUD */
+    .pranayama-upper-hud {
+      text-align: center;
+      margin-bottom: 20px;
+      z-index: 10;
+    }
+
+    .pranayama-phase-sanskrit {
+      font-size: 2.8rem;
+      font-weight: 600;
+      letter-spacing: 3px;
+      color: var(--inhale-color);
+      transition: color 0.6s ease;
+    }
+
+    .pranayama-phase-english {
+      font-size: 1.3rem;
+      color: var(--text-muted);
+      letter-spacing: 1.5px;
+      margin-top: 4px;
+    }
+
+    .pranayama-phase-numeral {
+      font-size: 5rem;
+      font-weight: 200;
+      line-height: 1;
+      margin-top: 8px;
+      color: #FFFFFF;
+      letter-spacing: -1px;
+    }
+
+    /* Side-View Blooming Lotus SVG Container */
+    .lotus-container {
+      width: 380px;
+      height: 220px;
+      position: relative;
+      z-index: 5;
+    }
+
+    .lotus-svg {
+      width: 100%;
+      height: 100%;
+      overflow: visible;
+      filter: drop-shadow(0 0 20px rgba(78, 205, 196, 0.3));
+      transition: filter 0.8s ease;
+    }
+
+    /* Petal Kinematics Classes */
+    .petal {
+      fill: var(--inhale-color);
+      fill-opacity: 0.85;
+      stroke: #FFFFFF;
+      stroke-width: 1.5;
+      stroke-opacity: 0.35;
+      transform-origin: 190px 180px;
+      transition: transform 1.2s cubic-bezier(0.65, 0.05, 0.35, 1), fill 0.8s ease;
+    }
+
+    .calyx {
+      fill: #10B981;
+      stroke: #34D399;
+      stroke-width: 1.5;
+      stroke-opacity: 0.4;
+    }
+
+    .stem {
+      stroke: #10B981;
+      stroke-width: 5;
+      stroke-linecap: round;
+    }
+
+    /* Waterline Ripple Wave */
+    .waterline {
+      stroke: rgba(255, 255, 255, 0.15);
+      stroke-width: 2;
+      fill: none;
+    }
+
+    .pranayama-lower-hud {
+      margin-top: 16px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      z-index: 10;
+    }
+
+    .pranayama-milestone-capsule {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 20px;
+      padding: 8px 20px;
+      font-size: 1.1rem;
+      color: #E2E8F0;
+    }
+
+    .pranayama-total-time {
+      font-size: 1.15rem;
+      color: var(--text-muted);
+    }
+
+    /* ==========================================================================
+       SCREEN 4: GENERAL / SURYA NAMASKAR SCREEN
+       ========================================================================== */
+    .general-stage {
+      position: relative;
+      width: 480px;
+      height: 480px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin: auto;
+    }
+
+    .general-svg {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      transform: rotate(-90deg);
+    }
+
+    .general-bg {
+      fill: none;
+      stroke: rgba(255, 255, 255, 0.08);
+      stroke-width: 10;
+    }
+
+    .general-bar {
+      fill: none;
+      stroke: var(--gold-color);
+      stroke-width: 10;
+      stroke-linecap: round;
+      stroke-dasharray: 1382;
+      stroke-dashoffset: 0;
+      transition: stroke-dashoffset 1s linear;
+    }
+
+    .general-clock {
+      text-align: center;
+      z-index: 10;
+    }
+
+    .general-time {
+      font-size: 7rem;
+      font-weight: 200;
+      letter-spacing: -2px;
+      line-height: 1;
+      color: #FFFFFF;
+    }
+
+    .general-interval {
+      margin-top: 14px;
+      font-size: 1.3rem;
+      font-weight: 500;
+      color: var(--gold-color);
+      letter-spacing: 1.5px;
+    }
+
+    .asana-card {
+      position: absolute;
+      bottom: -65px;
+      left: 50%;
+      transform: translateX(-50%);
+      text-align: center;
+      width: 460px;
+      opacity: 0;
+      transition: opacity 0.5s ease;
+    }
+
+    .asana-card.active {
+      opacity: 1;
+    }
+
+    .asana-name {
+      font-size: 1.9rem;
+      font-weight: 600;
+      color: var(--gold-color);
+    }
+
+    .asana-breath {
+      font-size: 1.15rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    /* Global Footer */
+    .footer {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: var(--text-muted);
+      font-size: 1.05rem;
+      z-index: 10;
+    }
+
+    .status-text {
+      color: var(--gold-color);
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    /* Volume HUD */
+    .volume-hud {
+      position: fixed;
+      top: 30px;
+      right: 30px;
+      background: rgba(20, 20, 20, 0.9);
+      border: 1px solid var(--gold-border);
+      border-radius: 16px;
+      padding: 12px 22px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      opacity: 0;
+      transition: opacity 0.4s ease;
+      z-index: 100;
+      color: var(--gold-color);
+      font-weight: 600;
+      font-size: 1rem;
+    }
+
+    .volume-hud.visible {
+      opacity: 1;
+    }
+  </style>
 </head>
 <body>
+  <!-- Embedded Media Player for CAF v3 Framework Compliance -->
+  <cast-media-player style="display:none;"></cast-media-player>
+
+  <!-- Ambient Dynamic Radial Aura -->
+  <div id="ambientAura" class="ambient-aura"></div>
+
+  <!-- Persistent Volume HUD -->
+  <div id="volumeHud" class="volume-hud">
+    <span id="volumeHudLabel">Bell Volume: 90%</span>
+  </div>
+
+  <!-- ========================================================================
+       SCREEN 1: SPLASH VIEW (Standby / Idle / Connected)
+       ======================================================================== -->
+  <div id="viewSplash" class="view-container active">
     <div class="header">
-        <div class="badge">Living Room TV Dashboard</div>
-        <div class="title" id="sessionTitle">🍽 Mindful Eating</div>
-        <div class="tv-status" id="bgStatus">Background: ॐ Aum Drone</div>
+      <div class="badge">Habit Bell</div>
+      <div class="header-center-info">Mindful TV Sanctuary</div>
+      <div class="device-status">
+        <div id="splashDot" class="status-dot"></div>
+        <span id="splashStatusText">Waiting for Phone...</span>
+      </div>
     </div>
 
-    <div class="center-stage">
-        <div class="breath-ring" id="breathRing"></div>
-        <svg class="progress-svg" viewBox="0 0 480 480">
-            <circle class="progress-bg" cx="240" cy="240" r="220" />
-            <circle class="progress-bar" id="progressBar" cx="240" cy="240" r="220" />
+    <div class="splash-center">
+      <!-- Sacred Habit Bell & Lotus Vector Emblem -->
+      <svg class="splash-emblem" viewBox="0 0 120 120">
+        <defs>
+          <radialGradient id="bellGoldGrad" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="#FDE047" />
+            <stop offset="60%" stop-color="#E5A93C" />
+            <stop offset="100%" stop-color="#B45309" />
+          </radialGradient>
+        </defs>
+        <!-- Ambient outer halo -->
+        <circle cx="60" cy="60" r="54" fill="none" stroke="rgba(229, 169, 60, 0.25)" stroke-width="2" stroke-dasharray="6 4" />
+        <!-- Bell Crown -->
+        <path d="M55 24 Q60 18 65 24 L68 30 L52 30 Z" fill="url(#bellGoldGrad)" />
+        <circle cx="60" cy="20" r="4" fill="url(#bellGoldGrad)" />
+        <!-- Bell Dome Body -->
+        <path d="M52 30 C52 48 38 72 34 82 C44 85 76 85 86 82 C82 72 68 48 68 30 Z" fill="url(#bellGoldGrad)" />
+        <!-- Bell Lip -->
+        <ellipse cx="60" cy="83" rx="28" ry="5" fill="#D97706" />
+        <ellipse cx="60" cy="83" rx="26" ry="3" fill="#FDE047" />
+        <!-- Clapper Ball -->
+        <circle cx="60" cy="91" r="5" fill="url(#bellGoldGrad)" />
+      </svg>
+
+      <div class="splash-title">HABIT BELL</div>
+      <div class="splash-subtitle">Mindful Living Room • Meditative Sanctuary</div>
+
+      <div class="splash-connection-pill">
+        <div id="splashPillDot" class="status-dot"></div>
+        <span id="splashPillLabel">Open Habit Bell on your phone to connect</span>
+      </div>
+
+      <div id="splashPreviewCard" class="splash-preview-card">
+        <div id="splashPreviewName" class="splash-preview-name">Mindful Eating</div>
+        <div id="splashPreviewHint" class="splash-preview-hint">Ready • Press Start on phone or TV remote</div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <div>Habit Bell Cast Receiver v3</div>
+      <div>Native 4K / 1080p Vector Display • 432Hz Tibetan Chimes</div>
+    </div>
+  </div>
+
+  <!-- ========================================================================
+       SCREEN 2: MINDFUL EATING VIEW
+       ======================================================================== -->
+  <div id="viewEating" class="view-container">
+    <div class="header">
+      <div class="badge">Mindful Eating</div>
+      <div id="eatingRoundLabel" class="header-center-info">Bite Interval 1</div>
+      <div class="device-status">
+        <div class="status-dot connected"></div>
+        <span>Google Cast Active</span>
+      </div>
+    </div>
+
+    <div class="eating-stage">
+      <!-- Expanding Chime Wave on Bell Trigger -->
+      <div id="eatingChimeRipple" class="chime-ripple"></div>
+
+      <!-- Concentric Dual Progress Rings -->
+      <svg class="eating-svg" viewBox="0 0 520 520">
+        <!-- Outer Track: Total Mealtime Progress (radius 220, circumference ~1382) -->
+        <circle class="outer-bg" cx="260" cy="260" r="220" />
+        <circle id="eatingOuterBar" class="outer-bar" cx="260" cy="260" r="220" />
+
+        <!-- Inner Track: Bite Pacing Interval Cycle (radius 175, circumference ~1099) -->
+        <circle class="inner-bg" cx="260" cy="260" r="175" />
+        <circle id="eatingInnerBar" class="inner-bar" cx="260" cy="260" r="175" />
+      </svg>
+
+      <div class="eating-center-content">
+        <!-- Minimalist Zen Dining Bowl & Chopsticks SVG Icon -->
+        <svg class="eating-bowl-icon" viewBox="0 0 24 24">
+          <path d="M22 12c0 5.523-4.477 10-10 10S2 17.523 2 12h20z" />
+          <path d="M7 21h10M12 18v3" stroke="#E5A93C" stroke-width="2" stroke-linecap="round" />
+          <path d="M3 7l18 3M3 10l18-3" stroke="#E5A93C" stroke-width="1.5" stroke-linecap="round" opacity="0.75" />
         </svg>
-        <div class="clock-container">
-            <div class="clock-time" id="clockText">20:00</div>
-            <div class="next-bell" id="bellText">Next Bell in 00:30</div>
+
+        <!-- Large Meal Countdown Numerals -->
+        <div id="eatingTimeDisplay" class="eating-countdown">45:00</div>
+
+        <!-- Bite Pacing Capsule -->
+        <div class="eating-bite-capsule">
+          <span>🔔</span>
+          <span id="eatingNextBell">Bite Bell in 01:00</span>
+          <span>• CHEW & SAVOR</span>
         </div>
+      </div>
     </div>
 
-    <div>
-        <div class="controls">
-            <button class="btn" id="btnReset" onclick="resetTimer()">Reset (R)</button>
-            <button class="btn btn-primary" id="btnPlayPause" onclick="togglePlayPause()">Pause (Space)</button>
-            <button class="btn btn-active" id="btnBgMusic" onclick="toggleBgSound()">ॐ Music: ON (M)</button>
-            <button class="btn" onclick="adjustTime(-5)">-5 Min</button>
-            <button class="btn" onclick="adjustTime(5)">+5 Min</button>
-            <label for="bellVolume">Bell Volume:</label>
-    <input type="range" id="bellVolume" min="0" max="1" step="0.01" value="0.45">
-    <label for="bgVolume">Music Volume:</label>
-    <input type="range" id="bgVolume" min="0" max="1" step="0.01" value="0.35">
-</div>
-        <div class="hint">Use TV Remote [OK / Enter] to Play/Pause • Mobile phone can now be locked or turned off</div>
+    <!-- Mindful Eating Guidance Prompts Bar -->
+    <div class="eating-guidance-bar">
+      <div id="eatingGuidanceText" class="eating-guidance-text">Chew each bite 30–40 times • Savor every texture, aroma, and flavor</div>
     </div>
 
-    <iframe id="ytFrame" allow="autoplay; encrypted-media"></iframe>
+    <div class="footer">
+      <div class="session-indicator">
+        <span>Status: </span>
+        <span id="eatingStatusText" class="status-text">Ready</span>
+      </div>
+      <div>Habit Bell • Mindful Dining Rhythm</div>
+    </div>
+  </div>
 
-    <script>
-        const urlParams = new URLSearchParams(window.location.search);
-        const ytParam = urlParams.get('yt');
-        const bgParam = urlParams.get('bg') || (ytParam ? 'yt' : 'aum');
+  <!-- ========================================================================
+       SCREEN 3: PRANAYAMA VIEW (Heroic Blooming Lotus)
+       ======================================================================== -->
+  <div id="viewPranayama" class="view-container">
+    <div class="header">
+      <div id="pranayamaBadge" class="badge">Pranayama</div>
+      <div id="pranayamaRoundLabel" class="header-center-info">Round 1 of 12</div>
+      <div class="device-status">
+        <div class="status-dot connected"></div>
+        <span>Google Cast Active</span>
+      </div>
+    </div>
 
-        const totalParam = parseInt(urlParams.get('total')) || 2700;
-        const intervalParam = parseInt(urlParams.get('interval')) || 60;
+    <div class="pranayama-stage">
+      <!-- Upper Sanskrit HUD (Zero text overlap with flower) -->
+      <div class="pranayama-upper-hud">
+        <div id="pranayamaSanskrit" class="pranayama-phase-sanskrit">PŪRAKA</div>
+        <div id="pranayamaEnglish" class="pranayama-phase-english">Inhale Deeply</div>
+        <div id="pranayamaPhaseNumeral" class="pranayama-phase-numeral">4</div>
+      </div>
 
-        let totalSeconds = totalParam;
-        let remainingSeconds = totalParam;
-        let intervalSeconds = intervalParam;
-        let nextBell = intervalParam;
-        let isRunning = true;
-        let timer = null;
+      <!-- Heroic 13-Petal Blooming Lotus SVG -->
+      <div class="lotus-container">
+        <svg id="lotusSvg" class="lotus-svg" viewBox="0 0 380 220">
+          <!-- Calm Waterline -->
+          <line x1="60" y1="185" x2="320" y2="185" class="waterline" />
+          
+          <!-- Stem -->
+          <line x1="190" y1="185" x2="190" y2="215" class="stem" />
 
-        let isBgSoundEnabled = (bgParam !== 'none');
-        let bgSoundSource = ytParam ? 'yt' : 'aum';
+          <!-- Calyx / Leaves ("Patte") -->
+          <path d="M190 185 C160 195 120 190 100 182 C130 188 165 186 190 185 Z" class="calyx" />
+          <path d="M190 185 C220 195 260 190 280 182 C250 188 215 186 190 185 Z" class="calyx" />
+          <path d="M190 185 C180 198 190 205 190 185 Z" class="calyx" />
 
-        const CIRCUMFERENCE = 2 * Math.PI * 220; // ~1382.3
+          <!-- Petals (13 curved petals across 7 depth tiers) -->
+          <!-- Tier 1: Outer horizontal wings -->
+          <path id="petalL1" class="petal" d="M190 180 C130 175 70 155 50 130 C90 135 150 160 190 180 Z" />
+          <path id="petalR1" class="petal" d="M190 180 C250 175 310 155 330 130 C290 135 230 160 190 180 Z" />
 
-        let audioCtx = null;
-        let aumSource = null;
-        let aumGain = null;
+          <!-- Tier 2: Mid-lateral wings -->
+          <path id="petalL2" class="petal" d="M190 180 C140 165 95 130 90 95 C125 115 165 150 190 180 Z" />
+          <path id="petalR2" class="petal" d="M190 180 C240 165 285 130 290 95 C255 115 215 150 190 180 Z" />
 
-        function getAudioContext() {
-            if (!audioCtx) {
-                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            }
-            if (audioCtx.state === 'suspended') {
-                audioCtx.resume();
-            }
-            return audioCtx;
-        }
+          <!-- Tier 3: High chalice petals -->
+          <path id="petalL3" class="petal" d="M190 180 C155 150 125 105 130 65 C155 95 175 140 190 180 Z" />
+          <path id="petalR3" class="petal" d="M190 180 C225 150 255 105 250 65 C225 95 205 140 190 180 Z" />
 
-/**
- * Retrieves the current bell volume from the UI slider.
- *
- * @returns {number} Volume in the range [0.0, 1.0].
- *                    Falls back to 0.45 if the slider is missing or unparsable.
- */
-function getBellVolume() {
-    const slider = document.getElementById('bellVolume');
-    if (slider) {
-        const val = parseFloat(slider.value);
-        return isNaN(val) ? 0.45 : val;
+          <!-- Tier 4: Inner chalice petals -->
+          <path id="petalL4" class="petal" d="M190 180 C165 140 145 90 155 50 C175 80 185 130 190 180 Z" />
+          <path id="petalR4" class="petal" d="M190 180 C215 140 235 90 225 50 C205 80 195 130 190 180 Z" />
+
+          <!-- Tier 5: Central spine petals -->
+          <path id="petalL5" class="petal" d="M190 180 C175 135 165 80 175 40 C185 75 188 125 190 180 Z" />
+          <path id="petalR5" class="petal" d="M190 180 C205 135 215 80 205 40 C195 75 192 125 190 180 Z" />
+
+          <!-- Central Apex Petal -->
+          <path id="petalC" class="petal" d="M190 180 C180 120 180 60 190 30 C200 60 200 120 190 180 Z" />
+        </svg>
+      </div>
+
+      <div class="pranayama-lower-hud">
+        <div id="pranayamaMilestone" class="pranayama-milestone-capsule">Milestone Chime in 5 rounds</div>
+        <div id="pranayamaTotalTime" class="pranayama-total-time">Total Remaining: 12:00</div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <div class="session-indicator">
+        <span>Status: </span>
+        <span id="pranayamaStatusText" class="status-text">Ready</span>
+      </div>
+      <div>Habit Bell • Classical Hatha Breathwork</div>
+    </div>
+  </div>
+
+  <!-- ========================================================================
+       SCREEN 4: GENERAL / SURYA NAMASKAR VIEW (Fallback)
+       ======================================================================== -->
+  <div id="viewGeneral" class="view-container">
+    <div class="header">
+      <div id="generalRoundBadge" class="badge">Round 1/1</div>
+      <div id="generalProfileTitle" class="header-center-info">Habit Bell</div>
+      <div class="device-status">
+        <div class="status-dot connected"></div>
+        <span>Google Cast Active</span>
+      </div>
+    </div>
+
+    <div class="general-stage">
+      <svg class="general-svg" viewBox="0 0 480 480">
+        <circle class="general-bg" cx="240" cy="240" r="220" />
+        <circle id="generalProgressBar" class="general-bar" cx="240" cy="240" r="220" />
+      </svg>
+      <div class="general-clock">
+        <div id="generalTimeDisplay" class="general-time">00:00</div>
+        <div id="generalNextBell" class="general-interval">Interval --:--</div>
+      </div>
+
+      <!-- Surya Namaskar Posture Card -->
+      <div id="asanaCard" class="asana-card">
+        <div id="asanaName" class="asana-name">Pranamasana</div>
+        <div id="asanaBreath" class="asana-breath">Prayer Pose • Exhale</div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <div class="session-indicator">
+        <span>Status: </span>
+        <span id="generalStatusText" class="status-text">Ready</span>
+      </div>
+      <div id="generalFooterNotice">Habit Bell • Living Room TV</div>
+    </div>
+  </div>
+
+  <!-- ========================================================================
+       CORE LOGIC: Web Audio Synthesizer, CAF v3, View Routing & Kinematics
+       ======================================================================== -->
+  <script>
+    const CUSTOM_NAMESPACE = 'urn:x-cast:com.habitbell.cast';
+    let audioCtx = null;
+    let masterBellVolume = 0.9;
+    let hudTimeout = null;
+    let activeScreen = 'SPLASH';
+    let currentGuidanceIndex = 0;
+    let guidanceTimer = null;
+
+    const EATING_GUIDANCE = [
+      "Chew each bite 30–40 times • Savor every texture, aroma, and flavor",
+      "Rest your fork between bites • Breathe deeply and relax your shoulders",
+      "Notice the colors and nuances of your food • Food is sacred prana",
+      "Tune in to gentle satiety cues • Satiety signals take 20 minutes to reach the brain",
+      "Eat with peaceful presence • Good digestion begins with mindful calm"
+    ];
+
+    /**
+     * Initializes Web Audio Context on user/sender interaction.
+     */
+    function initAudio() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
     }
-    return 0.45;
-}
 
-/**
- * Retrieves the current background music volume from the UI slider.
- *
- * @returns {number} Volume in the range [0.0, 1.0].
- *                    Falls back to 0.35 if the slider is missing or unparsable.
- */
-function getBgVolume() {
-    const slider = document.getElementById('bgVolume');
-    if (slider) {
-        const val = parseFloat(slider.value);
-        return isNaN(val) ? 0.35 : val;
+    /**
+     * Synthesizes authentic Tibetan singing bowl chimes at 432 Hz with natural overtones.
+     */
+    function playTibetanBell(freq = 432, duration = 4.5) {
+      try {
+        initAudio();
+        const now = audioCtx.currentTime;
+        const osc1 = audioCtx.createOscillator();
+        const osc2 = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+
+        osc1.type = 'sine';
+        osc1.frequency.setValueAtTime(freq, now);
+
+        osc2.type = 'sine';
+        osc2.frequency.setValueAtTime(freq * 2.76, now); // Tibetan bowl harmonic ratio
+
+        gain.gain.setValueAtTime(0, now);
+        gain.gain.linearRampToValueAtTime(masterBellVolume * 0.75, now + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+        osc1.connect(gain);
+        osc2.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        osc1.start(now);
+        osc2.start(now);
+        osc1.stop(now + duration);
+        osc2.stop(now + duration);
+      } catch (e) {
+        console.warn('Web Audio chime error:', e);
+      }
     }
-    return 0.35;
-}
 
-/**
- * Listens for changes on the background volume slider and propagates the new
- * value to both the AUM drone gain node and the YouTube iframe player.
- */
-document.getElementById('bgVolume').addEventListener('input', () => {
-    const vol = getBgVolume();
-    if (aumGain) {
-        aumGain.gain.setValueAtTime(vol, getAudioContext().currentTime);
+    function showVolumeHud(text) {
+      const hud = document.getElementById('volumeHud');
+      document.getElementById('volumeHudLabel').textContent = text;
+      hud.classList.add('visible');
+      clearTimeout(hudTimeout);
+      hudTimeout = setTimeout(() => hud.classList.remove('visible'), 2500);
     }
-    const frame = document.getElementById('ytFrame');
-    if (frame && frame.contentWindow) {
-        // YouTube iframe API expects volume 0‑100.
-        frame.contentWindow.postMessage(JSON.stringify({event:"command",func:"setVolume",args:[vol * 100]}), '*');
+
+    /**
+     * Smoothly transitions the active TV view between SPLASH, EATING, PRANAYAMA, and GENERAL.
+     */
+    function showScreen(screen) {
+      if (activeScreen === screen) return;
+      activeScreen = screen;
+      document.querySelectorAll('.view-container').forEach(el => el.classList.remove('active'));
+
+      if (screen === 'EATING') {
+        document.getElementById('viewEating').classList.add('active');
+        startGuidanceRotation();
+      } else if (screen === 'PRANAYAMA') {
+        document.getElementById('viewPranayama').classList.add('active');
+        stopGuidanceRotation();
+      } else if (screen === 'GENERAL') {
+        document.getElementById('viewGeneral').classList.add('active');
+        stopGuidanceRotation();
+      } else {
+        document.getElementById('viewSplash').classList.add('active');
+        stopGuidanceRotation();
+      }
     }
-});
 
-        function playHarmonicChime(freq, volume, duration) {
-            try {
-                const ctx = getAudioContext();
-                const now = ctx.currentTime;
-                const osc = ctx.createOscillator();
-                const gain = ctx.createGain();
+    function startGuidanceRotation() {
+      if (guidanceTimer) clearInterval(guidanceTimer);
+      guidanceTimer = setInterval(() => {
+        currentGuidanceIndex = (currentGuidanceIndex + 1) % EATING_GUIDANCE.length;
+        const el = document.getElementById('eatingGuidanceText');
+        el.style.opacity = '0';
+        setTimeout(() => {
+          el.textContent = EATING_GUIDANCE[currentGuidanceIndex];
+          el.style.opacity = '1';
+        }, 500);
+      }, 12000);
+    }
 
-                osc.type = 'sine';
-                osc.frequency.setValueAtTime(freq, now);
+    function stopGuidanceRotation() {
+      if (guidanceTimer) {
+        clearInterval(guidanceTimer);
+        guidanceTimer = null;
+      }
+    }
 
-                // Soft felt mallet attack envelope (50ms rise)
-                gain.gain.setValueAtTime(0.001, now);
-                gain.gain.exponentialRampToValueAtTime(volume, now + 0.050);
-                gain.gain.exponentialRampToValueAtTime(volume * 0.15, now + duration - 2.0);
-                // Asymptotic smooth cosine fadeout to zero boundary
-                gain.gain.linearRampToValueAtTime(0.00001, now + duration);
+    function triggerChimeRipple() {
+      const ripple = document.getElementById('eatingChimeRipple');
+      ripple.classList.remove('active');
+      void ripple.offsetWidth; // Force reflow
+      ripple.classList.add('active');
+    }
 
-                osc.connect(gain);
-                gain.connect(ctx.destination);
+    /**
+     * Updates the organic blooming lotus kinematics according to breath phase.
+     */
+    function updateLotusBloom(phase, phaseRemaining, phaseDuration) {
+      const phaseColors = {
+        'INHALE': '#4ECDC4',
+        'HOLD_IN': '#E5A93C',
+        'EXHALE': '#A78BFA',
+        'HOLD_OUT': '#60A5FA'
+      };
+      const color = phaseColors[phase] || '#4ECDC4';
 
-                osc.start(now);
-                osc.stop(now + duration + 0.05);
-            } catch (e) {
-                console.error(e);
-            }
+      document.getElementById('pranayamaSanskrit').style.color = color;
+      document.getElementById('pranayamaBadge').style.borderColor = color;
+      document.getElementById('lotusSvg').style.filter = `drop-shadow(0 0 25px ${color}55)`;
+      document.querySelectorAll('.petal').forEach(p => {
+        p.style.fill = color;
+      });
+
+      // Fraction of completion inside current phase
+      const fraction = phaseDuration > 0 ? (1 - (phaseRemaining / phaseDuration)) : 0;
+
+      // Kinematic angles for blooming
+      let bloomFactor = 0;
+      if (phase === 'INHALE') {
+        bloomFactor = Math.min(Math.max(fraction, 0), 1); // 0 -> 1 (opening)
+      } else if (phase === 'HOLD_IN') {
+        bloomFactor = 1.0; // Sustained open bloom
+      } else if (phase === 'EXHALE') {
+        bloomFactor = 1 - Math.min(Math.max(fraction, 0), 1); // 1 -> 0 (closing)
+      } else {
+        bloomFactor = 0; // Quiet resting bud
+      }
+
+      // Organic angular petal rotation based on bloom factor
+      const maxRotTier1 = 35 * bloomFactor;
+      const maxRotTier2 = 25 * bloomFactor;
+      const maxRotTier3 = 16 * bloomFactor;
+      const maxRotTier4 = 9 * bloomFactor;
+      const maxRotTier5 = 4 * bloomFactor;
+
+      document.getElementById('petalL1').style.transform = `rotate(-${maxRotTier1}deg)`;
+      document.getElementById('petalR1').style.transform = `rotate(${maxRotTier1}deg)`;
+      document.getElementById('petalL2').style.transform = `rotate(-${maxRotTier2}deg)`;
+      document.getElementById('petalR2').style.transform = `rotate(${maxRotTier2}deg)`;
+      document.getElementById('petalL3').style.transform = `rotate(-${maxRotTier3}deg)`;
+      document.getElementById('petalR3').style.transform = `rotate(${maxRotTier3}deg)`;
+      document.getElementById('petalL4').style.transform = `rotate(-${maxRotTier4}deg)`;
+      document.getElementById('petalR4').style.transform = `rotate(${maxRotTier4}deg)`;
+      document.getElementById('petalL5').style.transform = `rotate(-${maxRotTier5}deg)`;
+      document.getElementById('petalR5').style.transform = `rotate(${maxRotTier5}deg)`;
+    }
+
+    /**
+     * Primary state update router called when mobile sender dispatches state.
+     */
+    function updateState(data) {
+      initAudio();
+
+      // Determine target screen mode
+      const mode = data.screenMode || (
+        data.status === 'IDLE' ? 'SPLASH' :
+        data.isEating ? 'EATING' :
+        data.isPranayama ? 'PRANAYAMA' :
+        'GENERAL'
+      );
+
+      // 1. UPDATE SPLASH VIEW
+      if (data.profileName) {
+        document.getElementById('splashPreviewName').textContent = data.profileName;
+        document.getElementById('splashPreviewHint').textContent = data.status === 'IDLE'
+          ? 'Ready • Press Start on phone or TV remote'
+          : `Session in progress (${data.formattedTime || 'Active'})`;
+        document.getElementById('splashPreviewCard').classList.add('visible');
+      }
+
+      // Route to active view
+      showScreen(mode);
+
+      // 2. UPDATE MINDFUL EATING VIEW
+      if (mode === 'EATING') {
+        if (data.formattedTime) document.getElementById('eatingTimeDisplay').textContent = data.formattedTime;
+        if (data.formattedNextBell) document.getElementById('eatingNextBell').textContent = 'Bite Bell in ' + data.formattedNextBell;
+        if (data.status) document.getElementById('eatingStatusText').textContent = data.status;
+        if (data.currentRound) {
+          document.getElementById('eatingRoundLabel').textContent = `Bite Interval ${data.currentRound}${data.totalRounds ? ' of ' + data.totalRounds : ''}`;
         }
 
-        function playCountdownStrike(secondsRemaining) {
-            if (secondsRemaining === 3) {
-                playHarmonicChime(2048, getBellVolume(), 4.0);
-            } else if (secondsRemaining === 2) {
-                playHarmonicChime(1536, getBellVolume(), 4.5);
-            } else if (secondsRemaining === 1) {
-                playHarmonicChime(1024, getBellVolume(), 7.5);
-            }
+        // Total meal progress outer ring (circumference = 1382)
+        if (data.progressFraction !== undefined) {
+          const outerOffset = 1382 * (1 - Math.min(Math.max(data.progressFraction, 0), 1));
+          document.getElementById('eatingOuterBar').style.strokeDashoffset = outerOffset;
         }
 
-        function play321SoothingSequence() {
-            playHarmonicChime(2048, 0.45, 4.0);
-            setTimeout(() => playHarmonicChime(1536, 0.70, 4.5), 1000);
-            setTimeout(() => playHarmonicChime(1024, 1.00, 7.5), 2000);
+        // Bite interval progress inner ring (circumference = 1099)
+        const intervalSec = data.intervalDurationSeconds || 60;
+        const nextBellSec = data.nextBellSeconds !== undefined ? data.nextBellSeconds : 0;
+        const biteFraction = intervalSec > 0 ? (1 - (nextBellSec / intervalSec)) : 0;
+        const innerOffset = 1099 * (1 - Math.min(Math.max(biteFraction, 0), 1));
+        document.getElementById('eatingInnerBar').style.strokeDashoffset = innerOffset;
+
+        if (data.triggerBell) {
+          triggerChimeRipple();
+          playTibetanBell(data.bellFrequency || 432, 4.5);
+        }
+      }
+
+      // 3. UPDATE PRANAYAMA VIEW
+      else if (mode === 'PRANAYAMA') {
+        const pPhase = data.pranayamaPhase || 'INHALE';
+        document.getElementById('pranayamaSanskrit').textContent = (data.pranayamaSanskrit || pPhase).toUpperCase();
+        document.getElementById('pranayamaEnglish').textContent = data.pranayamaDisplay || 'Inhale Deeply';
+        document.getElementById('pranayamaPhaseNumeral').textContent = data.phaseRemainingSeconds !== undefined ? data.phaseRemainingSeconds : '';
+        if (data.formattedTime) document.getElementById('pranayamaTotalTime').textContent = 'Total Remaining: ' + data.formattedTime;
+        if (data.currentRound && data.totalRounds) {
+          document.getElementById('pranayamaRoundLabel').textContent = `Round ${data.currentRound} of ${data.totalRounds}`;
+        }
+        if (data.status) document.getElementById('pranayamaStatusText').textContent = data.status;
+
+        updateLotusBloom(pPhase, data.phaseRemainingSeconds || 0, data.phaseDurationSeconds || 4);
+
+        if (data.triggerBell) {
+          playTibetanBell(data.bellFrequency || 432, 4.5);
+        }
+      }
+
+      // 4. UPDATE GENERAL VIEW
+      else if (mode === 'GENERAL') {
+        if (data.formattedTime) document.getElementById('generalTimeDisplay').textContent = data.formattedTime;
+        if (data.formattedNextBell) document.getElementById('generalNextBell').textContent = 'Interval ' + data.formattedNextBell;
+        if (data.profileName) document.getElementById('generalProfileTitle').textContent = data.profileName;
+        if (data.status) document.getElementById('generalStatusText').textContent = data.status;
+        if (data.currentRound && data.totalRounds) {
+          document.getElementById('generalRoundBadge').textContent = `Round ${data.currentRound}/${data.totalRounds}`;
+        }
+        if (data.progressFraction !== undefined) {
+          const genOffset = 1382 * (1 - Math.min(Math.max(data.progressFraction, 0), 1));
+          document.getElementById('generalProgressBar').style.strokeDashoffset = genOffset;
         }
 
-        function playGongChime() {
-            playHarmonicChime(324, 0.95, 8.5);
+        const elAsana = document.getElementById('asanaCard');
+        if (data.poseName && data.poseName.length > 0) {
+          elAsana.classList.add('active');
+          document.getElementById('asanaName').textContent = data.poseName;
+          document.getElementById('asanaBreath').textContent = (data.poseSanskrit ? data.poseSanskrit + ' • ' : '') + (data.poseBreath || '');
+        } else {
+          elAsana.classList.remove('active');
         }
 
-        function playIntervalChime() {
-            play321SoothingSequence();
+        if (data.triggerBell) {
+          playTibetanBell(data.bellFrequency || 432, 4.5);
         }
+      }
+    }
 
-        function startAumDrone() {
-            if (!isBgSoundEnabled || bgSoundSource !== 'aum') return;
-            try {
-                const ctx = getAudioContext();
-                if (aumSource) return;
+    function setConnectedUI(connected) {
+      const dot = document.getElementById('splashDot');
+      const text = document.getElementById('splashStatusText');
+      const pillDot = document.getElementById('splashPillDot');
+      const pillLabel = document.getElementById('splashPillLabel');
 
-                const sampleRate = ctx.sampleRate;
-                const duration = 16.0;
-                const buffer = ctx.createBuffer(1, sampleRate * duration, sampleRate);
-                const data = buffer.getChannelData(0);
-                const f_om = 136.1;
+      if (connected) {
+        dot.classList.add('connected');
+        text.textContent = 'Google Cast Connected';
+        pillDot.classList.add('connected');
+        pillLabel.textContent = 'Connected to Habit Bell • Ready to begin';
+      } else {
+        dot.classList.remove('connected');
+        text.textContent = 'Waiting for Phone...';
+        pillDot.classList.remove('connected');
+        pillLabel.textContent = 'Open Habit Bell on your phone to connect';
+        document.getElementById('splashPreviewCard').classList.remove('visible');
+      }
+    }
 
-                for (let i = 0; i < data.length; i++) {
-                    const t = i / sampleRate;
-                    const om_fund = Math.sin(2.0 * Math.PI * f_om * t);
-                    const om_sub = 0.35 * Math.sin(2.0 * Math.PI * (f_om * 0.5) * t);
-                    const fifth = 0.22 * Math.sin(2.0 * Math.PI * (f_om * 1.5) * t);
-                    const octave = 0.18 * Math.sin(2.0 * Math.PI * (f_om * 2.0) * t);
-                    const breath = 0.70 + 0.30 * Math.sin(2.0 * Math.PI * 0.125 * t);
-                    const beating = 1.0 + 0.05 * Math.sin(2.0 * Math.PI * 4.5 * t);
-                    data[i] = Math.tanh((om_fund + om_sub + fifth + octave) * breath * beating * 0.6) * 0.35;
-                }
+    function sendRemoteAction(actionType) {
+      try {
+        const ctx = cast.framework.CastReceiverContext.getInstance();
+        ctx.sendCustomMessage(CUSTOM_NAMESPACE, undefined, { type: actionType });
+      } catch (e) {
+        console.warn('Could not dispatch remote action:', e);
+      }
+    }
 
-                aumSource = ctx.createBufferSource();
-                aumSource.buffer = buffer;
-                aumSource.loop = true;
+    // Physical TV Remote / CEC key listener
+    window.addEventListener('keydown', function(e) {
+      if (e.key === 'MediaPlayPause' || e.key === ' ' || e.key === 'Enter') {
+        sendRemoteAction('toggle');
+      } else if (e.key === 'MediaPlay') {
+        sendRemoteAction('play');
+      } else if (e.key === 'MediaPause') {
+        sendRemoteAction('pause');
+      }
+    });
 
-                aumGain = ctx.createGain();
-                aumGain.gain.setValueAtTime(0.001, ctx.currentTime);
-                aumGain.gain.linearRampToValueAtTime(0.35, ctx.currentTime + 2.0);
+    // Initialize Cast Application Framework Receiver v3
+    const context = cast.framework.CastReceiverContext.getInstance();
+    const options = new cast.framework.CastReceiverOptions();
+    options.disableIdleTimeout = true;
+    options.maxInactivity = 3600 * 6; // 6 hours
+    options.customNamespaces = {};
+    options.customNamespaces[CUSTOM_NAMESPACE] = cast.framework.system.MessageType.JSON;
 
-                aumSource.connect(aumGain);
-                aumGain.connect(ctx.destination);
-                aumSource.start();
-            } catch (e) {
-                console.error("Aum Drone error:", e);
-            }
+    // Listen for custom messages from Android sender
+    context.addCustomMessageListener(CUSTOM_NAMESPACE, function(event) {
+      try {
+        const msg = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+        if (!msg) return;
+        if (msg.type === 'state') {
+          updateState(msg);
+        } else if (msg.type === 'volume') {
+          if (msg.bellVolume !== undefined) {
+            masterBellVolume = msg.bellVolume;
+            showVolumeHud(`Bell Volume: ${Math.round(masterBellVolume * 100)}%`);
+          }
+        } else if (msg.type === 'chime') {
+          playTibetanBell(msg.freq || 432, 4.5);
         }
+      } catch (err) {
+        console.warn('Malformed Cast payload:', err);
+      }
+    });
 
-        function stopAumDrone() {
-            if (aumSource) {
-                try {
-                    aumSource.stop();
-                    aumSource.disconnect();
-                } catch (e) {}
-                aumSource = null;
-            }
-        }
+    // Sender lifecycle listeners
+    context.addEventListener(cast.framework.system.EventType.SENDER_CONNECTED, function(event) {
+      console.log('Sender connected:', event.senderId);
+      setConnectedUI(true);
+      try {
+        context.sendCustomMessage(CUSTOM_NAMESPACE, event.senderId, { type: 'ready' });
+      } catch (e) {}
+    });
 
-        function startYouTubeAudio() {
-            if (!isBgSoundEnabled || bgSoundSource !== 'yt') return;
-            const ytId = ytParam || 'x6UITRjhijI';
-            const frame = document.getElementById('ytFrame');
-            frame.src = `https://www.youtube-nocookie.com/embed/${ytId}?autoplay=1&enablejsapi=1&controls=0&loop=1&playlist=${ytId}&modestbranding=1`;
-        }
+    context.addEventListener(cast.framework.system.EventType.SENDER_DISCONNECTED, function(event) {
+      console.log('Sender disconnected:', event.senderId);
+      const senders = context.getSenders();
+      if (!senders || senders.length === 0) {
+        setConnectedUI(false);
+        showScreen('SPLASH');
+      }
+    });
 
-        function stopYouTubeAudio() {
-            const frame = document.getElementById('ytFrame');
-            frame.src = '';
-        }
+    context.addEventListener(cast.framework.system.EventType.READY, function() {
+      console.log('Cast Receiver Framework Ready');
+      try {
+        context.sendCustomMessage(CUSTOM_NAMESPACE, undefined, { type: 'ready' });
+      } catch (e) {}
+    });
 
-        function toggleBgSound() {
-            getAudioContext();
-            isBgSoundEnabled = !isBgSoundEnabled;
-            const btn = document.getElementById('btnBgMusic');
-            const status = document.getElementById('bgStatus');
-
-            if (isBgSoundEnabled) {
-                btn.className = "btn btn-active";
-                btn.innerText = "ॐ Music: ON (M)";
-                status.innerText = bgSoundSource === 'yt' ? "Background: YouTube Stream" : "Background: ॐ Aum Drone";
-                if (isRunning) {
-                    if (bgSoundSource === 'yt') startYouTubeAudio(); else startAumDrone();
-                }
-            } else {
-                btn.className = "btn";
-                btn.innerText = "Music: OFF (M)";
-                status.innerText = "Background: Muted";
-                stopAumDrone();
-                stopYouTubeAudio();
-            }
-        }
-
-        function formatTime(sec) {
-            const m = Math.floor(sec / 60).toString().padStart(2, '0');
-            const s = (sec % 60).toString().padStart(2, '0');
-            return `${m}:${s}`;
-        }
-
-        let customSubText = null;
-
-        function updateUI() {
-            document.getElementById('clockText').innerText = formatTime(remainingSeconds);
-            document.getElementById('bellText').innerText = customSubText || `Next Bell in ${formatTime(nextBell)}`;
-
-            const progress = (totalSeconds - remainingSeconds) / totalSeconds;
-            const offset = CIRCUMFERENCE * progress;
-            document.getElementById('progressBar').style.strokeDashoffset = offset;
-
-            document.getElementById('btnPlayPause').innerText = isRunning ? "Pause (Space)" : "Start (Space)";
-        }
-
-        function tick() {
-            if (!isRunning) return;
-            if (remainingSeconds === 3) {
-                playCountdownStrike(3);
-                document.getElementById('bellText').innerText = "🔔 3s Remaining...";
-            } else if (remainingSeconds === 2) {
-                playCountdownStrike(2);
-                document.getElementById('bellText').innerText = "🔔 2s Remaining...";
-            }
-
-            if (remainingSeconds <= 1) {
-                remainingSeconds = 0;
-                isRunning = false;
-                clearInterval(timer);
-                stopAumDrone();
-                stopYouTubeAudio();
-                playGongChime();
-                customSubText = "Session Completed 🙏";
-                document.getElementById('bellText').innerText = customSubText;
-                updateUI();
-                return;
-            }
-
-            remainingSeconds--;
-            nextBell--;
-
-            if (nextBell <= 0) {
-                playIntervalChime();
-                nextBell = intervalSeconds;
-            }
-
-            updateUI();
-        }
-
-        function syncWithServer() {
-            fetch('/api/state')
-                .then(res => res.json())
-                .then(data => {
-                    if (data && data.status) {
-                        const serverRunning = (data.status === 'RUNNING');
-                        if (isRunning !== serverRunning) {
-                            isRunning = serverRunning;
-                            document.getElementById('btnPlayPause').innerText = isRunning ? "Pause (Space)" : "Start (Space)";
-                            if (isRunning) {
-                                if (isBgSoundEnabled) {
-                                    if (bgSoundSource === 'yt') startYouTubeAudio(); else startAumDrone();
-                                }
-                            } else {
-                                stopAumDrone();
-                                stopYouTubeAudio();
-                            }
-                        }
-                        if (data.remainingSeconds !== undefined) {
-                            remainingSeconds = data.remainingSeconds;
-                            totalSeconds = data.totalSeconds || totalSeconds;
-                            nextBell = data.nextBellSeconds || nextBell;
-                        }
-                        if (data.profileName) {
-                            document.getElementById('sessionTitle').innerText = data.profileName;
-                        }
-
-                        // Synchronize Pranayama or Surya Namaskar posture visual details
-                        const ring = document.getElementById('breathRing');
-                        if (data.pranayamaPhase && data.pranayamaPhase.length > 0) {
-                            const phaseDisp = data.pranayamaDisplay || data.pranayamaPhase;
-                            const sanskrit = data.pranayamaSanskrit ? ` (${data.pranayamaSanskrit})` : '';
-                            const roundText = `Round ${data.currentRound} / ${data.totalRounds}`;
-                            customSubText = `${phaseDisp}${sanskrit} • ${roundText}`;
-
-                            if (ring) {
-                                if (data.pranayamaPhase.indexOf('INHALE') !== -1) {
-                                    ring.className = 'breath-ring inhale';
-                                } else if (data.pranayamaPhase.indexOf('HOLD_IN') !== -1) {
-                                    ring.className = 'breath-ring hold-in';
-                                } else if (data.pranayamaPhase.indexOf('EXHALE') !== -1) {
-                                    ring.className = 'breath-ring exhale';
-                                } else {
-                                    ring.className = 'breath-ring hold-out';
-                                }
-                            }
-                        } else if (data.poseName && data.poseName.length > 0) {
-                            if (ring) ring.className = 'breath-ring';
-                            const poseTitle = data.poseSanskrit ? `${data.poseName} (${data.poseSanskrit})` : data.poseName;
-                            const breathCue = data.poseBreath ? ` • ${data.poseBreath}` : '';
-                            const roundText = `Round ${data.currentRound} / ${data.totalRounds}`;
-                            customSubText = `${poseTitle}${breathCue} • ${roundText}`;
-                        } else {
-                            if (ring) ring.className = 'breath-ring';
-                            customSubText = null;
-                        }
-
-                        updateUI();
-                    }
-                })
-                .catch(() => {});
-        }
-
-        function togglePlayPause() {
-            getAudioContext();
-            fetch('/api/action/toggle')
-                .then(res => res.json())
-                .then(() => syncWithServer())
-                .catch(() => {});
-
-            isRunning = !isRunning;
-            document.getElementById('btnPlayPause').innerText = isRunning ? "Pause (Space)" : "Start (Space)";
-
-            if (isRunning) {
-                if (bgSoundSource === 'yt') startYouTubeAudio(); else startAumDrone();
-            } else {
-                stopAumDrone();
-                stopYouTubeAudio();
-            }
-        }
-
-        function resetTimer() {
-            fetch('/api/action/stop').catch(() => {});
-            remainingSeconds = totalSeconds;
-            nextBell = intervalSeconds;
-            updateUI();
-        }
-
-        function adjustTime(minutes) {
-            totalSeconds = Math.max(60, totalSeconds + minutes * 60);
-            remainingSeconds = Math.min(totalSeconds, remainingSeconds + minutes * 60);
-            updateUI();
-        }
-
-        // --- Universal Smart TV Remote Control Support (Samsung Tizen & LG webOS) ---
-        if (window.tizen && window.tizen.tvinputdevice) {
-            try {
-                const tizenKeys = [
-                    'MediaPlay', 'MediaPause', 'MediaPlayPause', 'MediaStop',
-                    'MediaFastForward', 'MediaRewind',
-                    'ColorF0Red', 'ColorF1Green', 'ColorF2Yellow', 'ColorF3Blue'
-                ];
-                tizenKeys.forEach(key => {
-                    try { window.tizen.tvinputdevice.registerKey(key); } catch (_) {}
-                });
-            } catch (err) {
-                console.warn("Tizen key registration notice:", err);
-            }
-        }
-
-        window.addEventListener('keydown', (e) => {
-            const keyCode = e.keyCode || e.which;
-
-            // 415: MediaPlay, 19: MediaPause, 10252: MediaPlayPause, 32: Space
-            if (keyCode === 415) {
-                e.preventDefault();
-                if (!isRunning) togglePlayPause();
-            } else if (keyCode === 19) {
-                e.preventDefault();
-                if (isRunning) togglePlayPause();
-            } else if (keyCode === 10252 || keyCode === 32 || (e.code === 'Space' && e.target.tagName !== 'BUTTON')) {
-                e.preventDefault();
-                togglePlayPause();
-            } else if (keyCode === 413 || keyCode === 82 || e.code === 'KeyR') {
-                // 413: MediaStop, 82: 'R'
-                e.preventDefault();
-                resetTimer();
-            } else if (keyCode === 77 || e.code === 'KeyM' || keyCode === 403) {
-                // 77: 'M', 403: Red Color Key
-                e.preventDefault();
-                toggleBgSound();
-            } else if (keyCode === 404) {
-                // 404: Green Color Key (-5 Min)
-                e.preventDefault();
-                adjustTime(-5);
-            } else if (keyCode === 405) {
-                // 405: Yellow Color Key (+5 Min)
-                e.preventDefault();
-                adjustTime(5);
-            } else if (keyCode === 10009 || keyCode === 461) {
-                // 10009: Samsung Tizen Return, 461: LG webOS Back
-                if (isRunning) {
-                    e.preventDefault();
-                    togglePlayPause();
-                }
-            }
-        });
-
-        // Autostart on first user click or remote press
-        window.addEventListener('click', () => {
-            getAudioContext();
-            if (isRunning && isBgSoundEnabled && !aumSource) {
-                if (bgSoundSource === 'yt') startYouTubeAudio(); else startAumDrone();
-            }
-        }, { once: true });
-
-        timer = setInterval(tick, 1000);
-        setInterval(syncWithServer, 2000);
-        updateUI();
-    </script>
+    context.start(options);
+  </script>
 </body>
 </html>
