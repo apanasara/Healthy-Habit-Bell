@@ -269,13 +269,24 @@ The heartbeat of the mindfulness runtime is a deterministic finite state machine
 
 ---
 
-### 2.5. Android Auto Subsystem (`com.habitbell.app.auto`)
-Habit Bell provides deep automotive integration complying with Android for Cars design guidelines (Car App Library v1.7.0, Car API Level 8):
+### 2.5. Android Auto & Foreground Services Subsystem (`com.habitbell.app.auto`, `com.habitbell.app.engine`)
+Habit Bell provides deep automotive integration complying with Android for Cars design guidelines (Car App Library v1.7.0, Car API Level 8) and robust background foreground service execution:
 - **`HabitBellCarAppService.kt`**: Top-level `CarAppService` entry point bound by the Android Auto host. Manifest category: `androidx.car.app.category.IOT` (wellness/timer/ambient routines). Uses `HostValidator.ALLOW_ALL_HOSTS_VALIDATOR` during development; production requires `HostValidator.Builder` with explicit allowlist.
-- **`HabitBellCarSession.kt`**: Per-connection session lifecycle manager. Handles initial `onCreateScreen()` and reconnection via `onNewIntent()` for transient disconnect recovery. Coordinates `DisplayAutomationManager.setCarConnected()` state across connect/disconnect transitions with diagnostic lifecycle logging.
+- **`HabitBellCarSession.kt`**: Per-connection session lifecycle manager. Handles initial `onCreateScreen()` and reconnection via `onNewIntent()` for transient disconnect recovery. Coordinates `DisplayAutomationManager.setCarConnected()` state across connect/disconnect transitions with diagnostic lifecycle logging. Binds to `BluetoothAudioDisconnectionManager.onCarDisconnected()` to safely pause active sessions when unplugged from the vehicle.
 - **`HabitBellCarScreen.kt`**: Driver-safe `ListTemplate` with 3 glanceable wellness routines (Posture, Breath, Eating). Optimized for the 2-second glance rule with shortened titles, duration indicators, and `ActionStrip` global Stop button during active sessions. State observer throttled to status-change and minute-boundary invalidation only (prevents 1Hz IPC flooding that destabilizes the Android Auto host Binder bridge). All `invalidate()` calls guarded by `Lifecycle.State.STARTED` check with `IllegalStateException` catch for host teardown race conditions.
-- **`HabitBellMediaService.kt`**: Extends `MediaBrowserServiceCompat` to provide media library browsability in automotive media drawers. Notification updates throttled to every 5 seconds to eliminate IPC spam.
+- **`HabitBellMediaService.kt`**: Extends `MediaBrowserServiceCompat` to expose mindful audio routines to vehicle media drawers, system media controllers, and Wear OS. Emits driver-optimized `NotificationCompat.MediaStyle` ongoing notifications throttled to status transitions and 5-second intervals.
 - **Session Token Sharing**: Both services bind directly to `CentralSessionHandler.sessionToken`, guaranteeing that media button presses on vehicle steering wheels instantly control the central timer engine with zero lag.
+
+#### Background Service Lifecycle & Recents Task Dismissal (`onTaskRemoved` & `android:stopWithTask="true"`)
+- **Problem Addressed (FLAW1)**: Prior to this architecture standard, clearing running apps from Android's Recents / App Switcher ("Clear All" / swipe away) left foreground media services running adrift in the background, causing continuous interval bell chimes, ambient audio streaming, wake lock retention, and an unkillable foreground notification.
+- **Implementation & Teardown Flow**:
+  - `HabitBellMediaService.kt` and `TimerService.kt` implement `override fun onTaskRemoved(rootIntent: Intent?)`.
+  - When invoked by the Android OS upon task dismissal, `onTaskRemoved` immediately commands `sessionHandler.stop()`.
+  - Halts `TimerEngine`, resets countdown state to `IDLE`, silences Tibetan bells in `AudioBellManager`, terminates ambient background music in `BackgroundMusicManager`, cancels haptic pulses in `HapticManager`, resets `HealthStepManager`, and releases power wake-locks in `BatteryOptimizer`.
+  - Calls `stopForeground(STOP_FOREGROUND_REMOVE)` and `notificationManager.cancel(NOTIFICATION_ID)` to strip ongoing notifications from the system shade.
+  - Commands `stopSelf()` to terminate the background service process and release system handles cleanly.
+  - Manifest enforcement: Both services declare `android:stopWithTask="true"` in `AndroidManifest.xml`.
+  - Clean Completion Termination: In `HabitBellMediaService.observeSessionState()`, transitioning to `SessionStatus.IDLE` or `SessionStatus.COMPLETED` calls `stopSelf()` to prevent idle service leakage.
 
 ---
 
@@ -291,6 +302,12 @@ Habit Bell provides deep automotive integration complying with Android for Cars 
 ### 2.7. Presentation Layer & Immersive Display
 - **Jetpack Compose**: 100% declarative UI built with Material 3 design tokens.
 - **Distraction-Free Immersion**: When a timer session transitions to `RUNNING`, `MainActivity` uses `WindowInsetsControllerCompat` to hide the system status bar and navigation bar (`BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE`), preventing notification distractions during mindfulness sessions.
+- **Ongoing Session Auto-Load & State Restoration Architecture (FLAW2)**:
+  - **Problem Addressed (FLAW2)**: When opening or returning to the app while a session was ongoing in the background, the UI previously defaulted to `AppScreen.HOME`, hiding the active session and forcing users to start another timer just to access the stop button.
+  - **ViewModel Dynamic Destination Routing**: `HabitBellViewModel` initializes `_uiState` dynamically: if `sessionState.status == RUNNING || sessionState.status == PAUSED`, the initial destination is set to `AppScreen.SESSION`, restoring active display mode and pocket mode configurations immediately.
+  - **Activity Entry Synchronization**: `MainActivity.kt` executes `viewModel.checkAndRestoreOngoingSession()` across `onCreate()`, `onNewIntent()`, and `onResume()`. Any launch intent with `EXTRA_NAVIGATE_TO_SESSION` or any foreground return during an active session routes instantly to `AppScreen.SESSION`.
+  - **Splash Screen Bypass**: When `sessionState.status` is `RUNNING` or `PAUSED`, `MainActivity` automatically bypasses the splash screen overlay (`showSplashOverlay = false`) for instant access to playback controls.
+  - **Home Screen Active Session Banner (`ActiveSessionBanner`)**: In `ModernHomeScreenSample.kt`, if the user explicitly navigates to the Home dashboard while a session is active, a prominent top banner renders the active profile name, remaining time countdown, pulsing status badge, and 1-tap "Stop" and "Open / Resume" buttons.
 - **Punch-Hole Cutout Safe Geometry (`SessionScreen.kt`)**:
   - Modern smartphones feature centered or offset physical camera punch-holes. When immersive session mode engages (`setStatusBarHidden(true)`), standard system status bar insets collapse to zero.
   - `SessionScreen` enforces `Modifier.displayCutoutPadding()` and implements a **decoupled header architecture**: the top action bar splits navigation (`Back`) to the far-left and controls (`Cast`, `Pocket Mode`, `Settings`) to the far-right, leaving the top-center column completely unobstructed.
