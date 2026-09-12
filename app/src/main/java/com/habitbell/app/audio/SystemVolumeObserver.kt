@@ -76,14 +76,18 @@ class SystemVolumeObserver(private val context: Context) {
     /** Tracks whether the content observer is currently active and registered with ContentResolver. */
     private var isRegistered = false
 
-    init {
-        register()
-    }
+    /**
+     * Indicates whether the [ContentObserver] is currently actively registered with [Settings.System.CONTENT_URI].
+     *
+     * @return True if actively observing system volume changes; false if dormant/unregistered.
+     */
+    val isObserving: Boolean get() = isRegistered
 
     /**
      * Registers the [ContentObserver] with Android's [Settings.System.CONTENT_URI].
      *
-     * Lifecycle: Safe to call repeatedly; idempotent.
+     * Lifecycle: Safe to call repeatedly; idempotent. Invoked lazily when the user opens
+     * volume configuration screens to conserve battery and eliminate background OS dispatch overhead.
      */
     fun register() {
         if (!isRegistered) {

@@ -164,6 +164,16 @@ The audio architecture guarantees high-fidelity, boundary-free sound reproductio
   - `HabitBellViewModel.kt` utilizes Kotlin Coroutines `castManager.isCasting.collectLatest`:
     - When `isCasting == true`, it cancels mobile observation and collects `castManager.castVolume`, initializing the slider to the TV's current volume level.
     - When `isCasting == false`, it cancels Cast observation and collects `systemVolumeObserver.volume`, initializing the slider to the phone's current media volume.
+- **Lazy Lifecycle Scoping & Battery Conservation**:
+  - To prevent unnecessary OS-wide event dispatching and maximize device battery longevity during hours-long workout or meditation sessions, continuous observation is strictly scoped to active UI presentation:
+    - `isVolumeUiActive = (isVolumeSheetOpen || isSettingsDrawerOpen) && isAppForeground`.
+    - **Dormant by Default**: `SystemVolumeObserver` does NOT register a `ContentObserver` upon instantiation or while running sessions with closed settings.
+    - **Activation on UI Reveal**: When the user opens the Volume Settings Sheet or Settings Drawer while the app is in the foreground:
+      1. `register()` attaches the `ContentObserver` to Android's `Settings.System.CONTENT_URI`.
+      2. `readCurrentNormalizedVolume()` immediately synchronizes the slider state to the exact current stream level before the first frame renders.
+      3. Real-time collection mirrors any physical phone rocker button presses or Bluetooth headset adjustments onto the slider.
+    - **Suspension on Dismiss or Background**: Dismissing the sheet/drawer or backgrounding the activity (`MainActivity.onStop`) immediately invokes `unregister()`, cleanly severing the `ContentObserver`.
+    - **Acoustic Continuity**: Because the audio engine plays at unity gain ($1.0\text{f}$) directly into Android's `STREAM_MUSIC` hardware bus, physical phone buttons or car knobs continue to govern acoustic output volume natively without requiring active app observation.
 - **Unity Gain & Unimpaired Voice Guidance Ducking (`BackgroundMusicManager.kt`)**:
   - Internal player output gain defaults to unity ($1.0\text{f}$), delegating master acoustic attenuation entirely to the phone or TV hardware.
   - During voice guidance cues (e.g., Pranayama breath pacing or pre-session preparation countdown), `duckVolume(0.20f, 350L)` attenuates internal gain to $0.20\text{f}$ and restores it to $1.0\text{f}$ upon completion, guaranteeing crystal-clear vocal clarity without modifying the user's master system volume setting.
