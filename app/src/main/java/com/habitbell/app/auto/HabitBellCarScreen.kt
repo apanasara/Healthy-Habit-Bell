@@ -60,7 +60,7 @@ class HabitBellCarScreen(carContext: CarContext) : Screen(carContext) {
      */
     override fun onGetTemplate(): Template {
         val sessionState = sessionHandler.sessionState.value
-        val isRunning = sessionState.status == SessionStatus.RUNNING
+        val isRunning = sessionState.status == SessionStatus.RUNNING || sessionState.status == SessionStatus.PREPARING
         val isPaused = sessionState.status == SessionStatus.PAUSED
         val activeProfileId = sessionState.profile.id
 
@@ -69,6 +69,7 @@ class HabitBellCarScreen(carContext: CarContext) : Screen(carContext) {
         // 1. Posture & Spinal Alignment item
         val isPostureActive = (isRunning || isPaused) && activeProfileId == "posture"
         val postureText = when {
+            isPostureActive && sessionState.status == SessionStatus.PREPARING -> "Get Ready • ${sessionState.preparationSecondsRemaining}s • Tap to pause"
             isPostureActive && isRunning -> "Active • ${sessionState.formattedRemainingTime} remaining • Tap to pause"
             isPostureActive && isPaused -> "Paused • ${sessionState.formattedRemainingTime} remaining • Tap to resume"
             else -> "5m subtle interval bell • Tap to start"
@@ -90,6 +91,7 @@ class HabitBellCarScreen(carContext: CarContext) : Screen(carContext) {
         // 2. Mindful Breath & Calming Drive item
         val isBreathActive = (isRunning || isPaused) && (activeProfileId == "breathing" || activeProfileId == "box-breathing")
         val breathText = when {
+            isBreathActive && sessionState.status == SessionStatus.PREPARING -> "Get Ready • ${sessionState.preparationSecondsRemaining}s • Tap to pause"
             isBreathActive && isRunning -> "Active • ${sessionState.formattedRemainingTime} remaining • Tap to pause"
             isBreathActive && isPaused -> "Paused • ${sessionState.formattedRemainingTime} remaining • Tap to resume"
             else -> "4m calm breath chime • Tap to start"
@@ -111,6 +113,7 @@ class HabitBellCarScreen(carContext: CarContext) : Screen(carContext) {
         // 3. Mindful Eating / Break item
         val isEatingActive = (isRunning || isPaused) && activeProfileId.contains("eating")
         val eatingText = when {
+            isEatingActive && sessionState.status == SessionStatus.PREPARING -> "Get Ready • ${sessionState.preparationSecondsRemaining}s • Tap to pause"
             isEatingActive && isRunning -> "Active • ${sessionState.formattedRemainingTime} remaining • Tap to pause"
             isEatingActive && isPaused -> "Paused • ${sessionState.formattedRemainingTime} remaining • Tap to resume"
             else -> "1m gentle interval chime • Tap to start"

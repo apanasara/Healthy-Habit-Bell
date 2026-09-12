@@ -59,6 +59,7 @@ import com.habitbell.app.ui.components.CompoundPoseCard
  * @param onUserInteraction Callback triggered when the user interacts with the display to wake from dimming.
  * @param isScreenMirroringActive Whether Screen Mirroring is currently engaged.
  * @param onToggleOrientation Screen rotation callback.
+ * @param onSkipPreparation Callback to bypass the 5-second preparation countdown.
  * @param modifier Composable layout modifier.
  */
 @Composable
@@ -72,6 +73,7 @@ fun SessionScreen(
     onUserInteraction: () -> Unit = {},
     isScreenMirroringActive: Boolean = false,
     onToggleOrientation: () -> Unit = {},
+    onSkipPreparation: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val configuration = LocalConfiguration.current
@@ -107,7 +109,8 @@ fun SessionScreen(
                 onExit = onExit,
                 onToggleTheme = onToggleTheme,
                 isScreenMirroringActive = isScreenMirroringActive,
-                onToggleOrientation = onToggleOrientation
+                onToggleOrientation = onToggleOrientation,
+                onSkipPreparation = onSkipPreparation
             )
         } else {
             PortraitSessionLayout(
@@ -118,8 +121,53 @@ fun SessionScreen(
                 onExit = onExit,
                 onToggleTheme = onToggleTheme,
                 isScreenMirroringActive = isScreenMirroringActive,
-                onToggleOrientation = onToggleOrientation
+                onToggleOrientation = onToggleOrientation,
+                onSkipPreparation = onSkipPreparation
             )
+        }
+
+        // TV Screen Mirroring Floating Orientation Action Pill
+        androidx.compose.animation.AnimatedVisibility(
+            visible = isScreenMirroringActive,
+            enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.slideInVertically { -it / 2 },
+            exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.slideOutVertically { -it / 2 },
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .statusBarsPadding()
+                .padding(top = 8.dp)
+        ) {
+            Surface(
+                shape = RoundedCornerShape(20.dp),
+                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.45f)),
+                shadowElevation = 6.dp,
+                modifier = Modifier.clickable { onToggleOrientation() }
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Tv,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Text(
+                        text = if (isLandscape) "TV Mirroring: Horizontal • Tap to Rotate Vertical" else "TV Mirroring: Vertical • Tap to Rotate Horizontal",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Icon(
+                        imageVector = Icons.Outlined.ScreenRotation,
+                        contentDescription = "Rotate Screen",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(14.dp)
+                    )
+                }
+            }
         }
     }
 }
@@ -146,7 +194,8 @@ private fun LandscapeSessionLayout(
     onExit: () -> Unit,
     onToggleTheme: () -> Unit,
     isScreenMirroringActive: Boolean = false,
-    onToggleOrientation: () -> Unit = {}
+    onToggleOrientation: () -> Unit = {},
+    onSkipPreparation: () -> Unit = {}
 ) {
     val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val buttonPillBg = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (isDark) 0.35f else 0.75f)
@@ -435,6 +484,7 @@ private fun LandscapeSessionLayout(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
                         text = when (sessionState.status) {
+                            SessionStatus.PREPARING -> "● Get Ready • Take Position"
                             SessionStatus.RUNNING -> "● Active Mindful Session"
                             SessionStatus.PAUSED -> "Paused"
                             SessionStatus.COMPLETED -> "Session Completed 🙏"
@@ -442,7 +492,7 @@ private fun LandscapeSessionLayout(
                         },
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Medium,
-                        color = if (sessionState.status == SessionStatus.RUNNING) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        color = if (sessionState.status == SessionStatus.RUNNING || sessionState.status == SessionStatus.PREPARING) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     if (sessionState.isStepTrackingActive) {
                         Text(
@@ -538,7 +588,8 @@ private fun PortraitSessionLayout(
     onExit: () -> Unit,
     onToggleTheme: () -> Unit,
     isScreenMirroringActive: Boolean = false,
-    onToggleOrientation: () -> Unit = {}
+    onToggleOrientation: () -> Unit = {},
+    onSkipPreparation: () -> Unit = {}
 ) {
     Column(
         modifier = Modifier
@@ -902,13 +953,14 @@ private fun PortraitSessionLayout(
 
             Text(
                 text = when (sessionState.status) {
+                    SessionStatus.PREPARING -> "● Get Ready • Take Position"
                     SessionStatus.RUNNING -> if (isEating) "● Mindful Chewing Rhythm" else "● Active Mindful Session"
                     SessionStatus.PAUSED -> "Paused"
                     SessionStatus.COMPLETED -> "Session Completed 🙏"
                     SessionStatus.IDLE -> "Ready"
                 },
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = if (sessionState.status == SessionStatus.RUNNING || sessionState.status == SessionStatus.PREPARING) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                 letterSpacing = 1.sp
             )
         }

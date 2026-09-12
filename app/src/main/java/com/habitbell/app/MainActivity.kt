@@ -129,7 +129,7 @@ class MainActivity : FragmentActivity() {
             // Keep screen awake dynamically while session is running or while Screen Mirroring is active
             // to prevent Android OS display sleep from terminating the real-time Screen Mirroring capture encoder or dropping Chromecast streams
             LaunchedEffect(sessionState.status, isScreenMirroringActive) {
-                val shouldKeepAwake = sessionState.status == SessionStatus.RUNNING || isScreenMirroringActive
+                val shouldKeepAwake = sessionState.status == SessionStatus.RUNNING || sessionState.status == SessionStatus.PREPARING || isScreenMirroringActive
                 viewModel.batteryOptimizer.applyScreenAwake(this@MainActivity, shouldKeepAwake)
             }
 
@@ -243,6 +243,9 @@ class MainActivity : FragmentActivity() {
                                 onUserInteraction = {
                                     viewModel.userInteractionWake()
                                 },
+                                onSkipPreparation = {
+                                    viewModel.skipPreparation()
+                                },
                                 isScreenMirroringActive = isScreenMirroringActive,
                                 onToggleOrientation = {
                                     viewModel.toggleScreenOrientation()
@@ -332,6 +335,8 @@ class MainActivity : FragmentActivity() {
                             onToggleSunMoonTheme = { viewModel.toggleSunMoonTheme() },
                             isPauseOnBluetoothDisconnect = uiState.isPauseOnBluetoothDisconnect,
                             onPauseOnBluetoothDisconnectToggle = { viewModel.setPauseOnBluetoothDisconnect(it) },
+                            isPrepCountdownEnabled = uiState.isPrepCountdownEnabled,
+                            onPrepCountdownToggle = { viewModel.setPrepCountdownEnabled(it) },
                             isScreenMirroringActive = isScreenMirroringActive,
                             isScreenMirroringManual = isScreenMirroringManual,
                             screenMirroringTargetOrientation = targetOrientation,

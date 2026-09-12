@@ -164,6 +164,8 @@ fun SettingsDrawer(
     onUpdateSurya: (poses: List<CompoundPose>, targetRounds: Int, speedPreset: String, customPaceSeconds: Int, voiceCueMode: VoiceCueMode) -> Unit = { _, _, _, _, _ -> },
     isPauseOnBluetoothDisconnect: Boolean = true,
     onPauseOnBluetoothDisconnectToggle: (Boolean) -> Unit = {},
+    isPrepCountdownEnabled: Boolean = true,
+    onPrepCountdownToggle: (Boolean) -> Unit = {},
     isScreenMirroringActive: Boolean = false,
     isScreenMirroringManual: Boolean = false,
     screenMirroringTargetOrientation: ScreenOrientation = ScreenOrientation.AUTO,
@@ -337,6 +339,8 @@ fun SettingsDrawer(
                             tvCastUrl = tvCastUrl,
                             isPauseOnBluetoothDisconnect = isPauseOnBluetoothDisconnect,
                             onPauseOnBluetoothDisconnectToggle = onPauseOnBluetoothDisconnectToggle,
+                            isPrepCountdownEnabled = isPrepCountdownEnabled,
+                            onPrepCountdownToggle = onPrepCountdownToggle,
                             isScreenMirroringActive = isScreenMirroringActive,
                             isScreenMirroringManual = isScreenMirroringManual,
                             screenMirroringTargetOrientation = screenMirroringTargetOrientation,
@@ -942,6 +946,8 @@ private fun GlobalConfigContent(
     tvCastUrl: String,
     isPauseOnBluetoothDisconnect: Boolean = true,
     onPauseOnBluetoothDisconnectToggle: (Boolean) -> Unit = {},
+    isPrepCountdownEnabled: Boolean = true,
+    onPrepCountdownToggle: (Boolean) -> Unit = {},
     isScreenMirroringActive: Boolean = false,
     isScreenMirroringManual: Boolean = false,
     screenMirroringTargetOrientation: ScreenOrientation = ScreenOrientation.AUTO,
@@ -1507,6 +1513,12 @@ private fun GlobalConfigContent(
                     subtitle = "Automatically pause active timer when car or Bluetooth headphones disconnect",
                     checked = isPauseOnBluetoothDisconnect,
                     onCheckedChange = onPauseOnBluetoothDisconnectToggle
+                )
+                SettingsToggleRow(
+                    title = "Preparation Countdown",
+                    subtitle = "5-second lead time with voice cue to put down mobile and take position",
+                    checked = isPrepCountdownEnabled,
+                    onCheckedChange = onPrepCountdownToggle
                 )
             }
         }

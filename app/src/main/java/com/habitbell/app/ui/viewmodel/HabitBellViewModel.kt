@@ -87,7 +87,8 @@ data class AppUiState(
     val bgMusicCustomName: String? = null,
     val bgMusicYouTubeUrl: String = "https://youtu.be/x6UITRjhijI",
     val bgMusicVolume: Float = 0.35f,
-    val isPauseOnBluetoothDisconnect: Boolean = true
+    val isPauseOnBluetoothDisconnect: Boolean = true,
+    val isPrepCountdownEnabled: Boolean = true
 )
 
 /**
@@ -254,7 +255,7 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
      */
     fun checkAndRestoreOngoingSession() {
         val currentSession = sessionState.value
-        if (currentSession.status == SessionStatus.RUNNING || currentSession.status == SessionStatus.PAUSED) {
+        if (currentSession.status == SessionStatus.RUNNING || currentSession.status == SessionStatus.PAUSED || currentSession.status == SessionStatus.PREPARING) {
             _uiState.update { current ->
                 if (current.currentScreen != AppScreen.SESSION) {
                     current.copy(
@@ -983,6 +984,7 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
         val savedAutoDim = prefs.getBoolean("is_auto_dim", true)
         val savedBellVol = prefs.getFloat("bell_volume", 0.9f)
         val savedPauseOnBluetooth = prefs.getBoolean("is_pause_on_bluetooth_disconnect", true)
+        val savedPrepCountdown = prefs.getBoolean("is_prep_countdown_enabled", true)
 
         _uiState.update {
             it.copy(
@@ -995,13 +997,15 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
                 bellStyle = savedStyle,
                 bellVolume = savedBellVol,
                 isAutoDim = savedAutoDim,
-                isPauseOnBluetoothDisconnect = savedPauseOnBluetooth
+                isPauseOnBluetoothDisconnect = savedPauseOnBluetooth,
+                isPrepCountdownEnabled = savedPrepCountdown
             )
         }
 
         audioManager.bellStyle = savedStyle
         audioManager.setVolume(savedBellVol)
         sessionHandler.bluetoothDisconnectionManager.isEnabled = savedPauseOnBluetooth
+        engine.isPreparationCountdownEnabled = savedPrepCountdown
         bgMusicManager.isEnabled = savedEnabled
         bgMusicManager.soundType = savedType
         bgMusicManager.customAudioUri = savedUri
@@ -1010,7 +1014,7 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     /**
-     * Persists current audio settings, volume levels, bell styles, auto-dim, and Bluetooth disconnect preferences to [SharedPreferences].
+     * Persists current audio settings, volume levels, bell styles, auto-dim, prep countdown, and Bluetooth disconnect preferences to [SharedPreferences].
      */
     private fun saveSettings() {
         val state = _uiState.value
@@ -1025,7 +1029,26 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
             .putString("bell_style", state.bellStyle.name)
             .putBoolean("is_auto_dim", state.isAutoDim)
             .putBoolean("is_pause_on_bluetooth_disconnect", state.isPauseOnBluetoothDisconnect)
+            .putBoolean("is_prep_countdown_enabled", state.isPrepCountdownEnabled)
             .apply()
+    }
+
+    /**
+     * Toggles whether the 5-second preparation countdown lead-in is performed before starting sessions.
+     *
+     * @param enabled True to engage 5-second countdown with voice cues; false to start timer immediately.
+     */
+    fun setPrepCountdownEnabled(enabled: Boolean) {
+        _uiState.update { it.copy(isPrepCountdownEnabled = enabled) }
+        engine.isPreparationCountdownEnabled = enabled
+        saveSettings()
+    }
+
+    /**
+     * Bypasses the 5-second preparation countdown and commences active session countdown immediately.
+     */
+    fun skipPreparation() {
+        sessionHandler.skipPreparation()
     }
 
     /**

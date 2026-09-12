@@ -106,10 +106,18 @@ class CentralSessionHandler(private val application: Application) {
     /** Voice guidance player for Surya Namaskar Asana cues and Solar Mantras. */
     val suryaVoicePlayer: com.habitbell.app.audio.SuryaVoicePlayer = com.habitbell.app.audio.SuryaVoicePlayer(application, bgMusicManager)
 
+    /** Voice guidance player articulating 5-second countdown cues and strikes before session begins. */
+    val preparationVoiceGuide: com.habitbell.app.audio.PreparationVoiceGuide = com.habitbell.app.audio.PreparationVoiceGuide(
+        context = application,
+        bgMusicManager = bgMusicManager,
+        audioBellManager = audioManager
+    )
+
     /** Core 1Hz heartbeat finite state machine governing timer countdowns. */
     val engine: TimerEngine = TimerEngine(audioManager, hapticManager).apply {
         voiceGuide = this@CentralSessionHandler.voiceGuide
         suryaVoicePlayer = this@CentralSessionHandler.suryaVoicePlayer
+        preparationVoiceGuide = this@CentralSessionHandler.preparationVoiceGuide
     }
 
     /** Unified screen display automation orchestrator (Pocket, Car, TV, and Watch modes). */
@@ -289,6 +297,14 @@ class CentralSessionHandler(private val application: Application) {
                 if (statusChanged) {
                     lastStatus = state.status
                     when (state.status) {
+                        SessionStatus.PREPARING -> {
+                            updatePlaybackState(PlaybackStateCompat.STATE_PLAYING, 0L)
+                            updateMetadata(state.profile)
+                            batteryOptimizer.acquireWakeLock()
+                            batteryOptimizer.acquireWifiLock()
+                            displayAutomationManager.startMonitoring()
+                            startMediaService()
+                        }
                         SessionStatus.RUNNING -> {
                             updatePlaybackState(PlaybackStateCompat.STATE_PLAYING, elapsedMs)
                             updateMetadata(state.profile)
@@ -444,6 +460,9 @@ class CentralSessionHandler(private val application: Application) {
         json.put("profileName", state.profile.name)
         json.put("profileCategory", state.profile.category)
         json.put("status", state.status.name)
+        json.put("isPreparing", state.isPreparing)
+        json.put("preparationSeconds", state.preparationSecondsRemaining)
+        json.put("totalPreparationSeconds", state.totalPreparationSeconds)
         json.put("currentRound", state.currentRound)
         json.put("totalRounds", state.totalRounds)
         json.put("progressFraction", state.progressFraction.toDouble())
@@ -553,11 +572,18 @@ class CentralSessionHandler(private val application: Application) {
      * Toggles between running and paused states.
      */
     fun togglePlayPause() {
-        if (engine.state.value.status == SessionStatus.RUNNING) {
+        if (engine.state.value.status == SessionStatus.RUNNING || engine.state.value.status == SessionStatus.PREPARING) {
             pause()
         } else {
             resume()
         }
+    }
+
+    /**
+     * Bypasses the 5-second preparation countdown and transitions immediately to the active session.
+     */
+    fun skipPreparation() {
+        engine.skipPreparation()
     }
 
     /**
@@ -578,12 +604,13 @@ class CentralSessionHandler(private val application: Application) {
      * Loads a target [TimerProfile] and immediately commences countdown and background audio.
      *
      * @param profile Profile configuration governing duration, intervals, and bell timbre.
+     * @param skipPreparation If true, starts the session immediately without the 5-second preparation countdown.
      */
-    fun startProfile(profile: TimerProfile) {
+    fun startProfile(profile: TimerProfile, skipPreparation: Boolean = false) {
         _currentMediaId.value = profile.id
         engine.loadProfile(profile)
         updateMetadata(profile)
-        engine.startOrResume()
+        engine.startOrResume(skipPreparation = skipPreparation)
     }
 
     /**
