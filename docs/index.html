@@ -1,80 +1,63 @@
 <!DOCTYPE html>
 <!--
-  # Habit Bell • Google Cast Custom Web Receiver
-  
-  ## Architectural Role & Runtime Lifecycle
-  Executes inside the Chromecast, Google TV, and Sony Bravia Chromium hardware runtime
-  (hosted via GitHub Pages HTTPS at https://apanasara.github.io/Healthy-Habit-Bell/).
-  Communicates bi-directionally with the Habit Bell Android sender via Google Cast
-  Application Framework (CAF) v3 and the custom message channel ('urn:x-cast:com.habitbell.cast').
+  =============================================================================================
+  Habit Bell - Google Cast Custom Web Receiver (Landscape Session Screen Parity)
+  =============================================================================================
+  Architectural Role:
+    High-performance Custom Web Receiver operating directly within the Google Cast Application
+    Framework (CAF v3) hardware sandbox on Chromecasts, Google TVs, and Sony Bravia displays.
+    Engineered to match Android mobile SessionScreen.kt LandscapeSessionLayout bit-identically:
+      - Two-Column Landscape Split Layout (16:9 Living Room Widescreen Parity):
+          * Left Column (1.15x weight): Hero Visualizer Area (BreathIndicator Lotus, Concentric Meal
+            Bowl Ring, Circular Progress Ring, CompoundPoseCard with Surya Silhouettes).
+          * Right Column (1.05x weight): Top Bar (Back, Profile Name, Cast/Theme/Tune Icons),
+            Middle Status HUD (Sanskrit Devanagari, Large Countdown, Milestones, Chewing Pills),
+            and Bottom Transport Controls (Reset, Master Play/Pause, Tune).
+      - BreathIndicator.kt 1:1 Canvas Engine:
+          * 13 curved petals across 7 depth layers with dynamic length & angle morphing
+          * 3-leaf calyx ("patte") spreading dynamically from 22 deg to 58 deg with stem & receptacle
+          * Continuous calm water ripple ellipses propagating along the waterline
+          * C2-continuous aquatic floating buoyancy wave & breath-dependent lateral sway
+          * Breathing prana radial aura behind the flower
+      - Bidirectional CAF v3 Custom Message Bus ('urn:x-cast:com.habitbell.cast') supporting
+        state synchronization and remote 'toggle' & 'reset' action dispatching.
+      - Zero-Bandwidth In-Memory Tibetan Singing Bowl Web Audio synthesis (432 Hz fundamental + 1192 Hz).
 
-  ## Screen Modes (Bit-Identical to Mobile SessionScreen.kt)
-  - SPLASH: Standby & Connected welcome screen with golden prana aura, habit bell emblem,
-    connection beacons, and queued profile preview.
-  - LINEAR: Standard meditation and walking timers with authentic CircularProgressRing,
-    large ExtraLight countdown numerals, next interval bell subtitle, and step tracking badges.
-  - EATING: Mindful Eating screen with ambient candlelight aura, mealtime outer progress ring,
-    inner bite-cycle ring framing the authentic Phosphor dining bowl icon, large mealtime
-    countdown numerals, and bite pacing rhythm capsule ("🔔 MM:SS • CHEW & SAVOR").
-  - PRANAYAMA: Classical Breathwork visualizer with upper Sanskrit HUD (Sanskrit name,
-    Devanagari script, and phase countdown numeral), heroic 13-petal side-view blooming lotus
-    floating on calm waterline ripples, and round milestone status capsule.
-  - SURYA: Classical 12-step Surya Namaskar sequencer with 12-step cyclical flow indicator,
-    posture name, Sanskrit meaning, solar mantra ("☀️ ॐ..."), authentic monochrome vector
-    silhouette illustrations for all 12 postures, synchronized breath cues, and pose countdown pills.
-
-  ## Universal Transport & Action Surfaces
-  - Top Action Bar: Back pill, lowered/centered Routine Title, Cast Active beacon, Theme switcher, Settings tune pill.
-  - Bottom Transport Bar: Reset pill, prominent filled primary Play/Pause button, Settings pill, and active status badge.
-  - Two-Way CEC & Remote Synchronization: TV remote keys (Play/Pause/Space/Enter) and on-screen button
-    clicks immediately dispatch control signals back to the mobile sender.
-
-  ## Concurrency & Performance
-  - 60fps hardware-accelerated vector SVG transitions and requestAnimationFrame kinematics.
-  - Built-in zero-latency Web Audio Tibetan singing bowl synthesizer (432 Hz fundamental
-    and 1192.3 Hz Tibetan bowl overtone with natural exponential acoustic decay).
+  All rights reserved (c) 2026 Habit Bell.
+  =============================================================================================
 -->
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Habit Bell • Mindful Living Room TV</title>
-  <!-- Google Cast Application Framework (CAF) Receiver v3 -->
-  <script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
-  <style>
-    :root {
-      --bg-color: #0A0B0E;
-      --surface-color: #14161D;
-      --surface-variant: rgba(44, 44, 46, 0.45);
-      --primary-color: #E5A93C;
-      --primary-dim: rgba(229, 169, 60, 0.16);
-      --primary-border: rgba(229, 169, 60, 0.32);
-      --text-main: #FFFFFF;
-      --text-muted: #8E9BAE;
-      --text-dim: #505A69;
-      --border-pill: rgba(255, 255, 255, 0.14);
-      --calyx-leaf: rgba(163, 230, 53, 0.55);
-      --calyx-stroke: rgba(217, 249, 157, 0.80);
-      --calyx-stem: rgba(132, 204, 22, 0.90);
-      --track-color: rgba(255, 255, 255, 0.08);
-      --connected-green: #10B981;
-    }
+  <title>Habit Bell - Living Room Session</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <!-- Google Cast Application Framework (CAF v3) Receiver SDK -->
+  <script src="//www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
 
-    body.light-theme {
-      --bg-color: #FAF6EE;
-      --surface-color: #FFFDF9;
-      --surface-variant: rgba(242, 236, 225, 0.85);
-      --primary-color: #D97706;
-      --primary-dim: rgba(217, 119, 6, 0.12);
-      --primary-border: rgba(217, 119, 6, 0.30);
-      --text-main: #2E261F;
-      --text-muted: #7A6F64;
-      --text-dim: #A89B8D;
-      --border-pill: rgba(46, 38, 31, 0.15);
-      --calyx-leaf: rgba(132, 204, 22, 0.42);
-      --calyx-stroke: rgba(101, 163, 13, 0.85);
-      --calyx-stem: rgba(101, 163, 13, 0.90);
-      --track-color: rgba(46, 38, 31, 0.08);
+  <style>
+    /* -------------------------------------------------------------------------
+       CSS DESIGN TOKENS & AMOLED DARK THEME
+       ------------------------------------------------------------------------- */
+    :root {
+      --bg-color: #0A0D0E;
+      --bg-surface: #131719;
+      --bg-surface-elevated: #1B2124;
+      --primary-color: #E5A93C;       /* Golden Prana */
+      --primary-alpha: rgba(229, 169, 60, ALPHA);
+      --primary-container: rgba(229, 169, 60, 0.16);
+      --primary-glow: rgba(229, 169, 60, 0.40);
+      --text-main: #F3F4F6;
+      --text-secondary: #9CA3AF;
+      --text-muted: #6B7280;
+      --accent-emerald: #10B981;
+      --accent-cyan: #4ECDC4;
+      --accent-purple: #A78BFA;
+      --calyx-stem: #84CC16;
+      --calyx-leaf-fill: rgba(163, 230, 53, 0.55);
+      --calyx-leaf-stroke: rgba(217, 249, 157, 0.80);
+      --pill-bg: rgba(30, 38, 42, 0.65);
+      --pill-border: rgba(255, 255, 255, 0.08);
+      --button-border: rgba(255, 255, 255, 0.12);
     }
 
     * {
@@ -82,1735 +65,1715 @@
       margin: 0;
       padding: 0;
       user-select: none;
+      -webkit-user-select: none;
     }
 
     body {
-      background-color: var(--bg-color);
+      width: 100vw;
+      height: 100vh;
+      background: radial-gradient(circle at 50% 30%, #151A1D 0%, #0A0D0E 75%);
       color: var(--text-main);
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-      height: 100vh;
-      width: 100vw;
       overflow: hidden;
-      position: relative;
       display: flex;
       justify-content: center;
       align-items: center;
-      transition: background-color 0.5s ease, color 0.5s ease;
     }
 
-    /* Ambient Dynamic Radial Halo */
-    .ambient-aura {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      width: 900px;
-      height: 900px;
-      border-radius: 50%;
-      background: radial-gradient(circle, var(--primary-dim) 0%, rgba(10, 11, 14, 0) 70%);
-      pointer-events: none;
-      z-index: 0;
-      transition: background 1.2s ease;
+    /* Invisible Cast Media Player to satisfy CAF v3 PlayerManager */
+    cast-media-player {
+      display: none !important;
     }
 
-    /* Primary Viewport Frame */
+    /* -------------------------------------------------------------------------
+       VIEW CONTAINER & TRANSITIONS
+       ------------------------------------------------------------------------- */
     .view-container {
       position: absolute;
       top: 0;
       left: 0;
-      width: 100vw;
-      height: 100vh;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      align-items: center;
-      padding: 3.5vh 5vw;
+      width: 100%;
+      height: 100%;
       opacity: 0;
       pointer-events: none;
       transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-      z-index: 5;
+      display: flex;
+      flex-direction: column;
+      z-index: 1;
     }
 
     .view-container.active {
       opacity: 1;
       pointer-events: auto;
+      z-index: 10;
     }
 
-    /* Center Stage Container */
-    .session-frame {
+    /* -------------------------------------------------------------------------
+       SCREEN 1: SPLASH & STANDBY VIEW
+       ------------------------------------------------------------------------- */
+    #viewSplash {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      background: radial-gradient(circle at 50% 45%, #182024 0%, #0A0D0E 70%);
+      padding: 40px;
+      text-align: center;
+    }
+
+    .splash-aura {
+      position: absolute;
+      width: 600px;
+      height: 600px;
+      border-radius: 50%;
+      background: radial-gradient(circle, var(--primary-glow) 0%, rgba(229, 169, 60, 0.05) 50%, transparent 70%);
+      animation: pranaBreathe 5s ease-in-out infinite alternate;
+      pointer-events: none;
+    }
+
+    @keyframes pranaBreathe {
+      0% { transform: scale(0.85); opacity: 0.35; }
+      100% { transform: scale(1.18); opacity: 0.75; }
+    }
+
+    .splash-crest {
+      width: 160px;
+      height: 160px;
+      margin-bottom: 24px;
+      position: relative;
+      z-index: 2;
+      filter: drop-shadow(0 0 28px rgba(229, 169, 60, 0.45));
+    }
+
+    .splash-title {
+      font-size: 52px;
+      font-weight: 300;
+      letter-spacing: 4px;
+      color: var(--text-main);
+      margin-bottom: 8px;
+      z-index: 2;
+    }
+
+    .splash-subtitle {
+      font-size: 20px;
+      font-weight: 400;
+      letter-spacing: 2px;
+      color: var(--primary-color);
+      margin-bottom: 28px;
+      text-transform: uppercase;
+      z-index: 2;
+    }
+
+    .splash-status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 24px;
+      background: var(--pill-bg);
+      border: 1px solid var(--pill-border);
+      border-radius: 30px;
+      backdrop-filter: blur(16px);
+      font-size: 16px;
+      letter-spacing: 1px;
+      color: var(--text-secondary);
+      z-index: 2;
+    }
+
+    .pulse-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--accent-emerald);
+      box-shadow: 0 0 12px var(--accent-emerald);
+      animation: beaconPulse 2s infinite;
+    }
+
+    .pulse-dot.standby {
+      background: #F59E0B;
+      box-shadow: 0 0 12px #F59E0B;
+    }
+
+    @keyframes beaconPulse {
+      0% { transform: scale(0.9); opacity: 0.6; }
+      50% { transform: scale(1.3); opacity: 1; }
+      100% { transform: scale(0.9); opacity: 0.6; }
+    }
+
+    .splash-queue-card {
+      margin-top: 36px;
+      background: rgba(25, 32, 36, 0.65);
+      border: 1px solid rgba(229, 169, 60, 0.25);
+      border-radius: 18px;
+      padding: 16px 32px;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      z-index: 2;
+    }
+
+    .splash-queue-text {
+      font-size: 18px;
+      color: var(--text-main);
+      font-weight: 500;
+    }
+
+    /* -------------------------------------------------------------------------
+       UNIFIED TWO-COLUMN LANDSCAPE LAYOUT (MOBILE LandscapeSessionLayout PARITY)
+       ------------------------------------------------------------------------- */
+    .landscape-session-container {
       width: 100%;
-      max-width: 780px;
+      height: 100%;
+      display: flex;
+      flex-direction: row;
+      justify-content: space-between;
+      align-items: center;
+      padding: 36px 64px;
+    }
+
+    /* Left Column: Visualizer Area (weight: 1.15) */
+    .landscape-visualizer-col {
+      flex: 1.15;
+      height: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      position: relative;
+    }
+
+    /* Right Column: Action Bar, Elevated HUD, and Controls (weight: 1.05) */
+    .landscape-info-col {
+      flex: 1.05;
       height: 100%;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
       align-items: center;
-      z-index: 10;
+      padding: 8px 0 8px 36px;
     }
 
-    /* ==========================================================================
-       TOP ACTION BAR (Bit-Identical to Mobile SessionScreen Top Bar)
-       ========================================================================== */
-    .session-top-bar {
-      width: 100%;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .top-bar-row {
+    /* Top Bar across all landscape screens */
+    .landscape-top-bar {
       width: 100%;
       display: flex;
       justify-content: space-between;
       align-items: center;
     }
 
-    .top-bar-actions {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .btn-pill {
-      width: 44px;
-      height: 44px;
+    .action-circle-btn {
+      width: 52px;
+      height: 52px;
       border-radius: 50%;
-      background: var(--surface-variant);
-      border: 1px solid var(--border-pill);
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--button-border);
       display: flex;
-      align-items: center;
       justify-content: center;
+      align-items: center;
       color: var(--text-main);
       cursor: pointer;
-      outline: none;
-      transition: all 0.25s ease;
+      backdrop-filter: blur(12px);
+      transition: all 0.2s ease;
     }
 
-    .btn-pill:hover, .btn-pill:focus {
-      background: var(--primary-dim);
-      border-color: var(--primary-border);
-      transform: scale(1.06);
+    .action-circle-btn:hover {
+      background: rgba(255, 255, 255, 0.12);
+      transform: scale(1.05);
     }
 
-    .btn-pill.cast-active {
-      color: var(--primary-color);
-      border-color: var(--primary-border);
-    }
-
-    .phosphor-icon {
+    .action-circle-btn svg {
       width: 22px;
       height: 22px;
       fill: currentColor;
     }
 
-    .phosphor-icon-large {
-      width: 32px;
-      height: 32px;
+    .landscape-profile-title {
+      font-size: 26px;
+      font-weight: 600;
+      color: var(--text-main);
+      letter-spacing: 0.5px;
+    }
+
+    .landscape-top-actions-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .cast-pill-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      background: var(--pill-bg);
+      border: 1px solid var(--pill-border);
+      border-radius: 24px;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      color: var(--accent-emerald);
+    }
+
+    .cast-pill-badge svg {
+      width: 16px;
+      height: 16px;
+      fill: var(--accent-emerald);
+    }
+
+    /* Middle Status / HUD Area */
+    .landscape-middle-hud {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+
+    /* Bottom Transport Controls */
+    .landscape-bottom-controls {
+      width: 100%;
+      display: flex;
+      justify-content: space-evenly;
+      align-items: center;
+      padding: 12px 24px;
+      background: rgba(25, 32, 36, 0.55);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 36px;
+      backdrop-filter: blur(20px);
+    }
+
+    .btn-ctrl-circle {
+      width: 58px;
+      height: 58px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--button-border);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      color: var(--text-main);
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .btn-ctrl-circle:hover {
+      background: rgba(255, 255, 255, 0.14);
+      transform: scale(1.08);
+    }
+
+    .btn-ctrl-circle svg {
+      width: 24px;
+      height: 24px;
       fill: currentColor;
     }
 
-    .top-bar-title {
-      font-size: 1.55rem;
-      font-weight: 400;
-      letter-spacing: 0.8px;
-      color: var(--text-main);
-      text-align: center;
-    }
-
-    /* ==========================================================================
-       BOTTOM TRANSPORT CONTROLS (Bit-Identical to Mobile SessionScreen Controls)
-       ========================================================================== */
-    .session-bottom-bar {
-      width: 100%;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 12px;
-      padding-bottom: 8px;
-    }
-
-    .transport-controls-row {
-      width: 100%;
-      max-width: 340px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .btn-reset, .btn-settings {
-      width: 52px;
-      height: 52px;
-    }
-
-    .btn-play-pause {
-      width: 74px;
-      height: 74px;
+    .btn-play-pause-main {
+      width: 72px;
+      height: 72px;
       border-radius: 50%;
-      background: var(--primary-color);
+      background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);
       border: none;
       display: flex;
-      align-items: center;
       justify-content: center;
-      color: #060709;
+      align-items: center;
+      color: #0A0D0E;
       cursor: pointer;
-      outline: none;
-      box-shadow: 0 0 24px var(--primary-dim);
-      transition: all 0.25s ease;
+      box-shadow: 0 0 28px rgba(229, 169, 60, 0.55);
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
-    .btn-play-pause:hover, .btn-play-pause:focus {
-      transform: scale(1.07);
-      box-shadow: 0 0 32px rgba(229, 169, 60, 0.55);
+    .btn-play-pause-main:hover {
+      transform: scale(1.10);
+      box-shadow: 0 0 38px rgba(229, 169, 60, 0.80);
     }
 
-    .session-status-label {
-      font-size: 0.95rem;
-      letter-spacing: 1.2px;
-      color: var(--text-muted);
-      font-weight: 500;
-      display: flex;
-      align-items: center;
-      gap: 6px;
+    .btn-play-pause-main svg {
+      width: 32px;
+      height: 32px;
+      fill: #0A0D0E;
     }
 
-    .session-status-label.running {
-      color: var(--primary-color);
-    }
-
-    /* ==========================================================================
-       SCREEN 1: SPLASH VIEW (Standby / Idle / Connected)
-       ========================================================================== */
-    .splash-center {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      margin: auto;
-    }
-
-    .splash-emblem {
-      width: 120px;
-      height: 120px;
-      margin-bottom: 20px;
-      animation: gentleBreathing 4s ease-in-out infinite;
-      filter: drop-shadow(0 0 24px rgba(229, 169, 60, 0.35));
-    }
-
-    @keyframes gentleBreathing {
-      0%, 100% { transform: scale(1); filter: drop-shadow(0 0 20px rgba(229, 169, 60, 0.25)); }
-      50% { transform: scale(1.05); filter: drop-shadow(0 0 35px rgba(229, 169, 60, 0.5)); }
-    }
-
-    .splash-title {
-      font-size: 3rem;
-      font-weight: 300;
-      letter-spacing: 4px;
-      color: var(--text-main);
-      margin-bottom: 6px;
-    }
-
-    .splash-subtitle {
-      font-size: 1.25rem;
-      font-weight: 400;
-      color: var(--text-muted);
-      letter-spacing: 1.5px;
-      margin-bottom: 28px;
-    }
-
-    .splash-connection-pill {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      background: var(--surface-variant);
-      border: 1px solid var(--border-pill);
-      border-radius: 40px;
-      padding: 10px 26px;
-      font-size: 1.1rem;
-      color: var(--text-main);
-      margin-bottom: 20px;
-    }
-
-    .status-dot {
-      width: 10px;
-      height: 10px;
-      border-radius: 50%;
-      background-color: var(--primary-color);
-      box-shadow: 0 0 10px var(--primary-color);
-      transition: all 0.4s ease;
-    }
-
-    .status-dot.connected {
-      background-color: var(--connected-green);
-      box-shadow: 0 0 12px rgba(16, 185, 129, 0.85);
-    }
-
-    .splash-preview-card {
-      background: var(--primary-dim);
-      border: 1px solid var(--primary-border);
-      border-radius: 20px;
-      padding: 14px 34px;
-      text-align: center;
-      opacity: 0;
-      transform: translateY(10px);
-      transition: all 0.5s ease;
-    }
-
-    .splash-preview-card.visible {
-      opacity: 1;
-      transform: translateY(0);
-    }
-
-    .splash-preview-name {
-      font-size: 1.45rem;
-      font-weight: 600;
-      color: var(--primary-color);
-      letter-spacing: 0.8px;
-    }
-
-    .splash-preview-hint {
-      font-size: 1rem;
-      color: var(--text-muted);
-      margin-top: 4px;
-    }
-
-    /* ==========================================================================
-       SCREEN 2: LINEAR TIMER (Meditation / Walking / Quick Timer)
-       ========================================================================== */
-    .hero-stage {
+    /* -------------------------------------------------------------------------
+       SCREEN 2: LINEAR TIMER (Circular Progress Ring + Step / Cadence Telemetry)
+       ------------------------------------------------------------------------- */
+    .linear-ring-container {
+      width: 420px;
+      height: 420px;
       position: relative;
-      width: 440px;
-      height: 440px;
       display: flex;
       justify-content: center;
       align-items: center;
-      margin: auto;
     }
 
-    .circular-ring-svg {
-      position: absolute;
-      top: 0;
-      left: 0;
+    .progress-svg {
       width: 100%;
       height: 100%;
       transform: rotate(-90deg);
     }
 
-    .ring-track {
+    .progress-track {
       fill: none;
-      stroke: var(--track-color);
-      stroke-width: 9;
+      stroke: rgba(255, 255, 255, 0.08);
+      stroke-width: 10px;
     }
 
-    .ring-progress {
+    .progress-fill {
       fill: none;
       stroke: var(--primary-color);
-      stroke-width: 9;
+      stroke-width: 10px;
       stroke-linecap: round;
-      stroke-dasharray: 911; /* 2 * PI * 145 */
+      stroke-dasharray: 1256;
       stroke-dashoffset: 0;
-      transition: stroke-dashoffset 0.8s ease;
+      transition: stroke-dashoffset 0.8s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
-    .ring-center-content {
+    .progress-head-dot {
+      fill: #FFF;
+      filter: drop-shadow(0 0 10px var(--primary-color));
+      transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .linear-center-content {
+      position: absolute;
       display: flex;
       flex-direction: column;
-      align-items: center;
       justify-content: center;
-      text-align: center;
-      z-index: 10;
+      align-items: center;
     }
 
-    .countdown-numeral {
-      font-size: 5.4rem;
+    .linear-timer-digits {
+      font-size: 88px;
       font-weight: 200;
       letter-spacing: -2px;
       line-height: 1;
       color: var(--text-main);
     }
 
-    .interval-subtitle {
-      margin-top: 10px;
-      font-size: 1.05rem;
-      font-weight: 500;
-      letter-spacing: 1px;
-      color: var(--primary-color);
+    .linear-step-count {
+      font-size: 78px;
+      font-weight: 200;
+      letter-spacing: -2px;
+      line-height: 1;
+      color: var(--text-main);
+      display: none;
     }
 
-    .walking-badge-row {
-      margin-top: 8px;
-      display: flex;
+    .linear-step-unit {
+      font-size: 18px;
+      font-weight: 500;
+      color: var(--primary-color);
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      margin-top: 4px;
+      display: none;
+    }
+
+    .linear-elapsed-subtext {
+      font-size: 18px;
+      color: var(--text-muted);
+      margin-top: 10px;
+      letter-spacing: 0.5px;
+    }
+
+    .status-capsule-label {
+      font-size: 20px;
+      font-weight: 500;
+      color: var(--accent-emerald);
+      margin-bottom: 8px;
+    }
+
+    .step-telemetry-badge {
+      display: inline-flex;
       align-items: center;
       gap: 8px;
-    }
-
-    .walking-steps-pill {
-      background: var(--primary-dim);
-      border-radius: 16px;
-      padding: 4px 14px;
-      font-size: 1.05rem;
-      font-weight: 600;
+      padding: 10px 20px;
+      background: var(--pill-bg);
+      border: 1px solid var(--pill-border);
+      border-radius: 20px;
+      font-size: 16px;
       color: var(--primary-color);
+      margin-top: 10px;
     }
 
-    .walking-cadence-pill {
-      background: var(--surface-variant);
-      border-radius: 12px;
-      padding: 4px 10px;
-      font-size: 0.9rem;
-      color: var(--text-muted);
-    }
-
-    /* ==========================================================================
-       SCREEN 3: MINDFUL EATING (Bit-Identical to Mobile MindfulEatingContent)
-       ========================================================================== */
-    .eating-stage {
-      position: relative;
+    /* -------------------------------------------------------------------------
+       SCREEN 3: MINDFUL EATING (Dual Rings + Inner Chewing Arc + Dining Bowl)
+       ------------------------------------------------------------------------- */
+    .eating-visualizer-container {
       width: 440px;
       height: 440px;
+      position: relative;
       display: flex;
       justify-content: center;
       align-items: center;
-      margin: auto;
     }
 
     .eating-candle-aura {
       position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      width: 380px;
-      height: 380px;
+      width: 360px;
+      height: 360px;
       border-radius: 50%;
-      background: radial-gradient(circle, var(--primary-dim) 0%, rgba(10, 11, 14, 0) 70%);
-      pointer-events: none;
-      z-index: 0;
+      background: radial-gradient(circle, rgba(229, 169, 60, 0.18) 0%, rgba(229, 169, 60, 0.04) 55%, transparent 70%);
+      animation: candleFlicker 4s ease-in-out infinite alternate;
     }
 
-    .eating-center-box {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      z-index: 10;
+    @keyframes candleFlicker {
+      0% { transform: scale(0.95); opacity: 0.6; }
+      100% { transform: scale(1.05); opacity: 0.9; }
     }
 
-    /* Inner Bite-Cycle Ring framing Phosphor Bowl Icon */
-    .bite-cycle-box {
-      position: relative;
-      width: 86px;
-      height: 86px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-bottom: 12px;
-    }
-
-    .bite-cycle-svg {
-      position: absolute;
-      top: 0;
-      left: 0;
+    .eating-ring-svg {
       width: 100%;
       height: 100%;
       transform: rotate(-90deg);
     }
 
-    .bite-track {
+    .eating-meal-track {
       fill: none;
-      stroke: var(--surface-variant);
-      stroke-width: 4.5;
+      stroke: rgba(255, 255, 255, 0.08);
+      stroke-width: 10px;
     }
 
-    .bite-progress {
+    .eating-meal-fill {
       fill: none;
       stroke: var(--primary-color);
-      stroke-width: 4.5;
+      stroke-width: 10px;
       stroke-linecap: round;
-      stroke-dasharray: 220; /* 2 * PI * 35 */
+      stroke-dasharray: 1256;
       stroke-dashoffset: 0;
-      transition: stroke-dashoffset 0.8s ease;
+      transition: stroke-dashoffset 0.8s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
-    .bowl-icon {
-      width: 42px;
-      height: 42px;
-      color: var(--primary-color);
-      filter: drop-shadow(0 0 10px rgba(229, 169, 60, 0.4));
-    }
-
-    .eating-numeral {
-      font-size: 5.2rem;
-      letter-spacing: -1.5px;
-    }
-
-    /* Bite Pacing Rhythm Capsule */
-    .bite-rhythm-capsule {
-      margin-top: 12px;
-      display: flex;
-      align-items: center;
-      gap: 7px;
-      background: var(--surface-variant);
-      border: 1px solid var(--primary-border);
-      border-radius: 20px;
-      padding: 6px 18px;
-    }
-
-    .bell-icon {
-      width: 16px;
-      height: 16px;
-      color: var(--primary-color);
-    }
-
-    .capsule-next-bell {
-      font-size: 1.05rem;
-      font-weight: 600;
-      color: var(--primary-color);
-    }
-
-    .capsule-subtext {
-      font-size: 0.8rem;
-      letter-spacing: 1.2px;
-      font-weight: 500;
-      color: var(--text-muted);
-    }
-
-    /* Chime Ripple Wave */
-    .chime-ripple {
+    .eating-center-stage {
       position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%) scale(0.1);
-      width: 450px;
-      height: 450px;
-      border-radius: 50%;
-      border: 3px solid var(--primary-color);
-      opacity: 0;
-      pointer-events: none;
-      z-index: 2;
-    }
-
-    .chime-ripple.active {
-      animation: rippleExpand 1.5s cubic-bezier(0.1, 0.8, 0.3, 1) forwards;
-    }
-
-    @keyframes rippleExpand {
-      0% { transform: translate(-50%, -50%) scale(0.2); opacity: 0.9; }
-      100% { transform: translate(-50%, -50%) scale(2.2); opacity: 0; }
-    }
-
-    /* ==========================================================================
-       SCREEN 4: PRANAYAMA (Heroic Blooming Lotus + Sanskrit HUD)
-       ========================================================================== */
-    .pranayama-stage {
-      position: relative;
-      width: 100%;
-      max-width: 580px;
-      height: 480px;
       display: flex;
       flex-direction: column;
-      justify-content: space-between;
+      justify-content: center;
       align-items: center;
-      margin: auto;
     }
 
-    /* Upper Sanskrit HUD (Zero text overlap with flower) */
-    .pranayama-upper-hud {
-      text-align: center;
-      z-index: 10;
-      margin-top: 4px;
+    .eating-bite-box {
+      width: 140px;
+      height: 140px;
+      position: relative;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    .bite-arc-svg {
+      width: 100%;
+      height: 100%;
+      transform: rotate(-90deg);
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+
+    .bite-arc-track {
+      fill: none;
+      stroke: rgba(255, 255, 255, 0.08);
+      stroke-width: 6px;
+    }
+
+    .bite-arc-fill {
+      fill: none;
+      stroke: var(--primary-color);
+      stroke-width: 6px;
+      stroke-linecap: round;
+      stroke-dasharray: 408;
+      stroke-dashoffset: 0;
+      transition: stroke-dashoffset 0.5s ease-out;
+    }
+
+    .eating-bowl-icon {
+      width: 58px;
+      height: 58px;
+      fill: var(--primary-color);
+      z-index: 2;
+      filter: drop-shadow(0 0 16px rgba(229, 169, 60, 0.45));
+    }
+
+    .eating-remaining-digits {
+      font-size: 78px;
+      font-weight: 200;
+      letter-spacing: -2px;
+      color: var(--text-main);
+      line-height: 1;
+      margin-bottom: 12px;
+    }
+
+    .eating-bite-capsule {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 22px;
+      background: var(--pill-bg);
+      border: 1px solid rgba(229, 169, 60, 0.35);
+      border-radius: 24px;
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--primary-color);
+      margin-bottom: 16px;
+    }
+
+    .eating-bite-capsule svg {
+      width: 18px;
+      height: 18px;
+      fill: var(--primary-color);
+    }
+
+    .eating-guideline-card {
+      max-width: 440px;
+      background: rgba(25, 32, 36, 0.65);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+      padding: 12px 20px;
+      font-size: 15px;
+      color: var(--text-secondary);
+      line-height: 1.4;
+      font-style: italic;
+    }
+
+    /* -------------------------------------------------------------------------
+       SCREEN 4: PRANAYAMA (BreathIndicator.kt 1:1 Canvas Engine)
+       ------------------------------------------------------------------------- */
+    .pranayama-canvas-container {
+      width: 520px;
+      height: 440px;
+      position: relative;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    #lotusCanvas {
+      width: 520px;
+      height: 440px;
+      display: block;
     }
 
     .pranayama-phase-row {
       display: flex;
-      align-items: baseline;
-      justify-content: center;
-      gap: 10px;
-    }
-
-    .pranayama-phase-sanskrit {
-      font-size: 2.2rem;
-      font-weight: 700;
-      letter-spacing: 4px;
-      color: var(--primary-color);
-      transition: color 0.6s ease;
-    }
-
-    .pranayama-phase-script {
-      font-size: 1.4rem;
-      font-weight: 400;
-      color: var(--primary-color);
-      opacity: 0.85;
-    }
-
-    .pranayama-phase-numeral {
-      font-size: 4.8rem;
-      font-weight: 200;
-      line-height: 1;
-      margin-top: 4px;
-      color: var(--text-main);
-      letter-spacing: -1px;
-    }
-
-    /* Side-View Blooming Lotus SVG Container */
-    .lotus-container {
-      width: 440px;
-      height: 220px;
-      position: relative;
-      z-index: 5;
-    }
-
-    .lotus-svg {
-      width: 100%;
-      height: 100%;
-      overflow: visible;
-      filter: drop-shadow(0 0 24px rgba(229, 169, 60, 0.35));
-      transition: filter 0.8s ease;
-    }
-
-    /* Organic Lotus Petals (Coherent single theme color matching mobile) */
-    .petal {
-      fill: var(--primary-color);
-      fill-opacity: 0.82;
-      stroke: none;
-      transform-origin: 220px 185px;
-      transition: transform 1.2s cubic-bezier(0.645, 0.045, 0.355, 1);
-    }
-
-    .calyx {
-      fill: var(--calyx-leaf);
-      stroke: var(--calyx-stroke);
-      stroke-width: 1.5;
-    }
-
-    .stem {
-      stroke: var(--calyx-stem);
-      stroke-width: 5.5;
-      stroke-linecap: round;
-    }
-
-    .receptacle {
-      fill: var(--calyx-stem);
-    }
-
-    .waterline {
-      stroke: var(--primary-color);
-      stroke-opacity: 0.35;
-      stroke-width: 2;
-      fill: none;
-    }
-
-    .pranayama-lower-hud {
-      display: flex;
-      flex-direction: column;
       align-items: center;
-      gap: 6px;
-      z-index: 10;
+      gap: 14px;
       margin-bottom: 6px;
     }
 
-    .pranayama-milestone-capsule {
-      background: var(--surface-variant);
-      border: 1px solid var(--border-pill);
-      border-radius: 16px;
-      padding: 6px 18px;
-      font-size: 1rem;
-      font-weight: 600;
-      color: var(--text-main);
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .milestone-bell-accent {
+    .pranayama-sanskrit-title {
+      font-size: 30px;
+      font-weight: 700;
+      letter-spacing: 4px;
       color: var(--primary-color);
+      text-transform: uppercase;
     }
 
-    .pranayama-total-time {
-      font-size: 0.95rem;
-      color: var(--text-muted);
-      opacity: 0.85;
+    .pranayama-devanagari-script {
+      font-size: 24px;
+      font-weight: 300;
+      color: var(--primary-color);
+      opacity: 0.88;
     }
 
-    /* ==========================================================================
-       SCREEN 5: SURYA NAMASKAR (Bit-Identical to CompoundPoseCard.kt)
-       ========================================================================== */
-    .surya-stage {
-      position: relative;
-      width: 100%;
-      max-width: 580px;
+    .pranayama-countdown-large {
+      font-size: 96px;
+      font-weight: 200;
+      letter-spacing: -2px;
+      line-height: 1;
+      color: var(--text-main);
+      margin: 8px 0 16px 0;
+    }
+
+    .pranayama-milestone-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 24px;
+      background: var(--pill-bg);
+      border: 1px solid var(--pill-border);
+      border-radius: 20px;
+      font-size: 16px;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+    }
+
+    .pranayama-cadence-accent {
+      color: var(--primary-color);
+      font-weight: 600;
+    }
+
+    /* -------------------------------------------------------------------------
+       SCREEN 5: SURYA NAMASKAR (CompoundPoseCard Parity & Vector Silhouettes)
+       ------------------------------------------------------------------------- */
+    .surya-card-container {
+      width: 440px;
+      background: rgba(22, 28, 31, 0.75);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 24px;
+      padding: 24px 28px;
       display: flex;
       flex-direction: column;
       align-items: center;
       text-align: center;
-      margin: auto;
-      gap: 8px;
+      backdrop-filter: blur(16px);
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
     }
 
-    .surya-header {
-      font-size: 0.95rem;
+    .surya-round-pose-header {
+      font-size: 13px;
+      font-weight: 700;
       letter-spacing: 2px;
       color: var(--primary-color);
-      font-weight: 700;
       text-transform: uppercase;
+      margin-bottom: 12px;
     }
 
-    /* 12-Step Cyclical Flow Progress Indicator */
-    .surya-flow-bar {
+    .surya-12step-bar {
       display: flex;
       align-items: center;
-      justify-content: center;
-      gap: 5px;
-      padding: 4px 0 8px 0;
+      gap: 6px;
+      margin-bottom: 16px;
     }
 
-    .flow-step-dot {
-      height: 6px;
-      border-radius: 3px;
-      background: var(--surface-variant);
+    .surya-step-pill {
+      width: 8px;
+      height: 8px;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.15);
       transition: all 0.3s ease;
     }
 
-    .flow-step-dot.upcoming {
-      width: 6px;
-      background: var(--surface-variant);
-      opacity: 0.6;
+    .surya-step-pill.completed {
+      background: rgba(229, 169, 60, 0.50);
     }
 
-    .flow-step-dot.completed {
-      width: 6px;
+    .surya-step-pill.active {
+      width: 28px;
       background: var(--primary-color);
-      opacity: 0.5;
-    }
-
-    .flow-step-dot.active {
-      width: 22px;
-      background: var(--primary-color);
-      opacity: 1;
+      box-shadow: 0 0 12px var(--primary-color);
     }
 
     .surya-pose-name {
-      font-size: 2.2rem;
+      font-size: 32px;
       font-weight: 400;
       color: var(--text-main);
-      line-height: 1.1;
+      margin-bottom: 4px;
     }
 
-    .surya-pose-sanskrit {
-      font-size: 1.05rem;
-      color: var(--text-muted);
-      margin-top: 2px;
+    .surya-pose-translation {
+      font-size: 16px;
+      color: var(--text-secondary);
+      margin-bottom: 10px;
     }
 
-    .surya-pose-mantra {
-      font-size: 1.15rem;
+    .surya-solar-mantra {
+      font-size: 18px;
       font-weight: 600;
       color: var(--primary-color);
-      margin-top: 4px;
+      margin-bottom: 16px;
     }
 
-    /* Posture Silhouette Container */
-    .surya-silhouette-container {
-      width: 170px;
-      height: 170px;
-      margin: 8px 0;
+    .surya-silhouette-view {
+      width: 150px;
+      height: 150px;
+      margin-bottom: 16px;
       display: flex;
-      align-items: center;
       justify-content: center;
+      align-items: center;
+      filter: drop-shadow(0 0 18px rgba(229, 169, 60, 0.35));
     }
 
-    .surya-silhouette-svg {
+    .surya-silhouette-view svg {
       width: 100%;
       height: 100%;
-      filter: drop-shadow(0 0 16px var(--primary-dim));
-    }
-
-    .surya-silhouette-path {
       fill: var(--primary-color);
-      transition: d 0.4s ease;
     }
 
-    /* Breath Cue & Pose Countdown Row */
     .surya-cues-row {
       display: flex;
       align-items: center;
-      gap: 10px;
-      margin-top: 4px;
+      gap: 12px;
     }
 
-    .surya-pill-breath {
-      background: var(--surface-variant);
-      border-radius: 12px;
-      padding: 6px 16px;
-      font-size: 1rem;
+    .surya-breath-capsule {
+      padding: 8px 16px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid var(--pill-border);
+      border-radius: 14px;
+      font-size: 15px;
       color: var(--primary-color);
-      font-weight: 500;
     }
 
-    .surya-pill-duration {
-      background: var(--primary-dim);
-      border-radius: 12px;
-      padding: 6px 16px;
-      font-size: 1rem;
+    .surya-countdown-capsule {
+      padding: 8px 18px;
+      background: var(--primary-container);
+      border: 1px solid rgba(229, 169, 60, 0.35);
+      border-radius: 14px;
+      font-size: 16px;
       font-weight: 700;
       color: var(--primary-color);
-    }
-
-    .surya-total-remaining {
-      font-size: 3.4rem;
-      font-weight: 200;
-      letter-spacing: -1px;
-      color: var(--text-main);
-      margin-top: 6px;
-      line-height: 1;
-    }
-
-    /* Volume HUD */
-    .volume-hud {
-      position: fixed;
-      top: 24px;
-      right: 28px;
-      background: rgba(20, 22, 28, 0.92);
-      border: 1px solid var(--primary-border);
-      border-radius: 16px;
-      padding: 10px 20px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      opacity: 0;
-      transition: opacity 0.4s ease;
-      z-index: 100;
-      color: var(--primary-color);
-      font-weight: 600;
-      font-size: 1rem;
-    }
-
-    .volume-hud.visible {
-      opacity: 1;
     }
   </style>
 </head>
 <body>
-  <!-- Embedded Media Player for CAF v3 Framework Compliance -->
-  <cast-media-player style="display:none;"></cast-media-player>
 
-  <!-- Ambient Dynamic Radial Halo -->
-  <div id="ambientAura" class="ambient-aura"></div>
+  <!-- CAF v3 Headless Media Player -->
+  <cast-media-player></cast-media-player>
 
-  <!-- Persistent Volume HUD -->
-  <div id="volumeHud" class="volume-hud">
-    <span id="volumeHudLabel">Bell Volume: 90%</span>
-  </div>
-
-  <!-- ========================================================================
-       SCREEN 1: SPLASH VIEW (Standby / Idle / Connected)
-       ======================================================================== -->
+  <!-- =======================================================================
+       SCREEN 1: SPLASH & STANDBY VIEW
+       ======================================================================= -->
   <div id="viewSplash" class="view-container active">
-    <div class="session-frame">
-      <div class="session-top-bar">
-        <div class="top-bar-row">
-          <button class="btn-pill" title="Habit Bell Sanctuary">
-            <svg class="phosphor-icon" viewBox="0 0 256 256">
-              <path d="M166,224a6,6,0,0,1-6,6H96a6,6,0,0,1,0-12h64A6,6,0,0,1,166,224Zm54.11-33a13.83,13.83,0,0,1-12.1,7H48a14,14,0,0,1-12.06-21.06C41.59,167.2,50,139.74,50,104a78,78,0,1,1,156,0c0,35.73,8.42,63.2,14.08,72.94A13.9,13.9,0,0,1,220.11,191Zm-10.41-8C202.13,170,194,139.68,194,104a66,66,0,1,0-132,0c0,35.69-8.14,66-15.71,79a2,2,0,0,0,0,2,1.9,1.9,0,0,0,1.7,1H208a1.9,1.9,0,0,0,1.7-1A2,2,0,0,0,209.7,183Z" fill="currentColor"/>
-            </svg>
-          </button>
-          <div class="top-bar-title">Mindful Sanctuary</div>
-          <div class="top-bar-actions">
-            <button class="btn-pill" onclick="toggleThemeVisual()" title="Switch Theme">
-              <svg id="splashThemeIcon" class="phosphor-icon" viewBox="0 0 256 256">
-                <path d="M122,40V16a6,6,0,0,1,12,0V40a6,6,0,0,1-12,0Zm68,88a62,62,0,1,1-62-62A62.07,62.07,0,0,1,190,128Zm-12,0a50,50,0,1,0-50,50A50.06,50.06,0,0,0,178,128ZM59.76,68.24a6,6,0,1,0,8.48-8.48l-16-16a6,6,0,0,0-8.48,8.48Zm0,119.52-16,16a6,6,0,1,0,8.48,8.48l16-16a6,6,0,1,0-8.48-8.48ZM192,70a6,6,0,0,0,4.24-1.76l16-16a6,6,0,0,0-8.48-8.48l-16,16A6,6,0,0,0,192,70Zm4.24,117.76a6,6,0,0,0-8.48,8.48l16,16a6,6,0,0,0,8.48-8.48ZM46,128a6,6,0,0,0-6-6H16a6,6,0,0,0,0,12H40A6,6,0,0,0,46,128Zm82,82a6,6,0,0,0-6,6v24a6,6,0,0,0,12,0V216A6,6,0,0,0,128,210Zm112-88H216a6,6,0,0,0,0,12h24a6,6,0,0,0,0-12Z" fill="currentColor"/>
-              </svg>
-            </button>
-            <button class="btn-pill cast-active" title="Google Cast Ready">
-              <svg class="phosphor-icon" viewBox="0 0 256 256">
-                <path d="M216,66H142.48l37.76-37.76a6,6,0,0,0-8.48-8.48L128,63.51,84.24,19.76a6,6,0,1,0-8.48,8.48L113.52,66H40A14,14,0,0,0,26,80V200a14,14,0,0,0,14,14H216a14,14,0,0,0,14-14V80A14,14,0,0,0,216,66Zm2,134a2,2,0,0,1-2,2H40a2,2,0,0,1-2-2V80a2,2,0,0,1,2-2H216a2,2,0,0,1,2,2Z" fill="currentColor"/>
-              </svg>
-            </button>
-          </div>
-        </div>
-      </div>
+    <div class="splash-aura"></div>
+    
+    <!-- Sacred Habit Bell & Lotus Crest -->
+    <svg class="splash-crest" viewBox="0 0 120 120">
+      <defs>
+        <linearGradient id="crestGold" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#FCD34D" />
+          <stop offset="100%" stop-color="#D97706" />
+        </linearGradient>
+      </defs>
+      <!-- Lotus Petals -->
+      <path d="M60 25 C50 45 42 62 42 75 C42 88 52 92 60 92 C68 92 78 88 78 75 C78 62 70 45 60 25 Z" fill="url(#crestGold)" opacity="0.95"/>
+      <path d="M60 38 C42 50 28 65 30 78 C32 88 44 92 52 90 C46 80 48 65 60 52 Z" fill="url(#crestGold)" opacity="0.75"/>
+      <path d="M60 38 C78 50 92 65 90 78 C88 88 76 92 68 90 C74 80 72 65 60 52 Z" fill="url(#crestGold)" opacity="0.75"/>
+      <!-- Bell Crest Dome -->
+      <path d="M48 94 C48 91 53 88 60 88 C67 88 72 91 72 94 L76 97 C76 99 74 100 60 100 C46 100 44 99 44 97 Z" fill="#FCD34D"/>
+      <circle cx="60" cy="103" r="3" fill="#D97706"/>
+    </svg>
 
-      <div class="splash-center">
-        <!-- Sacred Habit Bell & Lotus Vector Emblem -->
-        <svg class="splash-emblem" viewBox="0 0 120 120">
-          <defs>
-            <radialGradient id="bellGoldGrad" cx="50%" cy="50%" r="50%">
-              <stop offset="0%" stop-color="#FDE047" />
-              <stop offset="60%" stop-color="#E5A93C" />
-              <stop offset="100%" stop-color="#B45309" />
-            </radialGradient>
-          </defs>
-          <circle cx="60" cy="60" r="54" fill="none" stroke="rgba(229, 169, 60, 0.25)" stroke-width="2" stroke-dasharray="6 4" />
-          <path d="M55 24 Q60 18 65 24 L68 30 L52 30 Z" fill="url(#bellGoldGrad)" />
-          <circle cx="60" cy="20" r="4" fill="url(#bellGoldGrad)" />
-          <path d="M52 30 C52 48 38 72 34 82 C44 85 76 85 86 82 C82 72 68 48 68 30 Z" fill="url(#bellGoldGrad)" />
-          <ellipse cx="60" cy="83" rx="28" ry="5" fill="#D97706" />
-          <ellipse cx="60" cy="83" rx="26" ry="3" fill="#FDE047" />
-          <circle cx="60" cy="91" r="5" fill="url(#bellGoldGrad)" />
-        </svg>
+    <h1 class="splash-title">HABIT BELL</h1>
+    <div class="splash-subtitle">Mindful Living Room Canvas</div>
 
-        <div class="splash-title">HABIT BELL</div>
-        <div class="splash-subtitle">Mindful Living Room • Meditative Sanctuary</div>
+    <div id="splashStatusBadge" class="splash-status-badge">
+      <div id="splashBeacon" class="pulse-dot standby"></div>
+      <span id="splashStatusText">Ready to Cast • Connect from Mobile</span>
+    </div>
 
-        <div class="splash-connection-pill">
-          <div id="splashDot" class="status-dot"></div>
-          <span id="splashStatusText">Waiting for Phone...</span>
-        </div>
-
-        <div id="splashPreviewCard" class="splash-preview-card">
-          <div id="splashPreviewName" class="splash-preview-name">Mindful Meditation</div>
-          <div id="splashPreviewHint" class="splash-preview-hint">Ready • Press Start on phone or TV remote</div>
-        </div>
-      </div>
-
-      <div class="session-bottom-bar">
-        <div class="session-status-label">
-          Google Cast Receiver v3 • 432Hz Tibetan Chimes
-        </div>
-      </div>
+    <div id="splashQueueCard" class="splash-queue-card" style="display: none;">
+      <span id="splashQueueText" class="splash-queue-text">Selected: Mindful Session</span>
     </div>
   </div>
 
-  <!-- ========================================================================
-       SCREEN 2: LINEAR TIMER VIEW (Meditation / Walking / Quick Timer)
-       ======================================================================== -->
+  <!-- =======================================================================
+       SCREEN 2: LINEAR TIMER (Landscape Parity)
+       ======================================================================= -->
   <div id="viewLinear" class="view-container">
-    <div class="session-frame">
-      <div class="session-top-bar">
-        <div class="top-bar-row">
-          <button class="btn-pill" onclick="sendRemoteAction('exit')" title="Exit Session">
-            <svg class="phosphor-icon" viewBox="0 0 256 256">
-              <path d="M164.24,203.76a6,6,0,1,1-8.48,8.48l-80-80a6,6,0,0,1,0-8.48l80-80a6,6,0,0,1,8.48,8.48L88.49,128Z" fill="currentColor"/>
-            </svg>
-          </button>
-          <div class="top-bar-actions">
-            <button class="btn-pill cast-active" title="Cast Active">
-              <svg class="phosphor-icon" viewBox="0 0 256 256">
-                <path d="M216,66H142.48l37.76-37.76a6,6,0,0,0-8.48-8.48L128,63.51,84.24,19.76a6,6,0,1,0-8.48,8.48L113.52,66H40A14,14,0,0,0,26,80V200a14,14,0,0,0,14,14H216a14,14,0,0,0,14-14V80A14,14,0,0,0,216,66Zm2,134a2,2,0,0,1-2,2H40a2,2,0,0,1-2-2V80a2,2,0,0,1,2-2H216a2,2,0,0,1,2,2Z" fill="currentColor"/>
-              </svg>
-            </button>
-            <button class="btn-pill" onclick="toggleThemeVisual()" title="Toggle Theme">
-              <svg class="phosphor-icon theme-icon-el" viewBox="0 0 256 256">
-                <path d="M122,40V16a6,6,0,0,1,12,0V40a6,6,0,0,1-12,0Zm68,88a62,62,0,1,1-62-62A62.07,62.07,0,0,1,190,128Zm-12,0a50,50,0,1,0-50,50A50.06,50.06,0,0,0,178,128ZM59.76,68.24a6,6,0,1,0,8.48-8.48l-16-16a6,6,0,0,0-8.48,8.48Zm0,119.52-16,16a6,6,0,1,0,8.48,8.48l16-16a6,6,0,1,0-8.48-8.48ZM192,70a6,6,0,0,0,4.24-1.76l16-16a6,6,0,0,0-8.48-8.48l-16,16A6,6,0,0,0,192,70Zm4.24,117.76a6,6,0,0,0-8.48,8.48l16,16a6,6,0,0,0,8.48-8.48ZM46,128a6,6,0,0,0-6-6H16a6,6,0,0,0,0,12H40A6,6,0,0,0,46,128Zm82,82a6,6,0,0,0-6,6v24a6,6,0,0,0,12,0V216A6,6,0,0,0,128,210Zm112-88H216a6,6,0,0,0,0,12h24a6,6,0,0,0,0-12Z" fill="currentColor"/>
-              </svg>
-            </button>
-            <button class="btn-pill" onclick="sendRemoteAction('settings')" title="Settings">
-              <svg class="phosphor-icon" viewBox="0 0 256 256">
-                <path d="M40,86H74.6a30,30,0,0,0,58.8,0H216a6,6,0,0,0,0-12H133.4a30,30,0,0,0-58.8,0H40a6,6,0,0,0,0,12Zm64-24A18,18,0,1,1,86,80,18,18,0,0,1,104,62ZM216,170H197.4a30,30,0,0,0-58.8,0H40a6,6,0,0,0,0,12h98.6a30,30,0,0,0,58.8,0H216a6,6,0,0,0,0-12Zm-48,24a18,18,0,1,1,18-18A18,18,0,0,1,168,194Z" fill="currentColor"/>
-              </svg>
-            </button>
-          </div>
-        </div>
-        <div id="linearTitle" class="top-bar-title">Mindful Meditation</div>
-      </div>
-
-      <!-- Center Hero Progress Ring -->
-      <div class="hero-stage">
-        <svg class="circular-ring-svg" viewBox="0 0 320 320">
-          <circle class="ring-track" cx="160" cy="160" r="145" />
-          <circle id="linearProgressBar" class="ring-progress" cx="160" cy="160" r="145" />
-        </svg>
-
-        <div class="ring-center-content">
-          <div id="linearTimeDisplay" class="countdown-numeral">15:00</div>
-          <div id="linearIntervalSubtitle" class="interval-subtitle">Bell in 05:00</div>
-          <div id="linearWalkingRow" class="walking-badge-row" style="display: none;">
-            <div id="linearStepCount" class="walking-steps-pill">🚶 0</div>
-            <div id="linearCadence" class="walking-cadence-pill">Cadence: 0 spm</div>
+    <div class="landscape-session-container">
+      <!-- Left Column: Circular Progress Ring -->
+      <div class="landscape-visualizer-col">
+        <div class="linear-ring-container">
+          <svg class="progress-svg" viewBox="0 0 420 420">
+            <circle class="progress-track" cx="210" cy="210" r="190" />
+            <circle id="linearProgressFill" class="progress-fill" cx="210" cy="210" r="190" />
+            <circle id="linearProgressHead" class="progress-head-dot" cx="400" cy="210" r="8" />
+          </svg>
+          <div class="linear-center-content">
+            <div id="linearTimerDigits" class="linear-timer-digits">15:00</div>
+            <div id="linearStepCount" class="linear-step-count">0</div>
+            <div id="linearStepUnit" class="linear-step-unit">steps</div>
+            <div id="linearElapsedSubtext" class="linear-elapsed-subtext">00:00 elapsed • 15:00 total</div>
           </div>
         </div>
       </div>
 
-      <!-- Bottom Transport Controls -->
-      <div class="session-bottom-bar">
-        <div class="transport-controls-row">
-          <button class="btn-pill btn-reset" onclick="sendRemoteAction('reset')" title="Reset">
-            <svg class="phosphor-icon" viewBox="0 0 256 256">
-              <path d="M222,128a94,94,0,0,1-92.74,94H128a93.43,93.43,0,0,1-64.5-25.65,6,6,0,1,1,8.24-8.72A82,82,0,1,0,70,70l-.19.19L39.44,98H72a6,6,0,0,1,0,12H24a6,6,0,0,1-6-6V56a6,6,0,0,1,12,0V90.34L61.63,61.4A94,94,0,0,1,222,128Z" fill="currentColor"/>
-            </svg>
+      <!-- Right Column: Top Bar + Middle HUD + Bottom Controls -->
+      <div class="landscape-info-col">
+        <!-- Top Bar -->
+        <div class="landscape-top-bar">
+          <button class="action-circle-btn" onclick="sendRemoteAction('toggle')" title="Exit / Pause">
+            <svg viewBox="0 0 256 256"><path d="M224,128a8,8,0,0,1-8,8H59.31l58.35,58.34a8,8,0,0,1-11.32,11.32l-72-72a8,8,0,0,1,0-11.32l72-72a8,8,0,0,1,11.32,11.32L59.31,120H216A8,8,0,0,1,224,128Z"/></svg>
           </button>
-          <button id="linearPlayBtn" class="btn-play-pause" onclick="sendRemoteAction('toggle')" title="Play / Pause">
-            <svg class="phosphor-icon-large play-svg" viewBox="0 0 256 256" style="display:none;">
-              <path d="M231.36,116.19,87.28,28.06a14,14,0,0,0-14.18-.27A13.69,13.69,0,0,0,66,39.87V216.13a13.69,13.69,0,0,0,7.1,12.08,14,14,0,0,0,14.18-.27l144.08-88.13a13.82,13.82,0,0,0,0-23.62Zm-6.26,13.38L81,217.7a2,2,0,0,1-2.06,0,1.78,1.78,0,0,1-1-1.61V39.87a1.78,1.78,0,0,1,1-1.61A2.06,2.06,0,0,1,80,38a2,2,0,0,1,1,.31L225.1,126.43a1.82,1.82,0,0,1,0,3.14Z" fill="currentColor"/>
-            </svg>
-            <svg class="phosphor-icon-large pause-svg" viewBox="0 0 256 256">
-              <path d="M200,34H160a14,14,0,0,0-14,14V208a14,14,0,0,0,14,14h40a14,14,0,0,0,14-14V48A14,14,0,0,0,200,34Zm2,174a2,2,0,0,1-2,2H160a2,2,0,0,1-2-2V48a2,2,0,0,1,2-2h40a2,2,0,0,1,2,2ZM96,34H56A14,14,0,0,0,42,48V208a14,14,0,0,0,14,14H96a14,14,0,0,0,14-14V48A14,14,0,0,0,96,34Zm2,174a2,2,0,0,1-2,2H56a2,2,0,0,1-2-2V48a2,2,0,0,1,2-2H96a2,2,0,0,1,2,2Z" fill="currentColor"/>
-            </svg>
+          <div id="linearProfileTitle" class="landscape-profile-title">General Timer</div>
+          <div class="landscape-top-actions-right">
+            <div class="cast-pill-badge">
+              <div class="pulse-dot"></div>
+              <span>TV CAST</span>
+            </div>
+            <div class="action-circle-btn" title="Tibetan Bowl">
+              <svg viewBox="0 0 256 256"><path d="M208,80H48A16,16,0,0,0,32,96v16a96.11,96.11,0,0,0,88,95.66V224H104a8,8,0,0,0,0,16h48a8,8,0,0,0,0-16H136V207.66A96.11,96.11,0,0,0,224,112V96A16,16,0,0,0,208,80Zm0,32a80.09,80.09,0,0,1-80,80,80.09,80.09,0,0,1-80-80V96H208Z"/></svg>
+            </div>
+          </div>
+        </div>
+
+        <!-- Middle HUD -->
+        <div class="landscape-middle-hud">
+          <div id="linearStatusLabel" class="status-capsule-label">● Active Mindful Session</div>
+          <div id="linearStepTelemetry" class="step-telemetry-badge" style="display: none;">
+            <span>👟 0 steps • 0 spm</span>
+          </div>
+          <div id="linearBellCue" class="step-telemetry-badge">
+            <span>🔔 Bell in 05:00</span>
+          </div>
+        </div>
+
+        <!-- Bottom Transport Controls -->
+        <div class="landscape-bottom-controls">
+          <button class="btn-ctrl-circle" onclick="sendRemoteAction('reset')" title="Reset Session">
+            <svg viewBox="0 0 256 256"><path d="M224,128A96,96,0,0,1,60.8,195.92a8,8,0,0,1,11.32-11.31A80,80,0,1,0,71.43,71.43L91.31,91.31A8,8,0,0,1,85.66,105H32a8,8,0,0,1-8-8V42.34a8,8,0,0,1,13.66-5.65L57.78,56.8A96,96,0,0,1,224,128Z"/></svg>
           </button>
-          <button class="btn-pill btn-settings" onclick="sendRemoteAction('settings')" title="Settings">
-            <svg class="phosphor-icon" viewBox="0 0 256 256">
-              <path d="M40,86H74.6a30,30,0,0,0,58.8,0H216a6,6,0,0,0,0-12H133.4a30,30,0,0,0-58.8,0H40a6,6,0,0,0,0,12Zm64-24A18,18,0,1,1,86,80,18,18,0,0,1,104,62ZM216,170H197.4a30,30,0,0,0-58.8,0H40a6,6,0,0,0,0,12h98.6a30,30,0,0,0,58.8,0H216a6,6,0,0,0,0-12Zm-48,24a18,18,0,1,1,18-18A18,18,0,0,1,168,194Z" fill="currentColor"/>
-            </svg>
+          <button id="linearPlayBtn" class="btn-play-pause-main" onclick="sendRemoteAction('toggle')" title="Play / Pause">
+            <svg class="play-svg" viewBox="0 0 256 256" style="display: none;"><path d="M240,128a15.74,15.74,0,0,1-7.6,13.51L88.32,229.65a16,16,0,0,1-16.2.3A15.86,15.86,0,0,1,64,216.13V39.87A15.86,15.86,0,0,1,72.12,26a16,16,0,0,1,16.2.3L232.4,114.49A15.74,15.74,0,0,1,240,128Z"/></svg>
+            <svg class="pause-svg" viewBox="0 0 256 256"><path d="M216,48V208a16,16,0,0,1-16,16H160a16,16,0,0,1-16-16V48a16,16,0,0,1,16-16h40A16,16,0,0,1,216,48ZM96,32H56A16,16,0,0,0,40,48V208a16,16,0,0,0,16,16H96a16,16,0,0,0,16-16V48A16,16,0,0,0,96,32Z"/></svg>
+          </button>
+          <button class="btn-ctrl-circle" title="Settings">
+            <svg viewBox="0 0 256 256"><path d="M128,80a48,48,0,1,0,48,48A48.05,48.05,0,0,0,128,80Zm0,80a32,32,0,1,1,32-32A32,32,0,0,1,128,160Z"/></svg>
           </button>
         </div>
-        <div id="linearStatusLabel" class="session-status-label running">● Active Mindful Session</div>
       </div>
     </div>
   </div>
 
-  <!-- ========================================================================
-       SCREEN 3: MINDFUL EATING VIEW (Bit-Identical to Mobile MindfulEatingContent)
-       ======================================================================== -->
+  <!-- =======================================================================
+       SCREEN 3: MINDFUL EATING (Landscape Parity)
+       ======================================================================= -->
   <div id="viewEating" class="view-container">
-    <div class="session-frame">
-      <div class="session-top-bar">
-        <div class="top-bar-row">
-          <button class="btn-pill" onclick="sendRemoteAction('exit')" title="Exit Session">
-            <svg class="phosphor-icon" viewBox="0 0 256 256">
-              <path d="M164.24,203.76a6,6,0,1,1-8.48,8.48l-80-80a6,6,0,0,1,0-8.48l80-80a6,6,0,0,1,8.48,8.48L88.49,128Z" fill="currentColor"/>
-            </svg>
-          </button>
-          <div class="top-bar-actions">
-            <button class="btn-pill cast-active" title="Cast Active">
-              <svg class="phosphor-icon" viewBox="0 0 256 256">
-                <path d="M216,66H142.48l37.76-37.76a6,6,0,0,0-8.48-8.48L128,63.51,84.24,19.76a6,6,0,1,0-8.48,8.48L113.52,66H40A14,14,0,0,0,26,80V200a14,14,0,0,0,14,14H216a14,14,0,0,0,14-14V80A14,14,0,0,0,216,66Zm2,134a2,2,0,0,1-2,2H40a2,2,0,0,1-2-2V80a2,2,0,0,1,2-2H216a2,2,0,0,1,2,2Z" fill="currentColor"/>
+    <div class="landscape-session-container">
+      <!-- Left Column: Dual Ring Visualizer + Inner Chewing Arc + Dining Bowl -->
+      <div class="landscape-visualizer-col">
+        <div class="eating-visualizer-container">
+          <div class="eating-candle-aura"></div>
+          <svg class="eating-ring-svg" viewBox="0 0 440 440">
+            <circle class="eating-meal-track" cx="220" cy="220" r="200" />
+            <circle id="eatingMealFill" class="eating-meal-fill" cx="220" cy="220" r="200" />
+          </svg>
+          <div class="eating-center-stage">
+            <div class="eating-bite-box">
+              <svg class="bite-arc-svg" viewBox="0 0 140 140">
+                <circle class="bite-arc-track" cx="70" cy="70" r="65" />
+                <circle id="eatingBiteArc" class="bite-arc-fill" cx="70" cy="70" r="65" />
               </svg>
-            </button>
-            <button class="btn-pill" onclick="toggleThemeVisual()" title="Toggle Theme">
-              <svg class="phosphor-icon theme-icon-el" viewBox="0 0 256 256">
-                <path d="M122,40V16a6,6,0,0,1,12,0V40a6,6,0,0,1-12,0Zm68,88a62,62,0,1,1-62-62A62.07,62.07,0,0,1,190,128Zm-12,0a50,50,0,1,0-50,50A50.06,50.06,0,0,0,178,128ZM59.76,68.24a6,6,0,1,0,8.48-8.48l-16-16a6,6,0,0,0-8.48,8.48Zm0,119.52-16,16a6,6,0,1,0,8.48,8.48l16-16a6,6,0,1,0-8.48-8.48ZM192,70a6,6,0,0,0,4.24-1.76l16-16a6,6,0,0,0-8.48-8.48l-16,16A6,6,0,0,0,192,70Zm4.24,117.76a6,6,0,0,0-8.48,8.48l16,16a6,6,0,0,0,8.48-8.48ZM46,128a6,6,0,0,0-6-6H16a6,6,0,0,0,0,12H40A6,6,0,0,0,46,128Zm82,82a6,6,0,0,0-6,6v24a6,6,0,0,0,12,0V216A6,6,0,0,0,128,210Zm112-88H216a6,6,0,0,0,0,12h24a6,6,0,0,0,0-12Z" fill="currentColor"/>
+              <!-- Phosphor Bowl Icon -->
+              <svg class="eating-bowl-icon" viewBox="0 0 256 256">
+                <path d="M208,80H48A16,16,0,0,0,32,96v16a96.11,96.11,0,0,0,88,95.66V224H104a8,8,0,0,0,0,16h48a8,8,0,0,0,0-16H136V207.66A96.11,96.11,0,0,0,224,112V96A16,16,0,0,0,208,80Zm0,32a80.09,80.09,0,0,1-80,80,80.09,80.09,0,0,1-80-80V96H208Z"/>
               </svg>
-            </button>
-            <button class="btn-pill" onclick="sendRemoteAction('settings')" title="Settings">
-              <svg class="phosphor-icon" viewBox="0 0 256 256">
-                <path d="M40,86H74.6a30,30,0,0,0,58.8,0H216a6,6,0,0,0,0-12H133.4a30,30,0,0,0-58.8,0H40a6,6,0,0,0,0,12Zm64-24A18,18,0,1,1,86,80,18,18,0,0,1,104,62ZM216,170H197.4a30,30,0,0,0-58.8,0H40a6,6,0,0,0,0,12h98.6a30,30,0,0,0,58.8,0H216a6,6,0,0,0,0-12Zm-48,24a18,18,0,1,1,18-18A18,18,0,0,1,168,194Z" fill="currentColor"/>
-              </svg>
-            </button>
-          </div>
-        </div>
-        <div class="top-bar-title">Mindful Eating</div>
-      </div>
-
-      <!-- Center Hero Stage: Candlelight Aura, Meal Ring, Inner Bite Ring & Bowl -->
-      <div class="eating-stage">
-        <div class="eating-candle-aura"></div>
-        <div id="eatingChimeRipple" class="chime-ripple"></div>
-
-        <svg class="circular-ring-svg" viewBox="0 0 320 320">
-          <circle class="ring-track" cx="160" cy="160" r="145" />
-          <circle id="eatingOuterBar" class="ring-progress" cx="160" cy="160" r="145" />
-        </svg>
-
-        <div class="eating-center-box">
-          <!-- Inner Bite Ring enclosing Phosphor Bowl Icon -->
-          <div class="bite-cycle-box">
-            <svg class="bite-cycle-svg" viewBox="0 0 80 80">
-              <circle class="bite-track" cx="40" cy="40" r="35" />
-              <circle id="eatingInnerBar" class="bite-progress" cx="40" cy="40" r="35" />
-            </svg>
-            <svg class="phosphor-icon bowl-icon" viewBox="0 0 256 256">
-              <path d="M224,106H213.77a86,86,0,0,0-171.54,0H32a6,6,0,0,0-6,6,102.35,102.35,0,0,0,56,91.06V208a14,14,0,0,0,14,14h64a14,14,0,0,0,14-14v-4.94A102.35,102.35,0,0,0,230,112,6,6,0,0,0,224,106ZM174.24,54.29a74.15,74.15,0,0,1,8.15,7.6A85.89,85.89,0,0,0,130.84,106H97.34A74.24,74.24,0,0,1,168,54C170.08,54,172.17,54.11,174.24,54.29ZM190.3,72.14A73.49,73.49,0,0,1,201.74,106H144.48A73.89,73.89,0,0,1,190.3,72.14ZM128,38a73.68,73.68,0,0,1,26.8,5,86.32,86.32,0,0,0-69.94,63H54.26A74.09,74.09,0,0,1,128,38Zm37.5,155.84a6,6,0,0,0-3.5,5.46V208a2,2,0,0,1-2,2H96a2,2,0,0,1-2-2v-8.7a6,6,0,0,0-3.5-5.46A90.35,90.35,0,0,1,38.2,118H217.8A90.35,90.35,0,0,1,165.5,193.84Z" fill="currentColor"/>
-            </svg>
-          </div>
-
-          <!-- Large Legible Countdown -->
-          <div id="eatingTimeDisplay" class="countdown-numeral eating-numeral">45:00</div>
-
-          <!-- Bite Pacing Rhythm Capsule -->
-          <div class="bite-rhythm-capsule">
-            <svg class="phosphor-icon bell-icon" viewBox="0 0 256 256">
-              <path d="M166,224a6,6,0,0,1-6,6H96a6,6,0,0,1,0-12h64A6,6,0,0,1,166,224Zm54.11-33a13.83,13.83,0,0,1-12.1,7H48a14,14,0,0,1-12.06-21.06C41.59,167.2,50,139.74,50,104a78,78,0,1,1,156,0c0,35.73,8.42,63.2,14.08,72.94A13.9,13.9,0,0,1,220.11,191Zm-10.41-8C202.13,170,194,139.68,194,104a66,66,0,1,0-132,0c0,35.69-8.14,66-15.71,79a2,2,0,0,0,0,2,1.9,1.9,0,0,0,1.7,1H208a1.9,1.9,0,0,0,1.7-1A2,2,0,0,0,209.7,183Z" fill="currentColor"/>
-            </svg>
-            <span id="eatingNextBell" class="capsule-next-bell">01:00</span>
-            <span class="capsule-subtext">• CHEW & SAVOR</span>
+            </div>
           </div>
         </div>
       </div>
 
-      <!-- Bottom Transport Controls -->
-      <div class="session-bottom-bar">
-        <div class="transport-controls-row">
-          <button class="btn-pill btn-reset" onclick="sendRemoteAction('reset')" title="Reset">
-            <svg class="phosphor-icon" viewBox="0 0 256 256">
-              <path d="M222,128a94,94,0,0,1-92.74,94H128a93.43,93.43,0,0,1-64.5-25.65,6,6,0,1,1,8.24-8.72A82,82,0,1,0,70,70l-.19.19L39.44,98H72a6,6,0,0,1,0,12H24a6,6,0,0,1-6-6V56a6,6,0,0,1,12,0V90.34L61.63,61.4A94,94,0,0,1,222,128Z" fill="currentColor"/>
-            </svg>
+      <!-- Right Column: Top Bar + Middle HUD + Bottom Controls -->
+      <div class="landscape-info-col">
+        <!-- Top Bar -->
+        <div class="landscape-top-bar">
+          <button class="action-circle-btn" onclick="sendRemoteAction('toggle')" title="Exit / Pause">
+            <svg viewBox="0 0 256 256"><path d="M224,128a8,8,0,0,1-8,8H59.31l58.35,58.34a8,8,0,0,1-11.32,11.32l-72-72a8,8,0,0,1,0-11.32l72-72a8,8,0,0,1,11.32,11.32L59.31,120H216A8,8,0,0,1,224,128Z"/></svg>
           </button>
-          <button id="eatingPlayBtn" class="btn-play-pause" onclick="sendRemoteAction('toggle')" title="Play / Pause">
-            <svg class="phosphor-icon-large play-svg" viewBox="0 0 256 256" style="display:none;">
-              <path d="M231.36,116.19,87.28,28.06a14,14,0,0,0-14.18-.27A13.69,13.69,0,0,0,66,39.87V216.13a13.69,13.69,0,0,0,7.1,12.08,14,14,0,0,0,14.18-.27l144.08-88.13a13.82,13.82,0,0,0,0-23.62Zm-6.26,13.38L81,217.7a2,2,0,0,1-2.06,0,1.78,1.78,0,0,1-1-1.61V39.87a1.78,1.78,0,0,1,1-1.61A2.06,2.06,0,0,1,80,38a2,2,0,0,1,1,.31L225.1,126.43a1.82,1.82,0,0,1,0,3.14Z" fill="currentColor"/>
-            </svg>
-            <svg class="phosphor-icon-large pause-svg" viewBox="0 0 256 256">
-              <path d="M200,34H160a14,14,0,0,0-14,14V208a14,14,0,0,0,14,14h40a14,14,0,0,0,14-14V48A14,14,0,0,0,200,34Zm2,174a2,2,0,0,1-2,2H160a2,2,0,0,1-2-2V48a2,2,0,0,1,2-2h40a2,2,0,0,1,2,2ZM96,34H56A14,14,0,0,0,42,48V208a14,14,0,0,0,14,14H96a14,14,0,0,0,14-14V48A14,14,0,0,0,96,34Zm2,174a2,2,0,0,1-2,2H56a2,2,0,0,1-2-2V48a2,2,0,0,1,2-2H96a2,2,0,0,1,2,2Z" fill="currentColor"/>
-            </svg>
+          <div class="landscape-profile-title">Mindful Eating</div>
+          <div class="landscape-top-actions-right">
+            <div class="cast-pill-badge">
+              <div class="pulse-dot"></div>
+              <span>TV CAST</span>
+            </div>
+            <div class="action-circle-btn" title="Tibetan Bowl">
+              <svg viewBox="0 0 256 256"><path d="M208,80H48A16,16,0,0,0,32,96v16a96.11,96.11,0,0,0,88,95.66V224H104a8,8,0,0,0,0,16h48a8,8,0,0,0,0-16H136V207.66A96.11,96.11,0,0,0,224,112V96A16,16,0,0,0,208,80Zm0,32a80.09,80.09,0,0,1-80,80,80.09,80.09,0,0,1-80-80V96H208Z"/></svg>
+            </div>
+          </div>
+        </div>
+
+        <!-- Middle HUD -->
+        <div class="landscape-middle-hud">
+          <div id="eatingRemainingDigits" class="eating-remaining-digits">45:00</div>
+          <div class="eating-bite-capsule">
+            <svg viewBox="0 0 256 256"><path d="M221.8,175.94C216.25,166.38,208,139.33,208,104a80,80,0,1,0-160,0c0,35.34-8.26,62.38-13.81,71.94A16,16,0,0,0,48,200H88.81a40,40,0,0,0,78.38,0H208a16,16,0,0,0,13.8-24.06ZM128,216a24,24,0,0,1-22.62-16h45.24A24,24,0,0,1,128,216Z"/></svg>
+            <span id="eatingBiteText">Bite in 00:45 • CHEW & SAVOR</span>
+          </div>
+          <div id="eatingGuidelineCard" class="eating-guideline-card">
+            "Chew each bite 30–40 times before swallowing to cultivate satiety and digestive ease."
+          </div>
+        </div>
+
+        <!-- Bottom Transport Controls -->
+        <div class="landscape-bottom-controls">
+          <button class="btn-ctrl-circle" onclick="sendRemoteAction('reset')" title="Reset Session">
+            <svg viewBox="0 0 256 256"><path d="M224,128A96,96,0,0,1,60.8,195.92a8,8,0,0,1,11.32-11.31A80,80,0,1,0,71.43,71.43L91.31,91.31A8,8,0,0,1,85.66,105H32a8,8,0,0,1-8-8V42.34a8,8,0,0,1,13.66-5.65L57.78,56.8A96,96,0,0,1,224,128Z"/></svg>
           </button>
-          <button class="btn-pill btn-settings" onclick="sendRemoteAction('settings')" title="Settings">
-            <svg class="phosphor-icon" viewBox="0 0 256 256">
-              <path d="M40,86H74.6a30,30,0,0,0,58.8,0H216a6,6,0,0,0,0-12H133.4a30,30,0,0,0-58.8,0H40a6,6,0,0,0,0,12Zm64-24A18,18,0,1,1,86,80,18,18,0,0,1,104,62ZM216,170H197.4a30,30,0,0,0-58.8,0H40a6,6,0,0,0,0,12h98.6a30,30,0,0,0,58.8,0H216a6,6,0,0,0,0-12Zm-48,24a18,18,0,1,1,18-18A18,18,0,0,1,168,194Z" fill="currentColor"/>
-            </svg>
+          <button id="eatingPlayBtn" class="btn-play-pause-main" onclick="sendRemoteAction('toggle')" title="Play / Pause">
+            <svg class="play-svg" viewBox="0 0 256 256" style="display: none;"><path d="M240,128a15.74,15.74,0,0,1-7.6,13.51L88.32,229.65a16,16,0,0,1-16.2.3A15.86,15.86,0,0,1,64,216.13V39.87A15.86,15.86,0,0,1,72.12,26a16,16,0,0,1,16.2.3L232.4,114.49A15.74,15.74,0,0,1,240,128Z"/></svg>
+            <svg class="pause-svg" viewBox="0 0 256 256"><path d="M216,48V208a16,16,0,0,1-16,16H160a16,16,0,0,1-16-16V48a16,16,0,0,1,16-16h40A16,16,0,0,1,216,48ZM96,32H56A16,16,0,0,0,40,48V208a16,16,0,0,0,16,16H96a16,16,0,0,0,16-16V48A16,16,0,0,0,96,32Z"/></svg>
+          </button>
+          <button class="btn-ctrl-circle" title="Settings">
+            <svg viewBox="0 0 256 256"><path d="M128,80a48,48,0,1,0,48,48A48.05,48.05,0,0,0,128,80Zm0,80a32,32,0,1,1,32-32A32,32,0,0,1,128,160Z"/></svg>
           </button>
         </div>
-        <div id="eatingStatusLabel" class="session-status-label running">● Mindful Chewing Rhythm</div>
       </div>
     </div>
   </div>
 
-  <!-- ========================================================================
-       SCREEN 4: PRANAYAMA VIEW (Heroic Blooming Lotus + Sanskrit HUD)
-       ======================================================================== -->
+  <!-- =======================================================================
+       SCREEN 4: PRANAYAMA (BreathIndicator.kt 1:1 Canvas Engine)
+       ======================================================================= -->
   <div id="viewPranayama" class="view-container">
-    <div class="session-frame">
-      <div class="session-top-bar">
-        <div class="top-bar-row">
-          <button class="btn-pill" onclick="sendRemoteAction('exit')" title="Exit Session">
-            <svg class="phosphor-icon" viewBox="0 0 256 256">
-              <path d="M164.24,203.76a6,6,0,1,1-8.48,8.48l-80-80a6,6,0,0,1,0-8.48l80-80a6,6,0,0,1,8.48,8.48L88.49,128Z" fill="currentColor"/>
-            </svg>
-          </button>
-          <div class="top-bar-actions">
-            <button class="btn-pill cast-active" title="Cast Active">
-              <svg class="phosphor-icon" viewBox="0 0 256 256">
-                <path d="M216,66H142.48l37.76-37.76a6,6,0,0,0-8.48-8.48L128,63.51,84.24,19.76a6,6,0,1,0-8.48,8.48L113.52,66H40A14,14,0,0,0,26,80V200a14,14,0,0,0,14,14H216a14,14,0,0,0,14-14V80A14,14,0,0,0,216,66Zm2,134a2,2,0,0,1-2,2H40a2,2,0,0,1-2-2V80a2,2,0,0,1,2-2H216a2,2,0,0,1,2,2Z" fill="currentColor"/>
-              </svg>
-            </button>
-            <button class="btn-pill" onclick="toggleThemeVisual()" title="Toggle Theme">
-              <svg class="phosphor-icon theme-icon-el" viewBox="0 0 256 256">
-                <path d="M122,40V16a6,6,0,0,1,12,0V40a6,6,0,0,1-12,0Zm68,88a62,62,0,1,1-62-62A62.07,62.07,0,0,1,190,128Zm-12,0a50,50,0,1,0-50,50A50.06,50.06,0,0,0,178,128ZM59.76,68.24a6,6,0,1,0,8.48-8.48l-16-16a6,6,0,0,0-8.48,8.48Zm0,119.52-16,16a6,6,0,1,0,8.48,8.48l16-16a6,6,0,1,0-8.48-8.48ZM192,70a6,6,0,0,0,4.24-1.76l16-16a6,6,0,0,0-8.48-8.48l-16,16A6,6,0,0,0,192,70Zm4.24,117.76a6,6,0,0,0-8.48,8.48l16,16a6,6,0,0,0,8.48-8.48ZM46,128a6,6,0,0,0-6-6H16a6,6,0,0,0,0,12H40A6,6,0,0,0,46,128Zm82,82a6,6,0,0,0-6,6v24a6,6,0,0,0,12,0V216A6,6,0,0,0,128,210Zm112-88H216a6,6,0,0,0,0,12h24a6,6,0,0,0,0-12Z" fill="currentColor"/>
-              </svg>
-            </button>
-            <button class="btn-pill" onclick="sendRemoteAction('settings')" title="Settings">
-              <svg class="phosphor-icon" viewBox="0 0 256 256">
-                <path d="M40,86H74.6a30,30,0,0,0,58.8,0H216a6,6,0,0,0,0-12H133.4a30,30,0,0,0-58.8,0H40a6,6,0,0,0,0,12Zm64-24A18,18,0,1,1,86,80,18,18,0,0,1,104,62ZM216,170H197.4a30,30,0,0,0-58.8,0H40a6,6,0,0,0,0,12h98.6a30,30,0,0,0,58.8,0H216a6,6,0,0,0,0-12Zm-48,24a18,18,0,1,1,18-18A18,18,0,0,1,168,194Z" fill="currentColor"/>
-              </svg>
-            </button>
-          </div>
+    <div class="landscape-session-container">
+      <!-- Left Column: Heroic Blooming Lotus Canvas Visualizer -->
+      <div class="landscape-visualizer-col">
+        <div class="pranayama-canvas-container">
+          <canvas id="lotusCanvas" width="520" height="440"></canvas>
         </div>
       </div>
 
-      <!-- Center Hero Stage: Upper Sanskrit HUD + Heroic Lotus + Lower Milestone -->
-      <div class="pranayama-stage">
-        <!-- Upper Sanskrit HUD (Zero text overlap with flower) -->
-        <div class="pranayama-upper-hud">
+      <!-- Right Column: Top Bar + Middle HUD + Bottom Controls -->
+      <div class="landscape-info-col">
+        <!-- Top Bar -->
+        <div class="landscape-top-bar">
+          <button class="action-circle-btn" onclick="sendRemoteAction('toggle')" title="Exit / Pause">
+            <svg viewBox="0 0 256 256"><path d="M224,128a8,8,0,0,1-8,8H59.31l58.35,58.34a8,8,0,0,1-11.32,11.32l-72-72a8,8,0,0,1,0-11.32l72-72a8,8,0,0,1,11.32,11.32L59.31,120H216A8,8,0,0,1,224,128Z"/></svg>
+          </button>
+          <div id="pranayamaProfileTitle" class="landscape-profile-title">Pranayama</div>
+          <div class="landscape-top-actions-right">
+            <div class="cast-pill-badge">
+              <div class="pulse-dot"></div>
+              <span>TV CAST</span>
+            </div>
+            <div class="action-circle-btn" title="Tibetan Bowl">
+              <svg viewBox="0 0 256 256"><path d="M208,80H48A16,16,0,0,0,32,96v16a96.11,96.11,0,0,0,88,95.66V224H104a8,8,0,0,0,0,16h48a8,8,0,0,0,0-16H136V207.66A96.11,96.11,0,0,0,224,112V96A16,16,0,0,0,208,80Zm0,32a80.09,80.09,0,0,1-80,80,80.09,80.09,0,0,1-80-80V96H208Z"/></svg>
+            </div>
+          </div>
+        </div>
+
+        <!-- Middle HUD -->
+        <div class="landscape-middle-hud">
           <div class="pranayama-phase-row">
-            <span id="pranayamaSanskrit" class="pranayama-phase-sanskrit">PŪRAKA</span>
-            <span id="pranayamaScript" class="pranayama-phase-script">पूरक</span>
+            <span id="pranayamaSanskrit" class="pranayama-sanskrit-title">PŪRAKA</span>
+            <span id="pranayamaScript" class="pranayama-devanagari-script">पूरक</span>
           </div>
-          <div id="pranayamaPhaseNumeral" class="pranayama-phase-numeral">4</div>
-        </div>
-
-        <!-- Heroic 13-Petal Side-View Blooming Lotus SVG -->
-        <div class="lotus-container">
-          <svg id="lotusSvg" class="lotus-svg" viewBox="0 0 440 220">
-            <!-- Calm Resting Waterline -->
-            <line x1="40" y1="185" x2="400" y2="185" class="waterline" />
-            
-            <!-- Vertical Stem -->
-            <line x1="220" y1="185" x2="220" y2="216" class="stem" />
-
-            <!-- Calyx Leaves ("Patte") -->
-            <path d="M220 185 C185 196 140 191 115 182 C150 188 190 186 220 185 Z" class="calyx" />
-            <path d="M220 185 C255 196 300 191 325 182 C290 188 250 186 220 185 Z" class="calyx" />
-            <path d="M220 185 C208 200 220 207 220 185 Z" class="calyx" />
-            <circle cx="220" cy="185" r="4.5" class="receptacle" />
-
-            <!-- 13 Curved Petals Across 7 Depth Tiers -->
-            <!-- Tier 1: Outer Horizontal Wings -->
-            <path id="petalL1" class="petal" d="M220 185 C150 180 80 158 55 130 C100 135 170 162 220 185 Z" />
-            <path id="petalR1" class="petal" d="M220 185 C290 180 360 158 385 130 C340 135 270 162 220 185 Z" />
-
-            <!-- Tier 2: Mid-Lateral Wings -->
-            <path id="petalL2" class="petal" d="M220 185 C165 168 115 132 105 95 C145 116 190 152 220 185 Z" />
-            <path id="petalR2" class="petal" d="M220 185 C275 168 325 132 335 95 C295 116 250 152 220 185 Z" />
-
-            <!-- Tier 3: High Chalice Petals -->
-            <path id="petalL3" class="petal" d="M220 185 C180 152 145 106 150 65 C180 96 205 142 220 185 Z" />
-            <path id="petalR3" class="petal" d="M220 185 C260 152 295 106 290 65 C260 96 235 142 220 185 Z" />
-
-            <!-- Tier 4: Inner Chalice Petals -->
-            <path id="petalL4" class="petal" d="M220 185 C190 142 168 90 180 50 C200 80 214 132 220 185 Z" />
-            <path id="petalR4" class="petal" d="M220 185 C250 142 272 90 260 50 C240 80 226 132 220 185 Z" />
-
-            <!-- Tier 5: Central Spine Petals -->
-            <path id="petalL5" class="petal" d="M220 185 C202 136 190 80 202 40 C214 76 218 126 220 185 Z" />
-            <path id="petalR5" class="petal" d="M220 185 C238 136 250 80 238 40 C226 76 222 126 220 185 Z" />
-
-            <!-- Central Apex Petal -->
-            <path id="petalC" class="petal" d="M220 185 C210 120 210 60 220 30 C230 60 230 120 220 185 Z" />
-          </svg>
-        </div>
-
-        <!-- Lower Milestone Capsule -->
-        <div class="pranayama-lower-hud">
-          <div class="pranayama-milestone-capsule">
+          <div id="pranayamaPhaseNumeral" class="pranayama-countdown-large">4</div>
+          <div class="pranayama-milestone-pill">
             <span id="pranayamaRoundLabel">Round 1 of 12</span>
-            <span id="pranayamaMilestoneBadge" class="milestone-bell-accent">• 🔔 Milestone in 5</span>
+            <span>•</span>
+            <span id="pranayamaTotalTime">12:00 left</span>
           </div>
-          <div id="pranayamaTotalTime" class="pranayama-total-time">Total Remaining: 12:00</div>
+          <div id="pranayamaIntervalBellPill" class="pranayama-milestone-pill" style="display: none;">
+            <span class="pranayama-cadence-accent">🔔 Interval Bell in 5 rounds</span>
+          </div>
         </div>
-      </div>
 
-      <!-- Bottom Transport Controls -->
-      <div class="session-bottom-bar">
-        <div class="transport-controls-row">
-          <button class="btn-pill btn-reset" onclick="sendRemoteAction('reset')" title="Reset">
-            <svg class="phosphor-icon" viewBox="0 0 256 256">
-              <path d="M222,128a94,94,0,0,1-92.74,94H128a93.43,93.43,0,0,1-64.5-25.65,6,6,0,1,1,8.24-8.72A82,82,0,1,0,70,70l-.19.19L39.44,98H72a6,6,0,0,1,0,12H24a6,6,0,0,1-6-6V56a6,6,0,0,1,12,0V90.34L61.63,61.4A94,94,0,0,1,222,128Z" fill="currentColor"/>
-            </svg>
+        <!-- Bottom Transport Controls -->
+        <div class="landscape-bottom-controls">
+          <button class="btn-ctrl-circle" onclick="sendRemoteAction('reset')" title="Reset Session">
+            <svg viewBox="0 0 256 256"><path d="M224,128A96,96,0,0,1,60.8,195.92a8,8,0,0,1,11.32-11.31A80,80,0,1,0,71.43,71.43L91.31,91.31A8,8,0,0,1,85.66,105H32a8,8,0,0,1-8-8V42.34a8,8,0,0,1,13.66-5.65L57.78,56.8A96,96,0,0,1,224,128Z"/></svg>
           </button>
-          <button id="pranayamaPlayBtn" class="btn-play-pause" onclick="sendRemoteAction('toggle')" title="Play / Pause">
-            <svg class="phosphor-icon-large play-svg" viewBox="0 0 256 256" style="display:none;">
-              <path d="M231.36,116.19,87.28,28.06a14,14,0,0,0-14.18-.27A13.69,13.69,0,0,0,66,39.87V216.13a13.69,13.69,0,0,0,7.1,12.08,14,14,0,0,0,14.18-.27l144.08-88.13a13.82,13.82,0,0,0,0-23.62Zm-6.26,13.38L81,217.7a2,2,0,0,1-2.06,0,1.78,1.78,0,0,1-1-1.61V39.87a1.78,1.78,0,0,1,1-1.61A2.06,2.06,0,0,1,80,38a2,2,0,0,1,1,.31L225.1,126.43a1.82,1.82,0,0,1,0,3.14Z" fill="currentColor"/>
-            </svg>
-            <svg class="phosphor-icon-large pause-svg" viewBox="0 0 256 256">
-              <path d="M200,34H160a14,14,0,0,0-14,14V208a14,14,0,0,0,14,14h40a14,14,0,0,0,14-14V48A14,14,0,0,0,200,34Zm2,174a2,2,0,0,1-2,2H160a2,2,0,0,1-2-2V48a2,2,0,0,1,2-2h40a2,2,0,0,1,2,2ZM96,34H56A14,14,0,0,0,42,48V208a14,14,0,0,0,14,14H96a14,14,0,0,0,14-14V48A14,14,0,0,0,96,34Zm2,174a2,2,0,0,1-2,2H56a2,2,0,0,1-2-2V48a2,2,0,0,1,2-2H96a2,2,0,0,1,2,2Z" fill="currentColor"/>
-            </svg>
+          <button id="pranayamaPlayBtn" class="btn-play-pause-main" onclick="sendRemoteAction('toggle')" title="Play / Pause">
+            <svg class="play-svg" viewBox="0 0 256 256" style="display: none;"><path d="M240,128a15.74,15.74,0,0,1-7.6,13.51L88.32,229.65a16,16,0,0,1-16.2.3A15.86,15.86,0,0,1,64,216.13V39.87A15.86,15.86,0,0,1,72.12,26a16,16,0,0,1,16.2.3L232.4,114.49A15.74,15.74,0,0,1,240,128Z"/></svg>
+            <svg class="pause-svg" viewBox="0 0 256 256"><path d="M216,48V208a16,16,0,0,1-16,16H160a16,16,0,0,1-16-16V48a16,16,0,0,1,16-16h40A16,16,0,0,1,216,48ZM96,32H56A16,16,0,0,0,40,48V208a16,16,0,0,0,16,16H96a16,16,0,0,0,16-16V48A16,16,0,0,0,96,32Z"/></svg>
           </button>
-          <button class="btn-pill btn-settings" onclick="sendRemoteAction('settings')" title="Settings">
-            <svg class="phosphor-icon" viewBox="0 0 256 256">
-              <path d="M40,86H74.6a30,30,0,0,0,58.8,0H216a6,6,0,0,0,0-12H133.4a30,30,0,0,0-58.8,0H40a6,6,0,0,0,0,12Zm64-24A18,18,0,1,1,86,80,18,18,0,0,1,104,62ZM216,170H197.4a30,30,0,0,0-58.8,0H40a6,6,0,0,0,0,12h98.6a30,30,0,0,0,58.8,0H216a6,6,0,0,0,0-12Zm-48,24a18,18,0,1,1,18-18A18,18,0,0,1,168,194Z" fill="currentColor"/>
-            </svg>
+          <button class="btn-ctrl-circle" title="Settings">
+            <svg viewBox="0 0 256 256"><path d="M128,80a48,48,0,1,0,48,48A48.05,48.05,0,0,0,128,80Zm0,80a32,32,0,1,1,32-32A32,32,0,0,1,128,160Z"/></svg>
           </button>
         </div>
-        <div id="pranayamaStatusLabel" class="session-status-label running">● Active Mindful Session</div>
       </div>
     </div>
   </div>
 
-  <!-- ========================================================================
-       SCREEN 5: SURYA NAMASKAR VIEW (Bit-Identical to CompoundPoseCard.kt)
-       ======================================================================== -->
+  <!-- =======================================================================
+       SCREEN 5: SURYA NAMASKAR (CompoundPoseCard Parity)
+       ======================================================================= -->
   <div id="viewSurya" class="view-container">
-    <div class="session-frame">
-      <div class="session-top-bar">
-        <div class="top-bar-row">
-          <button class="btn-pill" onclick="sendRemoteAction('exit')" title="Exit Session">
-            <svg class="phosphor-icon" viewBox="0 0 256 256">
-              <path d="M164.24,203.76a6,6,0,1,1-8.48,8.48l-80-80a6,6,0,0,1,0-8.48l80-80a6,6,0,0,1,8.48,8.48L88.49,128Z" fill="currentColor"/>
-            </svg>
-          </button>
-          <div class="top-bar-actions">
-            <button class="btn-pill cast-active" title="Cast Active">
-              <svg class="phosphor-icon" viewBox="0 0 256 256">
-                <path d="M216,66H142.48l37.76-37.76a6,6,0,0,0-8.48-8.48L128,63.51,84.24,19.76a6,6,0,1,0-8.48,8.48L113.52,66H40A14,14,0,0,0,26,80V200a14,14,0,0,0,14,14H216a14,14,0,0,0,14-14V80A14,14,0,0,0,216,66Zm2,134a2,2,0,0,1-2,2H40a2,2,0,0,1-2-2V80a2,2,0,0,1,2-2H216a2,2,0,0,1,2,2Z" fill="currentColor"/>
-              </svg>
-            </button>
-            <button class="btn-pill" onclick="toggleThemeVisual()" title="Toggle Theme">
-              <svg class="phosphor-icon theme-icon-el" viewBox="0 0 256 256">
-                <path d="M122,40V16a6,6,0,0,1,12,0V40a6,6,0,0,1-12,0Zm68,88a62,62,0,1,1-62-62A62.07,62.07,0,0,1,190,128Zm-12,0a50,50,0,1,0-50,50A50.06,50.06,0,0,0,178,128ZM59.76,68.24a6,6,0,1,0,8.48-8.48l-16-16a6,6,0,0,0-8.48,8.48Zm0,119.52-16,16a6,6,0,1,0,8.48,8.48l16-16a6,6,0,1,0-8.48-8.48ZM192,70a6,6,0,0,0,4.24-1.76l16-16a6,6,0,0,0-8.48-8.48l-16,16A6,6,0,0,0,192,70Zm4.24,117.76a6,6,0,0,0-8.48,8.48l16,16a6,6,0,0,0,8.48-8.48ZM46,128a6,6,0,0,0-6-6H16a6,6,0,0,0,0,12H40A6,6,0,0,0,46,128Zm82,82a6,6,0,0,0-6,6v24a6,6,0,0,0,12,0V216A6,6,0,0,0,128,210Zm112-88H216a6,6,0,0,0,0,12h24a6,6,0,0,0,0-12Z" fill="currentColor"/>
-              </svg>
-            </button>
-            <button class="btn-pill" onclick="sendRemoteAction('settings')" title="Settings">
-              <svg class="phosphor-icon" viewBox="0 0 256 256">
-                <path d="M40,86H74.6a30,30,0,0,0,58.8,0H216a6,6,0,0,0,0-12H133.4a30,30,0,0,0-58.8,0H40a6,6,0,0,0,0,12Zm64-24A18,18,0,1,1,86,80,18,18,0,0,1,104,62ZM216,170H197.4a30,30,0,0,0-58.8,0H40a6,6,0,0,0,0,12h98.6a30,30,0,0,0,58.8,0H216a6,6,0,0,0,0-12Zm-48,24a18,18,0,1,1,18-18A18,18,0,0,1,168,194Z" fill="currentColor"/>
-              </svg>
-            </button>
+    <div class="landscape-session-container">
+      <!-- Left Column: CompoundPoseCard Visualizer -->
+      <div class="landscape-visualizer-col">
+        <div class="surya-card-container">
+          <div id="suryaRoundHeader" class="surya-round-pose-header">ROUND 1 OF 6 • POSE 1 / 12</div>
+          <div id="surya12StepBar" class="surya-12step-bar"></div>
+          <div id="suryaPoseName" class="surya-pose-name">Pranamasana</div>
+          <div id="suryaPoseTranslation" class="surya-pose-translation">Prayer Pose</div>
+          <div id="suryaSolarMantra" class="surya-solar-mantra">☀️ ॐ मित्राय नमः</div>
+          
+          <div id="suryaSilhouetteView" class="surya-silhouette-view">
+            <!-- Dynamic Vector Posture Silhouette SVG -->
+          </div>
+
+          <div class="surya-cues-row">
+            <div id="suryaBreathCue" class="surya-breath-capsule">🌬 Inhale & Exhale</div>
+            <div id="suryaCountdownPill" class="surya-countdown-capsule">5s</div>
           </div>
         </div>
-        <div class="top-bar-title">Surya Namaskar</div>
       </div>
 
-      <!-- Center Posture Card (Flow bar, names, silhouette, cues, total time) -->
-      <div class="surya-stage">
-        <div id="suryaHeader" class="surya-header">ROUND 1 OF 6 • POSE 1 / 12</div>
-
-        <!-- 12-Step Cyclical Flow Progress Indicator -->
-        <div id="suryaFlowIndicator" class="surya-flow-bar"></div>
-
-        <div id="suryaPoseName" class="surya-pose-name">Pranamasana</div>
-        <div id="suryaPoseSanskrit" class="surya-pose-sanskrit">Prayer Pose</div>
-        <div id="suryaPoseMantra" class="surya-pose-mantra">☀️ ॐ मित्राय नमः</div>
-
-        <!-- Dynamic Silhouette Illustration -->
-        <div class="surya-silhouette-container">
-          <svg id="suryaSilhouetteSvg" class="surya-silhouette-svg" viewBox="0 0 512 512">
-            <path id="suryaSilhouettePath" class="surya-silhouette-path" d="" />
-          </svg>
+      <!-- Right Column: Top Bar + Middle HUD + Bottom Controls -->
+      <div class="landscape-info-col">
+        <!-- Top Bar -->
+        <div class="landscape-top-bar">
+          <button class="action-circle-btn" onclick="sendRemoteAction('toggle')" title="Exit / Pause">
+            <svg viewBox="0 0 256 256"><path d="M224,128a8,8,0,0,1-8,8H59.31l58.35,58.34a8,8,0,0,1-11.32,11.32l-72-72a8,8,0,0,1,0-11.32l72-72a8,8,0,0,1,11.32,11.32L59.31,120H216A8,8,0,0,1,224,128Z"/></svg>
+          </button>
+          <div class="landscape-profile-title">Surya Namaskar</div>
+          <div class="landscape-top-actions-right">
+            <div class="cast-pill-badge">
+              <div class="pulse-dot"></div>
+              <span>TV CAST</span>
+            </div>
+            <div class="action-circle-btn" title="Tibetan Bowl">
+              <svg viewBox="0 0 256 256"><path d="M208,80H48A16,16,0,0,0,32,96v16a96.11,96.11,0,0,0,88,95.66V224H104a8,8,0,0,0,0,16h48a8,8,0,0,0,0-16H136V207.66A96.11,96.11,0,0,0,224,112V96A16,16,0,0,0,208,80Zm0,32a80.09,80.09,0,0,1-80,80,80.09,80.09,0,0,1-80-80V96H208Z"/></svg>
+            </div>
+          </div>
         </div>
 
-        <!-- Breath Cue & Duration Row -->
-        <div class="surya-cues-row">
-          <div id="suryaBreathPill" class="surya-pill-breath">🌬 Inhale & Exhale gently</div>
-          <div id="suryaDurationPill" class="surya-pill-duration">5s</div>
+        <!-- Middle HUD -->
+        <div class="landscape-middle-hud">
+          <div class="status-capsule-label">● 12-Step Sun Salutation</div>
+          <div class="pranayama-milestone-pill" style="margin-top: 12px;">
+            <span id="suryaMasterRound">Round 1 of 6</span>
+            <span>•</span>
+            <span id="suryaMasterTotalTime">12:00 left</span>
+          </div>
         </div>
 
-        <div id="suryaTotalRemaining" class="surya-total-remaining">04:30</div>
-      </div>
-
-      <!-- Bottom Transport Controls -->
-      <div class="session-bottom-bar">
-        <div class="transport-controls-row">
-          <button class="btn-pill btn-reset" onclick="sendRemoteAction('reset')" title="Reset">
-            <svg class="phosphor-icon" viewBox="0 0 256 256">
-              <path d="M222,128a94,94,0,0,1-92.74,94H128a93.43,93.43,0,0,1-64.5-25.65,6,6,0,1,1,8.24-8.72A82,82,0,1,0,70,70l-.19.19L39.44,98H72a6,6,0,0,1,0,12H24a6,6,0,0,1-6-6V56a6,6,0,0,1,12,0V90.34L61.63,61.4A94,94,0,0,1,222,128Z" fill="currentColor"/>
-            </svg>
+        <!-- Bottom Transport Controls -->
+        <div class="landscape-bottom-controls">
+          <button class="btn-ctrl-circle" onclick="sendRemoteAction('reset')" title="Reset Session">
+            <svg viewBox="0 0 256 256"><path d="M224,128A96,96,0,0,1,60.8,195.92a8,8,0,0,1,11.32-11.31A80,80,0,1,0,71.43,71.43L91.31,91.31A8,8,0,0,1,85.66,105H32a8,8,0,0,1-8-8V42.34a8,8,0,0,1,13.66-5.65L57.78,56.8A96,96,0,0,1,224,128Z"/></svg>
           </button>
-          <button id="suryaPlayBtn" class="btn-play-pause" onclick="sendRemoteAction('toggle')" title="Play / Pause">
-            <svg class="phosphor-icon-large play-svg" viewBox="0 0 256 256" style="display:none;">
-              <path d="M231.36,116.19,87.28,28.06a14,14,0,0,0-14.18-.27A13.69,13.69,0,0,0,66,39.87V216.13a13.69,13.69,0,0,0,7.1,12.08,14,14,0,0,0,14.18-.27l144.08-88.13a13.82,13.82,0,0,0,0-23.62Zm-6.26,13.38L81,217.7a2,2,0,0,1-2.06,0,1.78,1.78,0,0,1-1-1.61V39.87a1.78,1.78,0,0,1,1-1.61A2.06,2.06,0,0,1,80,38a2,2,0,0,1,1,.31L225.1,126.43a1.82,1.82,0,0,1,0,3.14Z" fill="currentColor"/>
-            </svg>
-            <svg class="phosphor-icon-large pause-svg" viewBox="0 0 256 256">
-              <path d="M200,34H160a14,14,0,0,0-14,14V208a14,14,0,0,0,14,14h40a14,14,0,0,0,14-14V48A14,14,0,0,0,200,34Zm2,174a2,2,0,0,1-2,2H160a2,2,0,0,1-2-2V48a2,2,0,0,1,2-2h40a2,2,0,0,1,2,2ZM96,34H56A14,14,0,0,0,42,48V208a14,14,0,0,0,14,14H96a14,14,0,0,0,14-14V48A14,14,0,0,0,96,34Zm2,174a2,2,0,0,1-2,2H56a2,2,0,0,1-2-2V48a2,2,0,0,1,2-2H96a2,2,0,0,1,2,2Z" fill="currentColor"/>
-            </svg>
+          <button id="suryaPlayBtn" class="btn-play-pause-main" onclick="sendRemoteAction('toggle')" title="Play / Pause">
+            <svg class="play-svg" viewBox="0 0 256 256" style="display: none;"><path d="M240,128a15.74,15.74,0,0,1-7.6,13.51L88.32,229.65a16,16,0,0,1-16.2.3A15.86,15.86,0,0,1,64,216.13V39.87A15.86,15.86,0,0,1,72.12,26a16,16,0,0,1,16.2.3L232.4,114.49A15.74,15.74,0,0,1,240,128Z"/></svg>
+            <svg class="pause-svg" viewBox="0 0 256 256"><path d="M216,48V208a16,16,0,0,1-16,16H160a16,16,0,0,1-16-16V48a16,16,0,0,1,16-16h40A16,16,0,0,1,216,48ZM96,32H56A16,16,0,0,0,40,48V208a16,16,0,0,0,16,16H96a16,16,0,0,0,16-16V48A16,16,0,0,0,96,32Z"/></svg>
           </button>
-          <button class="btn-pill btn-settings" onclick="sendRemoteAction('settings')" title="Settings">
-            <svg class="phosphor-icon" viewBox="0 0 256 256">
-              <path d="M40,86H74.6a30,30,0,0,0,58.8,0H216a6,6,0,0,0,0-12H133.4a30,30,0,0,0-58.8,0H40a6,6,0,0,0,0,12Zm64-24A18,18,0,1,1,86,80,18,18,0,0,1,104,62ZM216,170H197.4a30,30,0,0,0-58.8,0H40a6,6,0,0,0,0,12h98.6a30,30,0,0,0,58.8,0H216a6,6,0,0,0,0-12Zm-48,24a18,18,0,1,1,18-18A18,18,0,0,1,168,194Z" fill="currentColor"/>
-            </svg>
+          <button class="btn-ctrl-circle" title="Settings">
+            <svg viewBox="0 0 256 256"><path d="M128,80a48,48,0,1,0,48,48A48.05,48.05,0,0,0,128,80Zm0,80a32,32,0,1,1,32-32A32,32,0,0,1,128,160Z"/></svg>
           </button>
         </div>
-        <div id="suryaStatusLabel" class="session-status-label running">● Active Mindful Session</div>
       </div>
     </div>
   </div>
 
-  <!-- ========================================================================
-       CORE JAVASCRIPT: Synthesizer, CAF v3 Protocol, Telemetry Router & SVG Physics
-       ======================================================================== -->
+  <!-- =======================================================================
+       JAVASCRIPT TELEMETRY ENGINE, CAF v3 BINDINGS & LOTUS KINEMATICS
+       ======================================================================= -->
   <script>
-    const CUSTOM_NAMESPACE = 'urn:x-cast:com.habitbell.cast';
-    let audioCtx = null;
-    let masterBellVolume = 0.9;
-    let hudTimeout = null;
-    let activeScreen = 'SPLASH';
-    let isDarkTheme = true;
+    const CAST_NAMESPACE = 'urn:x-cast:com.habitbell.cast';
 
-    /**
-     * 12 Classical Surya Namaskar monochrome vector silhouettes
-     * Extracted directly from Android vector drawables (yoga_pranamasana through yoga_parvatasana).
-     */
+    // -------------------------------------------------------------------------
+    // YOGA SILHOUETTE VECTOR ASSET MAP (Exact match with Android XML drawables)
+    // -------------------------------------------------------------------------
     const YOGA_SILHOUETTES = {
-      1: "M 255,62 C 263,59 274,65 278,78 C 280,84 284,89 284,94 C 284,97 282,98 282,100 C 282,104 280,110 277,115 C 275,120 274,124 274,130 C 274,138 278,148 282,156 C 285,160 290,165 292,172 C 294,180 292,190 288,198 C 284,206 280,212 277,220 C 274,230 271,240 270,250 C 269,258 270,266 272,274 C 274,280 274,286 273,294 C 272,306 270,320 268,336 C 267,344 266,350 266,356 C 265,366 264,380 263,394 C 262,406 261,420 261,430 C 261,436 266,440 272,444 C 276,446 278,447 278,448 L 248,448 C 246,447 244,444 244,440 C 244,432 247,420 248,408 C 250,396 251,388 250,376 C 249,364 247,356 247,350 C 247,344 246,338 244,328 C 243,316 241,304 240,292 C 239,284 237,276 236,268 C 235,260 236,252 238,244 C 237,236 233,226 228,216 C 224,206 222,198 222,190 C 222,182 225,174 230,166 C 234,156 238,146 241,136 C 243,130 246,122 247,116 C 248,108 248,98 247,90 C 246,82 243,76 238,70 C 234,66 233,60 236,58 C 239,56 245,56 250,59 C 253,60 255,61 255,62 Z",
-      2: "M 215,35 C 225,28 240,32 245,45 C 248,55 244,70 238,90 C 246,82 258,80 268,88 C 278,96 280,110 274,122 C 268,132 255,138 242,134 C 245,150 252,175 262,205 C 272,235 278,260 275,280 C 272,305 268,340 264,380 C 260,415 258,445 258,460 L 290,460 C 290,455 288,430 286,395 C 285,360 286,325 289,295 C 292,265 290,235 280,205 C 270,175 262,150 258,130 C 268,110 272,80 258,55 C 252,42 240,35 228,38 C 220,40 205,52 195,75 C 185,100 178,135 174,170 L 160,165 C 165,130 174,90 186,65 C 194,48 205,38 215,35 Z M 235,280 C 238,300 240,335 240,375 C 240,415 238,445 236,460 L 268,460 C 268,445 270,415 270,375 C 270,335 268,300 265,280 Z",
-      3: "M 190,460 L 230,460 C 230,420 228,370 226,310 C 224,260 222,230 225,210 C 228,190 240,180 255,190 C 265,200 270,225 272,260 C 274,300 274,350 273,400 C 272,425 270,445 268,460 L 295,460 C 298,435 300,405 300,360 C 300,300 295,240 285,195 C 275,160 250,145 220,150 C 190,155 175,185 175,230 C 175,290 178,380 180,440 C 180,452 184,458 190,460 Z M 255,390 C 265,390 275,398 275,410 C 275,422 265,430 255,430 C 245,430 235,422 235,410 C 235,398 245,390 255,390 Z",
-      4: "M 60,460 L 160,460 C 180,455 210,430 240,400 C 260,380 290,360 320,350 C 345,340 370,345 385,360 C 395,370 395,410 395,460 L 420,460 C 420,400 415,355 395,335 C 375,315 340,315 305,325 C 275,335 250,350 230,370 C 225,350 230,310 245,270 C 260,230 280,200 300,185 C 315,175 330,180 340,195 C 350,210 345,230 330,240 C 315,250 305,245 295,235 C 285,250 280,280 280,310 L 330,460 L 305,460 L 265,340 C 255,360 235,390 205,420 C 175,445 130,455 60,460 Z M 315,160 C 328,160 338,150 338,138 C 338,125 328,115 315,115 C 302,115 292,125 292,138 C 292,150 302,160 315,160 Z",
-      5: "M 65,450 C 65,440 75,430 90,420 L 190,360 L 280,310 L 360,265 C 370,260 380,265 385,275 L 395,460 L 365,460 L 355,320 L 270,360 L 180,410 L 95,455 C 85,460 70,460 65,450 Z M 390,240 C 402,232 418,235 425,248 C 432,260 428,275 415,282 C 402,290 388,285 380,272 C 375,260 380,245 390,240 Z",
-      6: "M 60,460 L 100,430 C 120,430 145,445 165,460 L 190,460 C 195,440 210,400 235,385 C 260,370 285,390 310,420 L 340,460 L 420,460 C 425,450 435,440 440,425 C 445,410 435,395 420,395 C 405,395 395,405 385,415 C 370,390 345,380 320,385 C 300,390 290,410 280,430 C 260,380 235,360 205,380 C 180,400 160,440 145,460 L 60,460 Z M 415,380 C 428,380 438,370 438,358 C 438,345 428,335 415,335 C 402,335 392,345 392,358 C 392,370 402,380 415,380 Z",
-      7: "M 60,460 L 240,460 C 260,440 280,390 290,340 C 295,310 305,275 315,250 C 320,240 330,245 335,255 C 340,270 330,310 320,350 C 310,390 300,430 305,460 L 345,460 C 345,420 355,370 360,330 C 365,290 355,250 335,225 C 315,200 290,220 280,260 C 270,300 255,350 240,390 C 220,435 180,455 120,458 L 60,460 Z M 335,205 C 348,205 358,195 358,182 C 358,170 348,160 335,160 C 322,160 312,170 312,182 C 312,195 322,205 335,205 Z",
-      8: "M 110,460 L 155,460 L 240,240 C 248,220 256,200 265,200 C 274,200 282,220 290,240 L 375,460 L 420,460 L 320,220 C 300,175 280,165 256,165 C 232,165 212,175 192,220 L 110,460 Z M 300,285 C 312,285 322,275 322,262 C 322,250 312,240 300,240 C 288,240 278,250 278,262 C 278,275 288,285 300,285 Z",
-      9: "M 60,460 L 160,460 C 180,455 210,430 240,400 C 260,380 290,360 320,350 C 345,340 370,345 385,360 C 395,370 395,410 395,460 L 420,460 C 420,400 415,355 395,335 C 375,315 340,315 305,325 C 275,335 250,350 230,370 C 225,350 230,310 245,270 C 260,230 280,200 300,185 C 315,175 330,180 340,195 C 350,210 345,230 330,240 C 315,250 305,245 295,235 C 285,250 280,280 280,310 L 330,460 L 305,460 L 265,340 C 255,360 235,390 205,420 C 175,445 130,455 60,460 Z M 315,160 C 328,160 338,150 338,138 C 338,125 328,115 315,115 C 302,115 292,125 292,138 C 292,150 302,160 315,160 Z",
-      10: "M 190,460 L 230,460 C 230,420 228,370 226,310 C 224,260 222,230 225,210 C 228,190 240,180 255,190 C 265,200 270,225 272,260 C 274,300 274,350 273,400 C 272,425 270,445 268,460 L 295,460 C 298,435 300,405 300,360 C 300,300 295,240 285,195 C 275,160 250,145 220,150 C 190,155 175,185 175,230 C 175,290 178,380 180,440 C 180,452 184,458 190,460 Z M 255,390 C 265,390 275,398 275,410 C 275,422 265,430 255,430 C 245,430 235,422 235,410 C 235,398 245,390 255,390 Z",
-      11: "M 215,35 C 225,28 240,32 245,45 C 248,55 244,70 238,90 C 246,82 258,80 268,88 C 278,96 280,110 274,122 C 268,132 255,138 242,134 C 245,150 252,175 262,205 C 272,235 278,260 275,280 C 272,305 268,340 264,380 C 260,415 258,445 258,460 L 290,460 C 290,455 288,430 286,395 C 285,360 286,325 289,295 C 292,265 290,235 280,205 C 270,175 262,150 258,130 C 268,110 272,80 258,55 C 252,42 240,35 228,38 C 220,40 205,52 195,75 C 185,100 178,135 174,170 L 160,165 C 165,130 174,90 186,65 C 194,48 205,38 215,35 Z M 235,280 C 238,300 240,335 240,375 C 240,415 238,445 236,460 L 268,460 C 268,445 270,415 270,375 C 270,335 268,300 265,280 Z",
-      12: "M 255,62 C 263,59 274,65 278,78 C 280,84 284,89 284,94 C 284,97 282,98 282,100 C 282,104 280,110 277,115 C 275,120 274,124 274,130 C 274,138 278,148 282,156 C 285,160 290,165 292,172 C 294,180 292,190 288,198 C 284,206 280,212 277,220 C 274,230 271,240 270,250 C 269,258 270,266 272,274 C 274,280 274,286 273,294 C 272,306 270,320 268,336 C 267,344 266,350 266,356 C 265,366 264,380 263,394 C 262,406 261,420 261,430 C 261,436 266,440 272,444 C 276,446 278,447 278,448 L 248,448 C 246,447 244,444 244,440 C 244,432 247,420 248,408 C 250,396 251,388 250,376 C 249,364 247,356 247,350 C 247,344 246,338 244,328 C 243,316 241,304 240,292 C 239,284 237,276 236,268 C 235,260 236,252 238,244 C 237,236 233,226 228,216 C 224,206 222,198 222,190 C 222,182 225,174 230,166 C 234,156 238,146 241,136 C 243,130 246,122 247,116 C 248,108 248,98 247,90 C 246,82 243,76 238,70 C 234,66 233,60 236,58 C 239,56 245,56 250,59 C 253,60 255,61 255,62 Z"
+      // 1 & 12: Pranamasana
+      pranamasana: `<svg viewBox="0 0 100 100"><circle cx="50" cy="18" r="7"/><path d="M46 29 L54 29 L58 46 L53 47 L51 38 L51 58 L55 88 L49 88 L47 62 L45 88 L39 88 L43 58 L43 38 L41 47 L36 46 Z"/><path d="M48 33 L52 33 L52 42 L48 42 Z"/></svg>`,
+      // 2 & 11: Hastauttanasana
+      hastauttanasana: `<svg viewBox="0 0 100 100"><circle cx="43" cy="22" r="7"/><path d="M41 33 C44 48 45 62 45 88 L51 88 C51 62 50 48 47 33 Z"/><path d="M44 33 L32 10 L37 8 L47 30 Z"/><path d="M46 33 L36 9 L41 7 L49 30 Z"/></svg>`,
+      // 3 & 10: Padahastasana
+      padahastasana: `<svg viewBox="0 0 100 100"><circle cx="38" cy="58" r="7"/><path d="M52 35 C52 55 52 70 54 88 L60 88 C58 70 58 55 58 35 Z"/><path d="M58 35 C50 35 44 42 40 54 L46 56 C49 46 53 41 58 41 Z"/><path d="M41 50 L34 78 L39 79 L46 52 Z"/></svg>`,
+      // 4 & 9: Ashwa Sanchalanasana
+      ashwa: `<svg viewBox="0 0 100 100"><circle cx="40" cy="30" r="7"/><path d="M42 40 L44 58 L62 64 L82 82 L77 84 L58 68 L42 63 Z"/><path d="M42 58 L24 60 L24 84 L18 84 L18 56 L38 54 Z"/><path d="M40 40 L35 68 L30 68 L34 40 Z"/></svg>`,
+      // 5: Dandasana (Plank)
+      dandasana: `<svg viewBox="0 0 100 100"><circle cx="25" cy="40" r="7"/><path d="M28 48 L76 66 L74 72 L26 54 Z"/><path d="M30 49 L32 78 L26 78 L24 49 Z"/><path d="M74 66 L84 76 L80 78 L72 68 Z"/></svg>`,
+      // 6: Ashtanga Namaskara
+      ashtanga: `<svg viewBox="0 0 100 100"><circle cx="20" cy="56" r="6"/><path d="M24 62 L38 64 L48 50 L64 56 L72 74 L66 76 L58 60 L46 56 L38 68 L24 68 Z"/><path d="M26 62 L26 74 L20 74 L20 62 Z"/><path d="M72 74 L84 76 L84 80 L70 78 Z"/></svg>`,
+      // 7: Bhujangasana (Cobra)
+      bhujangasana: `<svg viewBox="0 0 100 100"><circle cx="32" cy="32" r="7"/><path d="M30 42 C34 56 46 68 84 76 L82 82 C42 74 28 60 24 42 Z"/><path d="M32 44 L38 78 L32 78 L26 44 Z"/></svg>`,
+      // 8: Parvatasana (Mountain)
+      parvatasana: `<svg viewBox="0 0 100 100"><circle cx="34" cy="58" r="6.5"/><path d="M52 28 L80 82 L74 84 L50 36 L30 76 L24 73 L46 28 Z"/></svg>`
     };
 
-    /**
-     * Initializes Web Audio Context on user/sender interaction.
-     */
-    function initAudio() {
-      if (!audioCtx) {
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      }
-      if (audioCtx.state === 'suspended') {
-        audioCtx.resume();
-      }
+    const STEP_SILHOUETTE_MAP = {
+      1: 'pranamasana',
+      2: 'hastauttanasana',
+      3: 'padahastasana',
+      4: 'ashwa',
+      5: 'dandasana',
+      6: 'ashtanga',
+      7: 'bhujangasana',
+      8: 'parvatasana',
+      9: 'ashwa',
+      10: 'padahastasana',
+      11: 'hastauttanasana',
+      12: 'pranamasana'
+    };
+
+    // -------------------------------------------------------------------------
+    // MINDFUL EATING GUIDELINES ROTATION
+    // -------------------------------------------------------------------------
+    const MINDFUL_EATING_TIPS = [
+      "Chew each bite 30–40 times before swallowing to cultivate satiety and digestive ease.",
+      "Rest your fork or spoon between each mouthful to honor your body's natural pace.",
+      "Notice the vibrant colors, subtle aromas, textures, and rich flavors of your food.",
+      "Listen inward to genuine satiety signals; pause when your body feels comfortably satisfied.",
+      "Breathe deeply before eating; gratitude transforms everyday meals into mindful nourishment."
+    ];
+
+    let tipRotationTimer = null;
+    let currentTipIndex = 0;
+    function startTipRotation() {
+      if (tipRotationTimer) return;
+      tipRotationTimer = setInterval(() => {
+        currentTipIndex = (currentTipIndex + 1) % MINDFUL_EATING_TIPS.length;
+        const el = document.getElementById('eatingGuidelineCard');
+        if (el) {
+          el.style.opacity = '0';
+          setTimeout(() => {
+            el.textContent = `"${MINDFUL_EATING_TIPS[currentTipIndex]}"`;
+            el.style.opacity = '1';
+          }, 400);
+        }
+      }, 12000);
     }
 
-    /**
-     * Synthesizes authentic Tibetan singing bowl chimes at 432 Hz with natural overtones.
-     */
-    function playTibetanBell(freq = 432, duration = 4.5) {
+    // -------------------------------------------------------------------------
+    // WEB AUDIO ZERO-BANDWIDTH CHIME SYNTHESIS (Tibetan Singing Bowl)
+    // -------------------------------------------------------------------------
+    let audioCtx = null;
+    function playTibetanBowlChime() {
       try {
-        initAudio();
+        if (!audioCtx) {
+          const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+          if (AudioContextClass) audioCtx = new AudioContextClass();
+        }
+        if (audioCtx && audioCtx.state === 'suspended') {
+          audioCtx.resume();
+        }
+        if (!audioCtx) return;
+
         const now = audioCtx.currentTime;
         const osc1 = audioCtx.createOscillator();
         const osc2 = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
+        const gain1 = audioCtx.createGain();
+        const gain2 = audioCtx.createGain();
+        const masterGain = audioCtx.createGain();
 
+        // 432 Hz fundamental + 2.76 harmonic overtone (1192.3 Hz)
         osc1.type = 'sine';
-        osc1.frequency.setValueAtTime(freq, now);
-
+        osc1.frequency.setValueAtTime(432, now);
         osc2.type = 'sine';
-        osc2.frequency.setValueAtTime(freq * 2.76, now); // Tibetan bowl harmonic ratio
+        osc2.frequency.setValueAtTime(1192.3, now);
 
-        gain.gain.setValueAtTime(0, now);
-        gain.gain.linearRampToValueAtTime(masterBellVolume * 0.75, now + 0.02);
-        gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+        // Acoustic attack ramp (20ms) and exponential decay (4.5s)
+        gain1.gain.setValueAtTime(0.0001, now);
+        gain1.gain.linearRampToValueAtTime(0.75, now + 0.02);
+        gain1.gain.exponentialRampToValueAtTime(0.0001, now + 4.5);
 
-        osc1.connect(gain);
-        osc2.connect(gain);
-        gain.connect(audioCtx.destination);
+        gain2.gain.setValueAtTime(0.0001, now);
+        gain2.gain.linearRampToValueAtTime(0.28, now + 0.02);
+        gain2.gain.exponentialRampToValueAtTime(0.0001, now + 2.8);
+
+        masterGain.gain.setValueAtTime(0.85, now);
+
+        osc1.connect(gain1);
+        osc2.connect(gain2);
+        gain1.connect(masterGain);
+        gain2.connect(masterGain);
+        masterGain.connect(audioCtx.destination);
 
         osc1.start(now);
         osc2.start(now);
-        osc1.stop(now + duration);
-        osc2.stop(now + duration);
+        osc1.stop(now + 4.6);
+        osc2.stop(now + 3.0);
       } catch (e) {
-        console.warn('Web Audio chime error:', e);
+        console.warn('Audio synthesis error:', e);
       }
     }
 
-    function showVolumeHud(text) {
-      const hud = document.getElementById('volumeHud');
-      document.getElementById('volumeHudLabel').textContent = text;
-      hud.classList.add('visible');
-      clearTimeout(hudTimeout);
-      hudTimeout = setTimeout(() => hud.classList.remove('visible'), 2500);
+    // -------------------------------------------------------------------------
+    // BreathIndicator.kt 1:1 PROCEDURAL LOTUS CANVAS ENGINE
+    // -------------------------------------------------------------------------
+    const PETAL_SPECS = [
+      // Tier 0: Outermost horizontal wings
+      { id: "wing_L", angleBud: -6, angleBloom: -84, lengthRatioBud: 0.89, lengthRatioBloom: 0.555, widthRatio: 0.44, alpha: 0.22, layer: 0 },
+      { id: "wing_R", angleBud: 6, angleBloom: 84, lengthRatioBud: 0.89, lengthRatioBloom: 0.555, widthRatio: 0.44, alpha: 0.22, layer: 0 },
+      // Tier 1: Outer lateral wings
+      { id: "out_L2", angleBud: -5, angleBloom: -70, lengthRatioBud: 0.916, lengthRatioBloom: 0.666, widthRatio: 0.43, alpha: 0.26, layer: 1 },
+      { id: "out_R2", angleBud: 5, angleBloom: 70, lengthRatioBud: 0.916, lengthRatioBloom: 0.666, widthRatio: 0.43, alpha: 0.26, layer: 1 },
+      // Tier 2: Mid lateral petals
+      { id: "out_L1", angleBud: -4, angleBloom: -56, lengthRatioBud: 0.944, lengthRatioBloom: 0.777, widthRatio: 0.42, alpha: 0.30, layer: 2 },
+      { id: "out_R1", angleBud: 4, angleBloom: 56, lengthRatioBud: 0.944, lengthRatioBloom: 0.777, widthRatio: 0.42, alpha: 0.30, layer: 2 },
+      // Tier 3: Core fanning petals
+      { id: "mid_L", angleBud: -3, angleBloom: -42, lengthRatioBud: 0.958, lengthRatioBloom: 0.861, widthRatio: 0.41, alpha: 0.34, layer: 3 },
+      { id: "mid_R", angleBud: 3, angleBloom: 42, lengthRatioBud: 0.958, lengthRatioBloom: 0.861, widthRatio: 0.41, alpha: 0.34, layer: 3 },
+      // Tier 4: Inner-mid chalice
+      { id: "in_L", angleBud: -2, angleBloom: -28, lengthRatioBud: 0.972, lengthRatioBloom: 0.93, widthRatio: 0.40, alpha: 0.38, layer: 4 },
+      { id: "in_R", angleBud: 2, angleBloom: 28, lengthRatioBud: 0.972, lengthRatioBloom: 0.93, widthRatio: 0.40, alpha: 0.38, layer: 4 },
+      // Tier 5: Inner core
+      { id: "core_L", angleBud: -1, angleBloom: -14, lengthRatioBud: 0.986, lengthRatioBloom: 0.972, widthRatio: 0.39, alpha: 0.42, layer: 5 },
+      { id: "core_R", angleBud: 1, angleBloom: 14, lengthRatioBud: 0.986, lengthRatioBloom: 0.972, widthRatio: 0.39, alpha: 0.42, layer: 5 },
+      // Tier 6: Central erect spine
+      { id: "center", angleBud: 0, angleBloom: 0, lengthRatioBud: 1.0, lengthRatioBloom: 1.0, widthRatio: 0.38, alpha: 0.46, layer: 6 }
+    ];
+
+    function lerp(a, b, t) {
+      return a + (b - a) * t;
     }
 
-    /**
-     * Smoothly transitions the active TV view between SPLASH, LINEAR, EATING, PRANAYAMA, and SURYA.
-     */
-    function showScreen(screen) {
-      if (activeScreen === screen) return;
-      activeScreen = screen;
-      document.querySelectorAll('.view-container').forEach(el => el.classList.remove('active'));
+    // Cubic Bezier Easing matching Compose CubicBezierEasing(0.645f, 0.045f, 0.355f, 1.0f)
+    function cubicBezierEase(t) {
+      // Approximation of FastOutSlowIn cubic bezier
+      return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    }
 
-      if (screen === 'EATING') {
-        document.getElementById('viewEating').classList.add('active');
-      } else if (screen === 'PRANAYAMA') {
-        document.getElementById('viewPranayama').classList.add('active');
-      } else if (screen === 'SURYA') {
-        document.getElementById('viewSurya').classList.add('active');
-      } else if (screen === 'LINEAR') {
-        document.getElementById('viewLinear').classList.add('active');
+    let lotusCanvas = null;
+    let lotusCtx = null;
+    let currentPranayamaData = {
+      phase: 'INHALE',
+      phaseDuration: 4,
+      phaseRemaining: 4,
+      lastUpdateTs: Date.now(),
+      bloomFraction: 0.0
+    };
+
+    function initLotusCanvas() {
+      lotusCanvas = document.getElementById('lotusCanvas');
+      if (!lotusCanvas) return;
+      lotusCtx = lotusCanvas.getContext('2d');
+      requestAnimationFrame(renderLotusLoop);
+    }
+
+    function renderLotusLoop(timestamp) {
+      if (lotusCtx && lotusCanvas) {
+        drawLotusFrame(timestamp);
+      }
+      requestAnimationFrame(renderLotusLoop);
+    }
+
+    function drawLotusFrame(timestamp) {
+      const canvasW = lotusCanvas.width;
+      const canvasH = lotusCanvas.height;
+      const cx = canvasW / 2;
+      const baseWaterY = canvasH * 0.74;
+      const maxPetalLen = Math.min(canvasW * 0.48, canvasH * 0.45);
+      const stemLen = canvasH * 0.12;
+
+      lotusCtx.clearRect(0, 0, canvasW, canvasH);
+
+      // Compute continuous bloom progress
+      const p = currentPranayamaData;
+      const dur = Math.max(p.phaseDuration, 1);
+      const elapsed = Math.max(0, dur - p.phaseRemaining);
+      const linearFraction = Math.min(Math.max(elapsed / dur, 0), 1);
+      const easedFraction = cubicBezierEase(linearFraction);
+
+      let targetBloom = 0.0;
+      if (p.phase === 'INHALE') {
+        targetBloom = easedFraction;
+      } else if (p.phase === 'HOLD_IN') {
+        targetBloom = 1.0;
+      } else if (p.phase === 'EXHALE') {
+        targetBloom = 1.0 - easedFraction;
       } else {
-        document.getElementById('viewSplash').classList.add('active');
+        targetBloom = 0.0; // HOLD_OUT
       }
-    }
 
-    function triggerChimeRipple() {
-      const ripple = document.getElementById('eatingChimeRipple');
-      if (!ripple) return;
-      ripple.classList.remove('active');
-      void ripple.offsetWidth;
-      ripple.classList.add('active');
-    }
+      // Smooth C2-continuous floating wave (2600ms cycle)
+      const floatWave = (timestamp / 2600) % 1.0;
+      const waveOffset = Math.sin(floatWave * 2 * Math.PI);
 
-    /**
-     * Updates organic blooming lotus kinematics according to active breath phase.
-     */
-    function updateLotusBloom(phase, phaseRemaining, phaseDuration) {
-      const fraction = phaseDuration > 0 ? (1 - (phaseRemaining / phaseDuration)) : 0;
+      let floatOffsetPx = 0;
+      let swayAngleDeg = 0;
 
-      let bloomFactor = 0;
-      if (phase === 'INHALE') {
-        bloomFactor = Math.min(Math.max(fraction, 0), 1);
-      } else if (phase === 'HOLD_IN') {
-        bloomFactor = 1.0;
-      } else if (phase === 'EXHALE') {
-        bloomFactor = 1 - Math.min(Math.max(fraction, 0), 1);
+      if (p.phase === 'INHALE') {
+        floatOffsetPx = -targetBloom * 7.0;
+        swayAngleDeg = Math.sin(targetBloom * Math.PI) * 0.7;
+      } else if (p.phase === 'HOLD_IN') {
+        floatOffsetPx = -7.0 - (waveOffset * 9.0);
+        swayAngleDeg = waveOffset * 1.15;
+      } else if (p.phase === 'EXHALE') {
+        floatOffsetPx = -targetBloom * 7.0;
+        swayAngleDeg = -Math.sin((1.0 - targetBloom) * Math.PI) * 0.7;
       } else {
-        bloomFactor = 0;
+        floatOffsetPx = -waveOffset * 7.0;
+        swayAngleDeg = waveOffset * 0.9;
       }
 
-      const maxRotTier1 = 36 * bloomFactor;
-      const maxRotTier2 = 26 * bloomFactor;
-      const maxRotTier3 = 16 * bloomFactor;
-      const maxRotTier4 = 9 * bloomFactor;
-      const maxRotTier5 = 4 * bloomFactor;
+      const cy = baseWaterY + floatOffsetPx;
 
-      document.getElementById('petalL1').style.transform = `rotate(-${maxRotTier1}deg)`;
-      document.getElementById('petalR1').style.transform = `rotate(${maxRotTier1}deg)`;
-      document.getElementById('petalL2').style.transform = `rotate(-${maxRotTier2}deg)`;
-      document.getElementById('petalR2').style.transform = `rotate(${maxRotTier2}deg)`;
-      document.getElementById('petalL3').style.transform = `rotate(-${maxRotTier3}deg)`;
-      document.getElementById('petalR3').style.transform = `rotate(${maxRotTier3}deg)`;
-      document.getElementById('petalL4').style.transform = `rotate(-${maxRotTier4}deg)`;
-      document.getElementById('petalR4').style.transform = `rotate(${maxRotTier4}deg)`;
-      document.getElementById('petalL5').style.transform = `rotate(-${maxRotTier5}deg)`;
-      document.getElementById('petalR5').style.transform = `rotate(${maxRotTier5}deg)`;
+      // 1. Luminous Breathing Prana Radial Aura behind flower
+      const auraRadius = (maxPetalLen * 0.85) + (targetBloom * maxPetalLen * 0.45);
+      const auraY = baseWaterY - maxPetalLen * 0.35;
+      const auraGrad = lotusCtx.createRadialGradient(cx, auraY, 0, cx, auraY, auraRadius);
+      auraGrad.addColorStop(0, 'rgba(229, 169, 60, 0.25)');
+      auraGrad.addColorStop(0.5, 'rgba(229, 169, 60, 0.08)');
+      auraGrad.addColorStop(1, 'transparent');
+
+      lotusCtx.beginPath();
+      lotusCtx.arc(cx, auraY, auraRadius, 0, 2 * Math.PI);
+      lotusCtx.fillStyle = auraGrad;
+      lotusCtx.fill();
+
+      // 2. Calm Resting Waterline Ripples (continuous 10s ripple timer)
+      const rippleAnimTime = (timestamp / 1000) % 10.0;
+      const r1 = (rippleAnimTime * 0.45) % 2.5;
+      const r2 = (rippleAnimTime * 0.45 + 1.25) % 2.5;
+
+      [r1, r2].forEach(r => {
+        const rw = 48 + (r * 108);
+        const rh = 9 + (r * 8);
+        const alpha = Math.max(0, Math.min(1, 1 - (r / 2.5))) * 0.45;
+        lotusCtx.beginPath();
+        lotusCtx.ellipse(cx, baseWaterY, rw, rh, 0, 0, 2 * Math.PI);
+        lotusCtx.strokeStyle = `rgba(229, 169, 60, ${alpha})`;
+        lotusCtx.lineWidth = 1.8;
+        lotusCtx.stroke();
+      });
+
+      // 3. Draw Lotus Petals & Calyx rotated by swayAngleDeg around (cx, cy)
+      lotusCtx.save();
+      lotusCtx.translate(cx, cy);
+      lotusCtx.rotate((swayAngleDeg * Math.PI) / 180);
+
+      // Draw 13 Curved Lotus Petals sorted by layer
+      const sortedSpecs = [...PETAL_SPECS].sort((a, b) => a.layer - b.layer);
+      sortedSpecs.forEach(spec => {
+        const curAngle = lerp(spec.angleBud, spec.angleBloom, targetBloom);
+        const curLenRatio = lerp(spec.lengthRatioBud, spec.lengthRatioBloom, targetBloom);
+        const curLength = maxPetalLen * curLenRatio;
+
+        lotusCtx.save();
+        lotusCtx.rotate((curAngle * Math.PI) / 180);
+
+        // drawCurvedLotusPetal
+        const halfW = curLength * spec.widthRatio * 0.55;
+        const tipY = -curLength;
+
+        lotusCtx.beginPath();
+        lotusCtx.moveTo(0, 0);
+        lotusCtx.bezierCurveTo(
+          -(halfW * 1.10), -(curLength * 0.38),
+          -(halfW * 0.65), -(curLength * 0.86),
+          0, tipY
+        );
+        lotusCtx.bezierCurveTo(
+          (halfW * 0.65), -(curLength * 0.86),
+          (halfW * 1.10), -(curLength * 0.38),
+          0, 0
+        );
+        lotusCtx.closePath();
+
+        lotusCtx.fillStyle = `rgba(229, 169, 60, ${spec.alpha})`;
+        lotusCtx.fill();
+        lotusCtx.restore();
+      });
+
+      // 4. Draw Geometric Calyx (3 leaves "patte" + vertical stem + receptacle dot)
+      // Stem
+      lotusCtx.beginPath();
+      lotusCtx.moveTo(0, 0);
+      lotusCtx.lineTo(0, stemLen);
+      lotusCtx.lineWidth = 4;
+      lotusCtx.lineCap = 'round';
+      lotusCtx.strokeStyle = 'rgba(132, 204, 22, 0.90)';
+      lotusCtx.stroke();
+
+      // 3 Calyx Leaves ("Patte") pointing downwards into water
+      const calyxSpread = lerp(22, 58, targetBloom);
+      const calyxLen = lerp(stemLen * 0.48, stemLen * 0.68, targetBloom);
+      const calyxW = calyxLen * 0.42;
+
+      function drawCalyxLeaf(angleDeg) {
+        lotusCtx.save();
+        lotusCtx.rotate((angleDeg * Math.PI) / 180);
+        lotusCtx.beginPath();
+        lotusCtx.moveTo(0, 0);
+        lotusCtx.bezierCurveTo(-(calyxW * 1.15), calyxLen * 0.4, -(calyxW * 0.65), calyxLen * 0.85, 0, calyxLen);
+        lotusCtx.bezierCurveTo((calyxW * 0.65), calyxLen * 0.85, (calyxW * 1.15), calyxLen * 0.4, 0, 0);
+        lotusCtx.closePath();
+        lotusCtx.fillStyle = 'rgba(163, 230, 53, 0.55)';
+        lotusCtx.fill();
+        lotusCtx.strokeStyle = 'rgba(217, 249, 157, 0.80)';
+        lotusCtx.lineWidth = 2;
+        lotusCtx.stroke();
+        lotusCtx.restore();
+      }
+
+      drawCalyxLeaf(180 - calyxSpread);
+      drawCalyxLeaf(180 + calyxSpread);
+      drawCalyxLeaf(180);
+
+      // Central receptacle seed dot
+      lotusCtx.beginPath();
+      lotusCtx.arc(0, 0, 7, 0, 2 * Math.PI);
+      lotusCtx.fillStyle = '#84CC16';
+      lotusCtx.fill();
+
+      lotusCtx.restore();
     }
 
-    /**
-     * Updates the 12-step flow indicator for Surya Namaskar.
-     */
-    function updateSuryaFlowIndicator(activeStep) {
-      const container = document.getElementById('suryaFlowIndicator');
+    // -------------------------------------------------------------------------
+    // VIEW SWITCHER & DISPATCHER
+    // -------------------------------------------------------------------------
+    let currentActiveView = 'viewSplash';
+
+    function switchView(targetViewId) {
+      if (currentActiveView === targetViewId) return;
+      document.querySelectorAll('.view-container').forEach(v => {
+        v.classList.remove('active');
+      });
+      const target = document.getElementById(targetViewId);
+      if (target) {
+        target.classList.add('active');
+        currentActiveView = targetViewId;
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // SURYA NAMASKAR FLOW STEP INDICATOR
+    // -------------------------------------------------------------------------
+    function updateSurya12StepBar(activeStep) {
+      const container = document.getElementById('surya12StepBar');
       if (!container) return;
       container.innerHTML = '';
       for (let i = 1; i <= 12; i++) {
-        const dot = document.createElement('div');
-        dot.className = 'flow-step-dot';
+        const pill = document.createElement('div');
+        pill.className = 'surya-step-pill';
         if (i === activeStep) {
-          dot.classList.add('active');
+          pill.classList.add('active');
         } else if (i < activeStep) {
-          dot.classList.add('completed');
-        } else {
-          dot.classList.add('upcoming');
+          pill.classList.add('completed');
         }
-        container.appendChild(dot);
+        container.appendChild(pill);
       }
     }
 
-    /**
-     * Updates play/pause button state icons across all screens.
-     */
-    function updatePlayPauseIcons(isRunning) {
-      document.querySelectorAll('.play-svg').forEach(el => {
-        el.style.display = isRunning ? 'none' : 'block';
-      });
-      document.querySelectorAll('.pause-svg').forEach(el => {
-        el.style.display = isRunning ? 'block' : 'none';
-      });
-    }
+    // -------------------------------------------------------------------------
+    // STATE UPDATE ROUTER
+    // -------------------------------------------------------------------------
+    function updateSessionState(data) {
+      if (!data) return;
 
-    /**
-     * Primary state update router called when mobile sender dispatches state.
-     */
-    function updateState(data) {
-      initAudio();
+      // Handle Tibetan Bowl Chime trigger
+      if (data.triggerBell) {
+        playTibetanBowlChime();
+      }
 
-      const isRunning = data.status === 'RUNNING';
-      updatePlayPauseIcons(isRunning);
+      // Determine active screen mode
+      let mode = data.screenMode || 'GENERAL';
+      const status = data.status || 'IDLE';
 
-      // Determine target screen mode
-      let mode = data.screenMode;
-      if (!mode || mode === 'GENERAL') {
-        if (data.status === 'IDLE') {
-          mode = 'SPLASH';
-        } else if (data.isEating) {
-          mode = 'EATING';
-        } else if (data.isPranayama) {
-          mode = 'PRANAYAMA';
-        } else if (data.isSurya || (data.poseName && data.poseName.length > 0)) {
-          mode = 'SURYA';
-        } else {
-          mode = 'LINEAR';
-        }
+      if (status === 'IDLE') {
+        mode = 'SPLASH';
       }
 
       // 1. UPDATE SPLASH VIEW
-      if (data.profileName) {
-        document.getElementById('splashPreviewName').textContent = data.profileName;
-        document.getElementById('splashPreviewHint').textContent = data.status === 'IDLE'
-          ? 'Ready • Press Start on phone or TV remote'
-          : `Session in progress (${data.formattedTime || 'Active'})`;
-        document.getElementById('splashPreviewCard').classList.add('visible');
+      if (mode === 'SPLASH') {
+        switchView('viewSplash');
+        const beacon = document.getElementById('splashBeacon');
+        const statusText = document.getElementById('splashStatusText');
+        const queueCard = document.getElementById('splashQueueCard');
+        const queueText = document.getElementById('splashQueueText');
+
+        if (beacon) beacon.className = 'pulse-dot';
+        if (statusText) statusText.textContent = 'Connected to Habit Bell • Ready to Begin';
+
+        if (data.profileTitle && queueCard && queueText) {
+          queueCard.style.display = 'flex';
+          queueText.textContent = `Queued: ${data.profileTitle} • ${data.formattedTime || ''}`;
+        }
+        return;
       }
 
-      // Route to active view
-      showScreen(mode);
-
-      // Helper for formatted status text
-      const formatStatusText = (status, isEatingSession) => {
-        if (status === 'RUNNING') return isEatingSession ? '● Mindful Chewing Rhythm' : '● Active Mindful Session';
-        if (status === 'PAUSED') return 'Paused';
-        if (status === 'COMPLETED') return 'Session Completed 🙏';
-        return 'Ready';
-      };
+      // Update Play/Pause icons across all transport controls
+      const isRunning = status === 'RUNNING';
+      document.querySelectorAll('.play-svg').forEach(el => el.style.display = isRunning ? 'none' : 'block');
+      document.querySelectorAll('.pause-svg').forEach(el => el.style.display = isRunning ? 'block' : 'none');
 
       // 2. UPDATE LINEAR TIMER VIEW
-      if (mode === 'LINEAR') {
-        if (data.profileName) document.getElementById('linearTitle').textContent = data.profileName;
-        if (data.formattedTime) document.getElementById('linearTimeDisplay').textContent = data.formattedTime;
+      if (mode === 'GENERAL') {
+        switchView('viewLinear');
+        document.getElementById('linearProfileTitle').textContent = data.profileTitle || 'General Timer';
+        
+        // Timer digits vs Steps
+        const timerDigits = document.getElementById('linearTimerDigits');
+        const stepDigits = document.getElementById('linearStepCount');
+        const stepUnit = document.getElementById('linearStepUnit');
+        const elapsedSubtext = document.getElementById('linearElapsedSubtext');
 
-        // Interval or Step subtitles
-        const subEl = document.getElementById('linearIntervalSubtitle');
-        const walkingRow = document.getElementById('linearWalkingRow');
         if (data.isStepTrackingActive) {
-          subEl.style.display = 'none';
-          walkingRow.style.display = 'flex';
-          document.getElementById('linearStepCount').textContent = `🚶 ${data.formattedStepCount || data.currentSteps || 0}`;
-          document.getElementById('linearCadence').textContent = `Cadence: ${data.formattedCadence || '0 spm'}`;
+          if (timerDigits) timerDigits.style.display = 'none';
+          if (stepDigits) {
+            stepDigits.style.display = 'block';
+            stepDigits.textContent = (data.currentSteps || 0).toLocaleString();
+          }
+          if (stepUnit) stepUnit.style.display = 'block';
+          if (elapsedSubtext) elapsedSubtext.textContent = `Goal: ${data.formattedTime || ''} • Cadence: ${data.formattedCadence || '0 spm'}`;
         } else {
-          walkingRow.style.display = 'none';
-          if (data.formattedNextBell && data.intervalDurationSeconds > 0) {
-            subEl.style.display = 'block';
-            subEl.textContent = `Next Bell in ${data.formattedNextBell}`;
-          } else {
-            subEl.style.display = 'block';
-            subEl.textContent = '● Mindful Presence';
+          if (stepDigits) stepDigits.style.display = 'none';
+          if (stepUnit) stepUnit.style.display = 'none';
+          if (timerDigits) {
+            timerDigits.style.display = 'block';
+            timerDigits.textContent = data.formattedTime || '00:00';
+          }
+          if (elapsedSubtext) {
+            elapsedSubtext.textContent = `${data.formattedElapsed || '00:00'} elapsed • ${data.formattedTotal || '15:00'} total`;
           }
         }
 
-        // Circular progress ring (circumference = 911)
-        if (data.progressFraction !== undefined) {
-          const offset = 911 * (1 - Math.min(Math.max(data.progressFraction, 0), 1));
-          document.getElementById('linearProgressBar').style.strokeDashoffset = offset;
+        // Circular Progress Ring Fill
+        const progress = Math.min(Math.max(data.progress || 0, 0), 1);
+        const circumference = 2 * Math.PI * 190; // 1193.8
+        const fill = document.getElementById('linearProgressFill');
+        const head = document.getElementById('linearProgressHead');
+
+        if (fill) {
+          fill.style.strokeDasharray = circumference;
+          fill.style.strokeDashoffset = circumference * (1 - progress);
+        }
+        if (head) {
+          const angle = progress * 2 * Math.PI - Math.PI / 2;
+          const hx = 210 + 190 * Math.cos(angle);
+          const hy = 210 + 190 * Math.sin(angle);
+          head.setAttribute('cx', hx);
+          head.setAttribute('cy', hy);
         }
 
-        const statusEl = document.getElementById('linearStatusLabel');
-        statusEl.textContent = formatStatusText(data.status, false);
-        statusEl.className = 'session-status-label ' + (isRunning ? 'running' : '');
+        // Status & Step/Bell cues
+        const statusLabel = document.getElementById('linearStatusLabel');
+        if (statusLabel) {
+          statusLabel.textContent = isRunning ? '● Active Mindful Session' : (status === 'PAUSED' ? 'Paused' : 'Ready');
+        }
 
-        if (data.triggerBell) {
-          playTibetanBell(data.bellFrequency || 432, 4.5);
+        const stepTelemetry = document.getElementById('linearStepTelemetry');
+        if (stepTelemetry) {
+          if (data.isStepTrackingActive) {
+            stepTelemetry.style.display = 'inline-flex';
+            stepTelemetry.innerHTML = `<span>🚶 ${data.formattedStepCount || '0 steps'} • Cadence: ${data.formattedCadence || '0 spm'}</span>`;
+          } else {
+            stepTelemetry.style.display = 'none';
+          }
+        }
+
+        const bellCue = document.getElementById('linearBellCue');
+        if (bellCue) {
+          bellCue.innerHTML = `<span>🔔 Tibetan Bell in ${data.formattedNextBell || '05:00'}</span>`;
         }
       }
 
       // 3. UPDATE MINDFUL EATING VIEW
       else if (mode === 'EATING') {
-        if (data.formattedTime) document.getElementById('eatingTimeDisplay').textContent = data.formattedTime;
-        if (data.formattedNextBell) document.getElementById('eatingNextBell').textContent = data.formattedNextBell;
+        switchView('viewEating');
+        startTipRotation();
 
-        // Total meal progress outer ring (circumference = 911)
-        if (data.progressFraction !== undefined) {
-          const outerOffset = 911 * (1 - Math.min(Math.max(data.progressFraction, 0), 1));
-          document.getElementById('eatingOuterBar').style.strokeDashoffset = outerOffset;
+        const digits = document.getElementById('eatingRemainingDigits');
+        if (digits) digits.textContent = data.formattedTime || '45:00';
+
+        // Outer Meal Ring Fill
+        const mealProgress = Math.min(Math.max(data.progress || 0, 0), 1);
+        const mealCircumference = 2 * Math.PI * 200; // 1256.6
+        const mealFill = document.getElementById('eatingMealFill');
+        if (mealFill) {
+          mealFill.style.strokeDasharray = mealCircumference;
+          mealFill.style.strokeDashoffset = mealCircumference * (1 - mealProgress);
         }
 
-        // Inner Bite Interval ring (circumference = 220)
-        const intervalSec = data.intervalDurationSeconds || 60;
-        const nextBellSec = data.nextBellSeconds !== undefined ? data.nextBellSeconds : 0;
-        const biteFraction = intervalSec > 0 ? (1 - (nextBellSec / intervalSec)) : 0;
-        const innerOffset = 220 * (1 - Math.min(Math.max(biteFraction, 0), 1));
-        document.getElementById('eatingInnerBar').style.strokeDashoffset = innerOffset;
+        // Inner Bite Arc Progress
+        const intervalDur = data.intervalDurationSeconds || 60;
+        const nextBell = data.nextBellSeconds !== undefined ? data.nextBellSeconds : intervalDur;
+        const biteProgress = intervalDur > 0 ? Math.min(Math.max(1 - (nextBell / intervalDur), 0), 1) : 0;
+        const biteCircumference = 2 * Math.PI * 65; // 408.4
+        const biteArc = document.getElementById('eatingBiteArc');
+        if (biteArc) {
+          biteArc.style.strokeDasharray = biteCircumference;
+          biteArc.style.strokeDashoffset = biteCircumference * (1 - biteProgress);
+        }
 
-        const statusEl = document.getElementById('eatingStatusLabel');
-        statusEl.textContent = formatStatusText(data.status, true);
-        statusEl.className = 'session-status-label ' + (isRunning ? 'running' : '');
-
-        if (data.triggerBell) {
-          triggerChimeRipple();
-          playTibetanBell(data.bellFrequency || 432, 4.5);
+        const biteText = document.getElementById('eatingBiteText');
+        if (biteText) {
+          biteText.textContent = `Bite in ${data.formattedNextBell || '00:45'} • CHEW & SAVOR`;
         }
       }
 
       // 4. UPDATE PRANAYAMA VIEW
       else if (mode === 'PRANAYAMA') {
+        switchView('viewPranayama');
+        document.getElementById('pranayamaProfileTitle').textContent = data.profileTitle || 'Pranayama';
+
         const pPhase = data.pranayamaPhase || 'INHALE';
         document.getElementById('pranayamaSanskrit').textContent = (data.pranayamaSanskrit || pPhase).toUpperCase();
         document.getElementById('pranayamaScript').textContent = data.pranayamaScript || '';
         document.getElementById('pranayamaPhaseNumeral').textContent = data.phaseRemainingSeconds !== undefined ? data.phaseRemainingSeconds : '';
 
-        if (data.currentRound && data.totalRounds) {
-          document.getElementById('pranayamaRoundLabel').textContent = `Round ${data.currentRound} of ${data.totalRounds}`;
+        document.getElementById('pranayamaRoundLabel').textContent = `Round ${data.currentRound || 1} of ${data.totalRounds || 12}`;
+        document.getElementById('pranayamaTotalTime').textContent = `${data.formattedTime || '12:00'} left`;
+
+        const intervalPill = document.getElementById('pranayamaIntervalBellPill');
+        if (intervalPill) {
+          if (data.isIntervalBellEnabled && data.roundsUntilBell > 0) {
+            intervalPill.style.display = 'inline-flex';
+            intervalPill.querySelector('.pranayama-cadence-accent').textContent = `🔔 Interval Bell in ${data.roundsUntilBell} rounds`;
+          } else {
+            intervalPill.style.display = 'none';
+          }
         }
 
-        const milestoneBadge = document.getElementById('pranayamaMilestoneBadge');
-        if (data.isIntervalBellEnabled && data.roundsUntilBell !== undefined) {
-          milestoneBadge.style.display = 'inline';
-          milestoneBadge.textContent = `• 🔔 Milestone in ${data.roundsUntilBell}`;
-        } else {
-          milestoneBadge.style.display = 'none';
-        }
-
-        if (data.formattedTime) {
-          document.getElementById('pranayamaTotalTime').textContent = `Total Remaining: ${data.formattedTime}`;
-        }
-
-        updateLotusBloom(pPhase, data.phaseRemainingSeconds || 0, data.phaseDurationSeconds || 4);
-
-        const statusEl = document.getElementById('pranayamaStatusLabel');
-        statusEl.textContent = formatStatusText(data.status, false);
-        statusEl.className = 'session-status-label ' + (isRunning ? 'running' : '');
-
-        if (data.triggerBell) {
-          playTibetanBell(data.bellFrequency || 432, 4.5);
-        }
+        // Update Lotus Canvas Data
+        currentPranayamaData.phase = pPhase;
+        currentPranayamaData.phaseDuration = data.phaseDurationSeconds || 4;
+        currentPranayamaData.phaseRemaining = data.phaseRemainingSeconds || 4;
+        currentPranayamaData.lastUpdateTs = Date.now();
       }
 
       // 5. UPDATE SURYA NAMASKAR VIEW
       else if (mode === 'SURYA') {
-        const poseIdx = data.poseIndex || 1;
-        const totalRounds = data.totalRounds || 6;
-        const curRound = data.currentRound || 1;
+        switchView('viewSurya');
 
-        document.getElementById('suryaHeader').textContent = `ROUND ${curRound} OF ${totalRounds} • POSE ${poseIdx} / 12`;
-        updateSuryaFlowIndicator(poseIdx);
+        const stepIdx = data.poseIndex || 1;
+        document.getElementById('suryaRoundHeader').textContent = `ROUND ${data.currentRound || 1} OF ${data.totalRounds || 6} • POSE ${stepIdx} / 12`;
+        updateSurya12StepBar(stepIdx);
 
         document.getElementById('suryaPoseName').textContent = data.poseName || 'Pranamasana';
-        document.getElementById('suryaPoseSanskrit').textContent = data.poseSanskrit || 'Prayer Pose';
-        
-        const mantraEl = document.getElementById('suryaPoseMantra');
-        if (data.poseMantra && data.poseMantra.length > 0) {
-          mantraEl.style.display = 'block';
-          mantraEl.textContent = data.poseMantra.startsWith('☀️') ? data.poseMantra : `☀️ ${data.poseMantra}`;
-        } else {
-          mantraEl.style.display = 'none';
+        document.getElementById('suryaPoseTranslation').textContent = data.poseSanskrit || 'Prayer Pose';
+        document.getElementById('suryaSolarMantra').textContent = data.poseMantra ? `☀️ ${data.poseMantra}` : '';
+
+        // Dynamic Posture Silhouette
+        const silhouetteKey = STEP_SILHOUETTE_MAP[stepIdx] || 'pranamasana';
+        const silhouetteView = document.getElementById('suryaSilhouetteView');
+        if (silhouetteView) {
+          silhouetteView.innerHTML = YOGA_SILHOUETTES[silhouetteKey] || YOGA_SILHOUETTES['pranamasana'];
         }
 
-        // Posture silhouette path
-        const svgPath = YOGA_SILHOUETTES[poseIdx] || YOGA_SILHOUETTES[1];
-        document.getElementById('suryaSilhouettePath').setAttribute('d', svgPath);
+        document.getElementById('suryaBreathCue').textContent = `🌬 ${data.poseBreath || 'Inhale & Exhale'}`;
+        document.getElementById('suryaCountdownPill').textContent = `${data.poseRemainingSeconds || 5}s`;
 
-        document.getElementById('suryaBreathPill').textContent = `🌬 ${data.poseBreath || 'Inhale & Exhale'}`;
-        document.getElementById('suryaDurationPill').textContent = `${data.poseRemainingSeconds || data.intervalDurationSeconds || 5}s`;
-
-        if (data.formattedTime) {
-          document.getElementById('suryaTotalRemaining').textContent = data.formattedTime;
-        }
-
-        const statusEl = document.getElementById('suryaStatusLabel');
-        statusEl.textContent = formatStatusText(data.status, false);
-        statusEl.className = 'session-status-label ' + (isRunning ? 'running' : '');
-
-        if (data.triggerBell) {
-          playTibetanBell(data.bellFrequency || 432, 4.5);
-        }
+        document.getElementById('suryaMasterRound').textContent = `Round ${data.currentRound || 1} of ${data.totalRounds || 6}`;
+        document.getElementById('suryaMasterTotalTime').textContent = `${data.formattedTime || '12:00'} left`;
       }
     }
 
-    function setConnectedUI(connected) {
-      const dot = document.getElementById('splashDot');
-      const text = document.getElementById('splashStatusText');
-
-      if (connected) {
-        dot.classList.add('connected');
-        text.textContent = 'Google Cast Connected';
-      } else {
-        dot.classList.remove('connected');
-        text.textContent = 'Waiting for Phone...';
-        document.getElementById('splashPreviewCard').classList.remove('visible');
-      }
-    }
-
+    // -------------------------------------------------------------------------
+    // REMOTE CONTROL ACTION SENDER (TV Receiver -> Android Sender)
+    // -------------------------------------------------------------------------
     function sendRemoteAction(actionType) {
       try {
-        const ctx = cast.framework.CastReceiverContext.getInstance();
-        ctx.sendCustomMessage(CUSTOM_NAMESPACE, undefined, { type: actionType });
-      } catch (e) {
-        console.warn('Could not dispatch remote action:', e);
-      }
-    }
-
-    function toggleThemeVisual() {
-      isDarkTheme = !isDarkTheme;
-      document.body.classList.toggle('light-theme', !isDarkTheme);
-    }
-
-    // Physical TV Remote / CEC key listener
-    window.addEventListener('keydown', function(e) {
-      if (e.key === 'MediaPlayPause' || e.key === ' ' || e.key === 'Enter') {
-        sendRemoteAction('toggle');
-      } else if (e.key === 'MediaPlay') {
-        sendRemoteAction('play');
-      } else if (e.key === 'MediaPause') {
-        sendRemoteAction('pause');
-      }
-    });
-
-    // Initialize Cast Application Framework Receiver v3
-    const context = cast.framework.CastReceiverContext.getInstance();
-    const options = new cast.framework.CastReceiverOptions();
-    options.disableIdleTimeout = true;
-    options.maxInactivity = 3600 * 6; // 6 hours
-    options.customNamespaces = {};
-    options.customNamespaces[CUSTOM_NAMESPACE] = cast.framework.system.MessageType.JSON;
-
-    // Listen for custom messages from Android sender
-    context.addCustomMessageListener(CUSTOM_NAMESPACE, function(event) {
-      try {
-        const msg = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
-        if (!msg) return;
-        if (msg.type === 'state') {
-          updateState(msg);
-        } else if (msg.type === 'volume') {
-          if (msg.bellVolume !== undefined) {
-            masterBellVolume = msg.bellVolume;
-            showVolumeHud(`Bell Volume: ${Math.round(masterBellVolume * 100)}%`);
-          }
-        } else if (msg.type === 'chime') {
-          playTibetanBell(msg.freq || 432, 4.5);
+        const castContext = cast.framework.CastReceiverContext.getInstance();
+        if (castContext) {
+          console.log(`[HabitBellCast] Dispatching remote action: ${actionType}`);
+          castContext.sendCustomMessage(CAST_NAMESPACE, undefined, { type: actionType });
         }
       } catch (err) {
-        console.warn('Malformed Cast payload:', err);
+        console.warn(`[HabitBellCast] Failed to dispatch action ${actionType}:`, err);
       }
-    });
+    }
 
-    // Sender lifecycle listeners
-    context.addEventListener(cast.framework.system.EventType.SENDER_CONNECTED, function(event) {
-      setConnectedUI(true);
-      try {
-        context.sendCustomMessage(CUSTOM_NAMESPACE, event.senderId, { type: 'ready' });
-      } catch (e) {}
-    });
+    // -------------------------------------------------------------------------
+    // CAF v3 LIFECYCLE INITIALIZATION
+    // -------------------------------------------------------------------------
+    window.addEventListener('DOMContentLoaded', () => {
+      initLotusCanvas();
 
-    context.addEventListener(cast.framework.system.EventType.SENDER_DISCONNECTED, function(event) {
-      const senders = context.getSenders();
-      if (!senders || senders.length === 0) {
-        setConnectedUI(false);
-        showScreen('SPLASH');
-      }
-    });
+      const context = cast.framework.CastReceiverContext.getInstance();
+      const options = new cast.framework.CastReceiverOptions();
 
-    context.addEventListener(cast.framework.system.EventType.READY, function() {
-      try {
-        context.sendCustomMessage(CUSTOM_NAMESPACE, undefined, { type: 'ready' });
-      } catch (e) {}
-    });
+      options.disableIdleTimeout = true;
+      options.maxInactivity = 21600; // 6 hours
 
-    context.start(options);
+      options.customNamespaces = {
+        [CAST_NAMESPACE]: cast.framework.system.MessageType.JSON
+      };
+
+      // Handle custom messages from Android sender
+      context.addCustomMessageListener(CAST_NAMESPACE, (event) => {
+        try {
+          const msg = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+          updateSessionState(msg);
+        } catch (e) {
+          console.error('[HabitBellCast] Message parse error:', e);
+        }
+      });
+
+      // Ready handshake
+      context.addEventListener(cast.framework.system.EventType.READY, () => {
+        sendRemoteAction('ready');
+      });
+
+      // Sender connected
+      context.addEventListener(cast.framework.system.EventType.SENDER_CONNECTED, () => {
+        sendRemoteAction('ready');
+      });
+
+      context.start(options);
+    });
   </script>
 </body>
 </html>

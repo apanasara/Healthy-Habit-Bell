@@ -223,52 +223,28 @@ The heartbeat of the mindfulness runtime is a deterministic finite state machine
   - Embedded `<cast-media-player style="display:none;"></cast-media-player>` enables CAF v3 `PlayerManager` to bind cleanly, preventing session initialization crashes when the Android sender attaches `RemoteMediaClient` and `CastMediaOptions`.
   - Custom namespace declaration: Explicitly pre-registers `options.customNamespaces = { ['urn:x-cast:com.habitbell.cast']: cast.framework.system.MessageType.JSON }` prior to `context.start(options)`.
   - Safe payload deserialization: Handles both pre-parsed JSON objects and raw string transmissions via `const msg = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;`, eliminating `SyntaxError: Unexpected token o in JSON at position 1` crashes that previously dropped sender state packets.
-- **Bit-Identical Mobile Timer UI Harmonization (`SessionScreen.kt` Parity)**:
-  The receiver UI is engineered to match the Android mobile timer experience (`SessionScreen.kt`) bit-identically across visual structure, typography, component layout, and dynamic modes:
-  1. **Top Action Bar**:
-     - Back button (`ic_ph_back`) with circular frosted surface (`rgba(255,255,255,0.06)`).
-     - Live casting status indicator pill: Cast icon (`ic_ph_tv`) with pulsing emerald beacon and `"CASTING TO TV"` tracking badge.
-     - Centered session header displaying profile title and subtitle.
-     - Sound / Tibetan Bowl indicator pill (`ic_ph_bowl`) indicating active acoustic bell frequency.
-  2. **Four Dynamic Timer Screen Topologies**:
-     - **SPLASH / Standby Screen**: Ambient golden prana breathing glow, sacred Habit Bell crest, dual-state connection status (amber pulsing standby transitioning to emerald connected), and queued routine preview card with profile metadata.
-     - **LINEAR / General Timer Mode (`screenMode == 'GENERAL'`)**:
-       - Primary SVG circular progress ring (radius 180, circumference 1131px) with gradient stroke and animated glowing progress head dot tracking exact completion percentage.
-       - Ultra-crisp, extra-large timer countdown typography (`MM:SS` or `HH:MM:SS`) with elapsed/total subtext (`02:15 elapsed • 15:00 total`).
-       - Health & step-tracking telemetry pill (`👟 1,420 steps • 112 spm • Bell in 580 steps`) dynamically rendered when mindful walking/step tracking is engaged.
-       - Session bell chime indicator (`🔔 Tibetan Bell every 5m`).
-     - **MINDFUL EATING Mode (`screenMode == 'EATING'`)**:
-       - Warm candlelight amber color palette (`#E5A93C`, `#D97706`).
-       - **Concentric Dual SVG Rings**:
-         - Outer meal ring (radius 180, circumference 1131px): Tracks total meal duration countdown.
-         - Inner bite pacing ring (radius 140, circumference 880px): Tracks active bite chewing interval with pulsing amber stroke.
-       - Centered Zen dining bowl and chopsticks vector icon (`ic_ph_bowl`).
-       - Bite pacing pill: `"🔔 Bite Bell in 00:42 • CHEW & SAVOR"`.
-       - Mindful eating guidelines carousel rotating evidence-based eating habits every 12 seconds ("Chew each bite 30–40 times", "Rest fork between bites", "Tune in to satiety cues").
-       - Radial chime ripple wave expanding outwards from the center bowl upon interval bell completion.
-     - **PRANAYAMA Mode (`screenMode == 'PRANAYAMA'`)**:
-       - **Heroic 13-Petal Side-View Blooming Lotus SVG** across 7 depth tiers (outer wings, mid-lateral wings, chalice petals, central erect spine, and emerald `#10B981` calyx/stem).
-       - **Smooth Kinematic Bloom Physics**:
-         - *Pūraka (Inhale)*: Petals lift and unfurl organically into full bloom with cubic bezier expansion.
-         - *Antar Kumbhaka (Hold In)*: Sustained open flower floating gently on calm aquatic waves.
-         - *Recaka (Exhale)*: Petals fold softly inward into a serene closed bud.
-         - *Bāhya Kumbhaka (Hold Out / Void)*: Slender resting bud suspended in stillness.
-       - **Dynamic Breath-Phase Color Harmony**: Luminous Cyan (`#4ECDC4`) for Pūraka, Radiant Amber (`#E5A93C`) for Antar Kumbhaka, Meditative Lavender (`#A78BFA`) for Recaka, and Celestial Azure (`#60A5FA`) for Bāhya Kumbhaka.
-       - **Upper Sanskrit HUD & Devanagari Banner**: Elevated Sanskrit script display (`पूरक`, `कुम्भक`, `रेचक`, `शून्यक`), English guidance (`Inhale Deeply`), and large phase countdown numeral (`4`).
-       - Round milestone tracker (`"Round 3 of 12"`) and interval bell indicator (`"🔔 Interval bell in 2 rounds"`).
-     - **SURYA NAMASKAR Mode (`screenMode == 'SURYA'`)**:
-       - Dedicated compound sequencer layout for 12-step Sun Salutation flows.
-       - **Vector Posture Silhouettes**: 8 unique vector postures extracted directly from Android vector drawables (`yoga_pranamasana.xml`, `yoga_hastauttanasana.xml`, `yoga_padahastasana.xml`, `yoga_ashwa_sanchalanasana.xml`, `yoga_dandasana.xml`, `yoga_ashtanga_namaskara.xml`, `yoga_bhujangasana.xml`, `yoga_parvatasana.xml`) accurately mapped to steps 1 through 12.
-       - 12-step solar progress indicator with numbered dot nodes and active step glow.
-       - Posture headline displaying pose index, English name, and Sanskrit name (`Pose 1/12 • Pranamasana (Prayer Pose)`).
-       - Sacred solar mantra card rendering traditional Devanagari invocation (`ॐ मित्राय नमः`).
-       - Breath cue badge with dynamic inhalation/exhalation color accents (`Inhale & Exhale gently`).
-       - Step countdown timer and master round badge (`Round 1 of 6`).
-  3. **Bottom Transport Control Bar**:
-     - Frosted floating pill container mirroring `SessionScreen.kt` transport controls.
-     - Reset action button (`ic_ph_reset`) sending bidirectional reset command to Android sender.
-     - Master Play / Pause button (`ic_ph_play` / `ic_ph_pause`) with pulsing golden prana halo.
-     - Tune / Settings icon (`ic_ph_tune`) matching mobile layout balance.
+- **Bit-Identical Mobile Timer UI Harmonization (`SessionScreen.kt` LandscapeSessionLayout Parity)**:
+  The receiver UI is engineered to match the Android mobile timer experience in landscape mode (`SessionScreen.kt`'s `LandscapeSessionLayout`) bit-identically across visual structure, 16:9 two-column widescreen division, component sizing, and dynamic topologies:
+  1. **Two-Column Horizontal Split Architecture**:
+     - **Left Column (Visualizer Area, weight 1.15)**: Dedicated to the hero visualizer centerpiece across all topologies.
+       - *Linear*: SVG circular progress ring (radius 190, circumference 1194px) with animated glowing progress head dot, large timer numerals (`88px`), step count, elapsed/total subtext (`00:00 elapsed • 15:00 total`).
+       - *Mindful Eating*: Concentric dual rings (outer meal countdown ring + inner bite pacing arc) centered around the Phosphor dining bowl icon (`ic_ph_bowl`) with flickering candlelight radial aura.
+       - *Pranayama (`BreathIndicator.kt` 1:1 Procedural Canvas Engine)*: High-performance HTML5 canvas rendering:
+         - **13 Curved Petals Across 7 Depth Layers**: Implements dynamic dual morphing where each petal interpolates both angle (`angleBud` $\to$ `angleBloom`, $-84^\circ \dots +84^\circ$) and length (`lengthRatioBud` $\to$ `lengthRatioBloom`, $0.555\times \dots 1.0\times$) so resting bud petals remain tall and slender, while blooming petals form an organic cupped water lily.
+         - **Dynamic 3-Leaf Calyx ("Patte") & Receptacle**: Three downward-pointing leaves spreading organically from $22^\circ$ to $58^\circ$ with bloom, a vertical stem with rounded caps, and a lime seed receptacle (`#84CC16`).
+         - **Continuous Waterline Ripples**: Dual expanding concentric ellipses at the resting waterline propagating outward and fading gracefully.
+         - **C2-Continuous Aquatic Floating Wave & Sway**: 2.6-second sinusoidal floating buoyancy wave ($\pm 7\text{px}$) and breath-dependent lateral angular sway ($\pm 1.15^\circ$) calibrated for Inhale lift, Kumbhaka float, and Exhale descent.
+         - **Breathing Prana Radial Aura**: Dynamic radial gradient expanding behind the flower apex.
+       - *Surya Namaskar (`CompoundPoseCard` Parity)*: Dedicated card featuring the active pose name, Sanskrit translation, Devanagari solar invocation (`☀️ ॐ मित्राय नमः`), 12-step cyclical flow progress bar with active elongated pill, 150px vector posture silhouette, synchronized breath cue badge, and pose countdown pill.
+     - **Right Column (Info & Transport Controls, weight 1.05)**:
+       - **Top Action Bar**: Circular frosted Back button (`ic_ph_back`), session profile title, Cast indicator badge (`ic_ph_tv` with emerald beacon), and Tibetan bowl sound pill (`ic_ph_bowl`).
+       - **Middle Status & HUD**:
+         - *Pranayama*: Sanskrit phase title (`PŪRAKA`), Devanagari script banner (`पूरक`), giant seconds countdown numeral (`96px`), round milestone capsule (`Round 1 of 12 • 12:00 left`), and interval bell cadence counter (`🔔 Interval Bell in 5 rounds`).
+         - *Mindful Eating*: Large meal countdown numerals (`78px`), bite bell countdown capsule (`🔔 Bite in 00:45 • CHEW & SAVOR`), and rotating 12-second mindful eating guidelines carousel.
+         - *Linear*: Session status indicator (`● Active Mindful Session`), walking step/cadence telemetry badge, and next Tibetan bell cue.
+         - *Surya Namaskar*: Sequence status label, master round indicator (`Round 1 of 6`), and total sequence countdown.
+       - **Bottom Transport Controls**:
+         - Frosted floating pill container spaced evenly with Reset button (`ic_ph_reset`), master Play/Pause button with golden prana glow (`ic_ph_play`/`ic_ph_pause`), and Settings icon (`ic_ph_tune`).
 - **Bidirectional Custom Message Bus (`urn:x-cast:com.habitbell.cast`) & Handshake Protocol**:
   - **Receiver Readiness Handshake**: Receiver emits `{ type: 'ready' }` upon startup (`EventType.READY`) and upon sender connection (`EventType.SENDER_CONNECTED`). Android `HabitBellCastManager` triggers `onReceiverReady`, causing `CentralSessionHandler` to immediately dispatch the current session snapshot (even if `IDLE`).
   - **Immediate Telemetry Synchronization**: Binds telemetry push to `castManager.isCasting.collect` regardless of session running status, instantly updating the TV from standby to active profile preview when the user taps Cast from the mobile home screen.
