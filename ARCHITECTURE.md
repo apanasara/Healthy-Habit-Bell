@@ -205,7 +205,7 @@ The heartbeat of the mindfulness runtime is a deterministic finite state machine
   - Crucially, setting `screenBrightness` modulates only the phone's physical display panel LED/OLED driver; it does **not** alter the GPU rendering buffer (`SurfaceFlinger`).
   - As a result, the mirrored TV screen receives uncompromised pixel color and luminance, remaining at **100% full, vivid brightness**, while the smartphone draws minimal battery current and remains cool to the touch.
 - **Unconditional Screen Awake Lock (Prevents 3–4 Min "Connection Lost")**:
-  - `MainActivity` dynamically binds `FLAG_KEEP_SCREEN_ON` for the entire duration of `SessionStatus.RUNNING`.
+  - `MainActivity` dynamically binds `FLAG_KEEP_SCREEN_ON` for the entire duration of `SessionStatus.RUNNING` or whenever `isScreenMirroringActive` is true.
   - This prevents Android OS display sleep from turning the screen off and terminating the real-time H.264 screen capture encoder (`MediaProjection` / Cast Mirroring pipeline).
 - **Low-Latency Wi-Fi Lock (Prevents 26-Min Doze Disconnect)**:
   - `CentralSessionHandler` acquires `WIFI_MODE_FULL_LOW_LATENCY` (`WifiLock`) via `BatteryOptimizer` on session start.
@@ -213,6 +213,14 @@ The heartbeat of the mindfulness runtime is a deterministic finite state machine
 - **Interactive Touch Grace Period**:
   - Any tap on the Compose root window triggers `HabitBellViewModel.onUserTouchDisplay()`, which dispatches `TimerEngine.wakeScreenTemporarily(6)`.
   - The phone screen physically brightens for 6 seconds for effortless user interaction, then automatically re-dims to 1% while the TV stays continuously illuminated.
+- **TV Screen Orientation & Rotation Subsystem (`ScreenOrientation.kt` & `ScreenMirroringManager.kt`)**:
+  - **Hardware & Manual Mirroring Sensing**: `ScreenMirroringManager` registers `DisplayManager.DisplayListener` callbacks on the system `DisplayManager`, automatically identifying external HDMI monitors, Miracast receivers, and Wi-Fi Display sinks (`display.displayId != Display.DEFAULT_DISPLAY`). A manual toggle in `SettingsDrawer` provides a fallback for system-level Google Cast Screen Mirroring ("Cast Screen / Audio" in Quick Settings / Google Home) and Samsung Smart View.
+  - **Dynamic Activity Window Reorientation**: When orientation changes, `MainActivity` updates `requestedOrientation` dynamically between `ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE` (16:9 widescreen TV), `SCREEN_ORIENTATION_SENSOR_PORTRAIT` (vertical smart displays/monitors), and `SCREEN_ORIENTATION_UNSPECIFIED` (device accelerometer tracking).
+  - **Multi-Surface Compose Controls**:
+    - **`SessionScreen` Top Action Bar**: Dedicated rotate icon buttons positioned beside `CastButton` in both `LandscapeSessionLayout` (`Icons.Outlined.StayCurrentPortrait` to rotate back to vertical) and `PortraitSessionLayout` (`Icons.Outlined.StayCurrentLandscape` to rotate into widescreen TV layout).
+    - **`ModernHomeScreenSample` Top Bar**: Surfaces dynamic rotate button in `ModernZenTopBar` when mirroring is active.
+    - **`SettingsDrawer` (Living Room Section)**: Features the active display status badge, "Screen Mirroring Mode" toggle, segmented orientation buttons ("Vertical", "Horizontal", "Auto"), and a prominent "Rotate Screen ⇄" quick action button.
+  - **Configuration Synchronization**: `MainActivity.onConfigurationChanged` broadcasts window dimension updates into `ScreenMirroringManager.notifyConfigurationChanged()` to maintain tight alignment between device sensors and UI state flows.
 
 #### 4. Local TV WebCast (`LocalCastWebServer.kt` & `assets/tv/index.html`)
 - **Zero-Cloud Local Casting**: Embedded lightweight multi-threaded HTTP server running on port `8888`.

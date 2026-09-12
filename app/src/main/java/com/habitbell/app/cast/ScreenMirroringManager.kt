@@ -1,37 +1,16 @@
-/**
- * # ScreenMirroringManager
- *
- * Centralized subsystem managing external display detection, TV screen mirroring lifecycle,
- * and dynamic screen rotation orientation alignment between mobile devices and TV screens.
- *
- * ## Architectural Role & Component Relationships
- * Core subsystem in `com.habitbell.app.cast`:
- * - Coordinates with Android OS [android.hardware.display.DisplayManager] via [DisplayManager.DisplayListener]
- *   to automatically detect active external displays (Miracast, Wi-Fi Display, Chromecast screen mirror, HDMI).
- * - Exposes reactive Kotlin [StateFlow] streams consumed by [com.habitbell.app.ui.viewmodel.HabitBellViewModel]
- *   and [com.habitbell.app.MainActivity] to dynamically request activity orientation updates (`requestedOrientation`).
- * - Drives user orientation rotation toggles on [com.habitbell.app.ui.screens.SessionScreen],
- *   [com.habitbell.app.ui.screens.ModernHomeScreenSample], and [com.habitbell.app.ui.screens.SettingsDrawer].
- *
- * ## Concurrency & Thread Safety
- * Process-level singleton instance. State mutation is thread-safe via atomic [MutableStateFlow] updates.
- * Display listener registrations execute safely on the main thread via [Looper.getMainLooper].
- *
- * ## Lifecycle
- * Instantiated within [com.habitbell.app.engine.CentralSessionHandler] and bound to the application lifecycle.
- */
 package com.habitbell.app.cast
 
+import android.app.Application
 import android.content.Context
 import android.content.res.Configuration
 import android.hardware.display.DisplayManager
 import android.os.Handler
 import android.os.Looper
-import android.util.Log
 import android.view.Display
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -40,235 +19,241 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 
 /**
- * Manager orchestrating external display monitoring and interactive screen rotation.
+ * # ScreenMirroringManager
  *
- * @param context Application context for system service resolution.
+ * Central subsystem responsible for detecting external TV displays, managing screen mirroring state,
+ * and coordinating manual and automatic orientation switching between horizontal landscape and
+ * vertical portrait formats.
+ *
+ * ## Architectural Role & Relationships
+ * - **Hardware Sensing**: Observes system [DisplayManager] callbacks to detect Miracast, HDMI,
+ *   Wi-Fi Display (WiDi), and USB-C DisplayPort connections.
+ * - **Manual Override Mode**: Enables users mirroring their screen via system Quick Settings
+ *   (e.g., Google Cast Screen Mirroring, Samsung Smart View) to explicitly activate TV controls.
+ * - **Orientation Dispatcher**: Coordinates with [com.habitbell.app.MainActivity] to dynamically
+ *   reorient the Android Activity window according to user preference.
+ * - **UI Surfaces**: Supplies reactive state streams to [com.habitbell.app.ui.screens.SessionScreen],
+ *   [com.habitbell.app.ui.screens.ModernHomeScreenSample], and [com.habitbell.app.ui.screens.SettingsDrawer].
+ *
+ * ## Lifecycle & Concurrency Model
+ * - Lifecycle is tied to [com.habitbell.app.engine.CentralSessionHandler] and spans the application process.
+ * - Thread-safe state publishing utilizing Kotlin [StateFlow] collectors running on the Main dispatcher.
+ *
+ * @param application Process-level application context for resolving system [DisplayManager].
  */
-class ScreenMirroringManager private constructor(private val context: Context) {
+class ScreenMirroringManager(private val application: Application) {
 
     companion object {
-        private const val TAG = "ScreenMirroringManager"
-
         @Volatile
         private var INSTANCE: ScreenMirroringManager? = null
 
         /**
-         * Returns or initializes the process-level [ScreenMirroringManager] singleton instance.
+         * Returns the process-level singleton instance of [ScreenMirroringManager].
          *
-         * @param context Application context.
-         * @return Authoritative [ScreenMirroringManager] instance.
+         * @param context Application or component context.
+         * @return The active [ScreenMirroringManager] singleton.
          */
         fun getInstance(context: Context): ScreenMirroringManager {
             return INSTANCE ?: synchronized(this) {
-                INSTANCE ?: ScreenMirroringManager(context.applicationContext).also {
+                INSTANCE ?: ScreenMirroringManager(context.applicationContext as Application).also {
                     INSTANCE = it
                 }
             }
         }
+
+        /**
+         * Pure calculation function determining the next orientation when toggling.
+         *
+         * @param currentTarget Currently selected [ScreenOrientation].
+         * @param isCurrentlyLandscape Whether the active window layout is currently rendered in landscape.
+         * @return The resulting [ScreenOrientation] to apply.
+         */
+        fun calculateToggledOrientation(
+            currentTarget: ScreenOrientation,
+            isCurrentlyLandscape: Boolean
+        ): ScreenOrientation {
+            return when (currentTarget) {
+                ScreenOrientation.LANDSCAPE -> ScreenOrientation.PORTRAIT
+                ScreenOrientation.PORTRAIT -> ScreenOrientation.LANDSCAPE
+                ScreenOrientation.AUTO -> {
+                    if (isCurrentlyLandscape) ScreenOrientation.PORTRAIT else ScreenOrientation.LANDSCAPE
+                }
+            }
+        }
+
+        /**
+         * Evaluates whether a given display ID corresponds to an external/secondary display
+         * rather than the default mobile device panel.
+         *
+         * @param displayId System display integer identifier.
+         * @return True if secondary/external display, false if primary default display.
+         */
+        fun isExternalDisplay(displayId: Int): Boolean {
+            return displayId != Display.DEFAULT_DISPLAY
+        }
     }
 
-    /** Process-level coroutine scope isolated with a SupervisorJob. */
+    /** Coroutine scope for state combination flows, isolated by a SupervisorJob. */
     private val scope = CoroutineScope(Dispatchers.Main.immediate + SupervisorJob())
 
-    /** Android system display manager service. */
-    private val displayManager = context.getSystemService(Context.DISPLAY_SERVICE) as? DisplayManager
+    /** System display service for monitoring physical and virtual external screens. */
+    private val displayManager = application.getSystemService(Context.DISPLAY_SERVICE) as? DisplayManager
 
-    /** Main thread handler for receiving display lifecycle callbacks. */
+    /** Handler bound to the main application looper for display callback dispatching. */
     private val mainHandler = Handler(Looper.getMainLooper())
 
-    // -------------------------------------------------------------------------
-    // Mutable Backing State Flows
-    // -------------------------------------------------------------------------
+    /** Mutable backing state indicating whether a physical external display is connected. */
+    private val _isHardwareDisplayConnected = MutableStateFlow(false)
 
-    /** Mutable backing state indicating whether a physical/wireless external display is connected. */
-    private val _isExternalDisplayConnected = MutableStateFlow(false)
+    /** Public immutable stream indicating whether an external hardware display is detected. */
+    val isHardwareDisplayConnected: StateFlow<Boolean> = _isHardwareDisplayConnected.asStateFlow()
 
-    /** Mutable backing state tracking the human-readable display label of the connected TV. */
+    /** Mutable backing state for the friendly name of the connected external display. */
     private val _externalDisplayName = MutableStateFlow<String?>(null)
 
-    /** Mutable backing state tracking manual screen mirroring mode toggle from the user interface. */
-    private val _isScreenMirroringManual = MutableStateFlow(false)
-
-    /** Mutable backing state tracking the current target requested orientation. */
-    private val _targetOrientation = MutableStateFlow(ScreenOrientation.AUTO)
-
-    /** Mutable backing state tracking whether the current layout is rendered in landscape orientation. */
-    private val _isLandscape = MutableStateFlow(false)
-
-    // -------------------------------------------------------------------------
-    // Public Immutable Reactive Streams
-    // -------------------------------------------------------------------------
-
-    /** Read-only state flow emitting whether an external display is physically connected. */
-    val isExternalDisplayConnected: StateFlow<Boolean> = _isExternalDisplayConnected.asStateFlow()
-
-    /** Read-only state flow emitting the friendly label of the connected TV or external display. */
+    /** Public immutable stream emitting the friendly name of the connected external display, if any. */
     val externalDisplayName: StateFlow<String?> = _externalDisplayName.asStateFlow()
 
-    /** Read-only state flow emitting whether manual screen mirroring mode is enabled by user. */
+    /** Mutable backing state indicating whether manual Screen Mirroring mode is toggled on. */
+    private val _isScreenMirroringManual = MutableStateFlow(false)
+
+    /** Public immutable stream indicating whether manual Screen Mirroring mode is active. */
     val isScreenMirroringManual: StateFlow<Boolean> = _isScreenMirroringManual.asStateFlow()
 
-    /** Read-only state flow emitting the active target orientation setting. */
-    val targetOrientation: StateFlow<ScreenOrientation> = _targetOrientation.asStateFlow()
-
-    /** Read-only state flow emitting whether the display is currently in horizontal landscape format. */
-    val isLandscape: StateFlow<Boolean> = _isLandscape.asStateFlow()
-
     /**
-     * Authoritative reactive stream indicating whether Screen Mirroring is actively in effect.
-     * Evaluates to `true` if an external display is hardware-detected OR if the user manually enabled
-     * Screen Mirroring mode in Settings.
+     * Combined reactive stream emitting true if either hardware display detection
+     * or manual screen mirroring mode is active.
      */
     val isScreenMirroringActive: StateFlow<Boolean> = combine(
-        _isExternalDisplayConnected,
+        _isHardwareDisplayConnected,
         _isScreenMirroringManual
-    ) { externalConnected, manualEnabled ->
-        externalConnected || manualEnabled
+    ) { hwConnected, manualMode ->
+        hwConnected || manualMode
     }.stateIn(
         scope = scope,
         started = SharingStarted.Eagerly,
         initialValue = false
     )
 
-    // -------------------------------------------------------------------------
-    // Display Listener Implementation
-    // -------------------------------------------------------------------------
+    /** Mutable backing state for the target orientation requested by the user. */
+    private val _targetOrientation = MutableStateFlow(ScreenOrientation.AUTO)
 
-    /** Listener monitoring hardware display connection, disconnection, and property alterations. */
+    /** Public immutable stream of the currently requested [ScreenOrientation]. */
+    val targetOrientation: StateFlow<ScreenOrientation> = _targetOrientation.asStateFlow()
+
+    /** Mutable backing state tracking whether current effective display rendering is landscape. */
+    private val _isLandscape = MutableStateFlow(false)
+
+    /** Public immutable stream indicating whether the active display window is in horizontal landscape. */
+    val isLandscape: StateFlow<Boolean> = _isLandscape.asStateFlow()
+
+    /** Hardware display listener monitoring display attach/detach/change lifecycle events. */
     private val displayListener = object : DisplayManager.DisplayListener {
         override fun onDisplayAdded(displayId: Int) {
-            Log.d(TAG, "Display added: id=$displayId")
-            evaluateExternalDisplays()
+            evaluateConnectedDisplays()
         }
 
         override fun onDisplayRemoved(displayId: Int) {
-            Log.d(TAG, "Display removed: id=$displayId")
-            evaluateExternalDisplays()
+            evaluateConnectedDisplays()
         }
 
         override fun onDisplayChanged(displayId: Int) {
-            Log.d(TAG, "Display changed: id=$displayId")
-            evaluateExternalDisplays()
+            evaluateConnectedDisplays()
         }
     }
 
     init {
-        // Register display listener on main thread
-        try {
-            displayManager?.registerDisplayListener(displayListener, mainHandler)
-            evaluateExternalDisplays()
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to register DisplayListener", e)
-        }
+        // Register display listener on main looper
+        displayManager?.registerDisplayListener(displayListener, mainHandler)
+        evaluateConnectedDisplays()
+
+        // Initialize current device window orientation
+        val initialOrientation = application.resources.configuration.orientation
+        _isLandscape.value = (initialOrientation == Configuration.ORIENTATION_LANDSCAPE)
     }
 
     /**
-     * Scans all system displays to identify external presentation / Miracast / wireless display surfaces.
-     * Any non-default display (`displayId != Display.DEFAULT_DISPLAY`) is classified as external.
+     * Scans currently connected system displays to detect secondary external screens
+     * (e.g. HDMI monitors, Miracast receivers, wireless display adapters).
      */
-    fun evaluateExternalDisplays() {
-        try {
-            val displays = displayManager?.displays ?: emptyArray()
-            val externalDisplays = displays.filter { it.displayId != Display.DEFAULT_DISPLAY && it.isValid }
+    private fun evaluateConnectedDisplays() {
+        val manager = displayManager ?: return
+        val displays = manager.displays
+        var foundExternal = false
+        var displayName: String? = null
 
-            val hasExternal = externalDisplays.isNotEmpty()
-            val displayName = externalDisplays.firstOrNull()?.name
-
-            _isExternalDisplayConnected.value = hasExternal
-            _externalDisplayName.value = displayName
-
-            Log.i(TAG, "External displays evaluated: count=${externalDisplays.size}, name=$displayName, connected=$hasExternal")
-        } catch (e: Exception) {
-            Log.e(TAG, "Error evaluating external displays", e)
+        for (display in displays) {
+            // Display ID 0 is the primary built-in device screen (Display.DEFAULT_DISPLAY)
+            if (isExternalDisplay(display.displayId)) {
+                foundExternal = true
+                displayName = display.name
+                break
+            }
         }
+
+        _isHardwareDisplayConnected.value = foundExternal
+        _externalDisplayName.value = displayName
     }
 
-    // -------------------------------------------------------------------------
-    // Orientation Management & Rotation Control
-    // -------------------------------------------------------------------------
-
     /**
-     * Toggles screen orientation between horizontal [ScreenOrientation.LANDSCAPE] and
-     * vertical [ScreenOrientation.PORTRAIT].
+     * Toggles screen orientation between Horizontal ([ScreenOrientation.LANDSCAPE])
+     * and Vertical ([ScreenOrientation.PORTRAIT]).
      *
-     * If the current active state is landscape, flips to portrait; otherwise flips to landscape.
+     * If the current orientation is [ScreenOrientation.AUTO], toggles to the opposite
+     * of the currently rendered window orientation.
      *
      * @return The newly assigned [ScreenOrientation].
      */
     fun toggleOrientation(): ScreenOrientation {
-        val nextOrientation = if (_isLandscape.value || _targetOrientation.value == ScreenOrientation.LANDSCAPE) {
-            ScreenOrientation.PORTRAIT
-        } else {
-            ScreenOrientation.LANDSCAPE
-        }
-        setOrientation(nextOrientation)
-        return nextOrientation
+        val newTarget = calculateToggledOrientation(_targetOrientation.value, _isLandscape.value)
+        _targetOrientation.value = newTarget
+        _isLandscape.value = (newTarget == ScreenOrientation.LANDSCAPE)
+        return newTarget
     }
 
     /**
-     * Assigns the desired screen orientation target for display alignment.
+     * Sets an explicit screen orientation target for display alignment.
      *
-     * @param orientation Desired [ScreenOrientation] mode.
+     * @param orientation Target [ScreenOrientation] (LANDSCAPE, PORTRAIT, or AUTO).
      */
     fun setOrientation(orientation: ScreenOrientation) {
         _targetOrientation.value = orientation
-        when (orientation) {
-            ScreenOrientation.LANDSCAPE -> _isLandscape.value = true
-            ScreenOrientation.PORTRAIT -> _isLandscape.value = false
-            ScreenOrientation.AUTO -> {
-                // Keep _isLandscape in sync with actual configuration
-            }
+        if (orientation != ScreenOrientation.AUTO) {
+            _isLandscape.value = (orientation == ScreenOrientation.LANDSCAPE)
         }
-        Log.i(TAG, "Target orientation set to: $orientation")
     }
 
     /**
-     * Convenience method to rotate screen between horizontal and vertical orientations.
+     * Enables or disables manual Screen Mirroring mode.
      *
-     * @return The newly assigned [ScreenOrientation].
-     */
-    fun rotateScreen(): ScreenOrientation {
-        return toggleOrientation()
-    }
-
-    /**
-     * Enables or disables manual Screen Mirroring mode override.
+     * When enabled, mirroring UI controls (such as the orientation rotation button)
+     * are surfaced even if the system [DisplayManager] has not registered a secondary
+     * hardware display entity (e.g., when mirroring via Google Cast Screen Mirroring or Smart View).
      *
-     * @param enabled True to manually engage screen mirroring controls; false to rely solely on hardware detection.
+     * @param enabled True to engage manual screen mirroring mode; false to revert to automatic hardware sensing.
      */
     fun setScreenMirroringManual(enabled: Boolean) {
         _isScreenMirroringManual.value = enabled
-        Log.i(TAG, "Manual screen mirroring mode set to: $enabled")
-    }
-
-    /**
-     * Synchronizes internal orientation tracking with the host Android Activity's configuration changes.
-     *
-     * @param newOrientation Android system orientation value ([Configuration.ORIENTATION_LANDSCAPE] or [Configuration.ORIENTATION_PORTRAIT]).
-     */
-    fun notifyConfigurationChanged(newOrientation: Int) {
-        val isLand = newOrientation == Configuration.ORIENTATION_LANDSCAPE
-        _isLandscape.value = isLand
-        if (_targetOrientation.value == ScreenOrientation.AUTO) {
-            Log.d(TAG, "Configuration changed to isLandscape=$isLand (AUTO mode)")
+        if (!enabled && !_isHardwareDisplayConnected.value) {
+            // Reset orientation to auto if screen mirroring is completely disengaged
+            _targetOrientation.value = ScreenOrientation.AUTO
         }
     }
 
     /**
-     * Resets screen orientation back to system default automatic sensor tracking ([ScreenOrientation.AUTO]).
+     * Propagates system window configuration changes from Activity to sync effective landscape state.
+     *
+     * @param orientation New [Configuration.ORIENTATION_LANDSCAPE] or [Configuration.ORIENTATION_PORTRAIT] code.
      */
-    fun resetOrientation() {
-        setOrientation(ScreenOrientation.AUTO)
+    fun notifyConfigurationChanged(orientation: Int) {
+        _isLandscape.value = (orientation == Configuration.ORIENTATION_LANDSCAPE)
     }
 
     /**
-     * Unregisters system display listeners and terminates background monitoring resources.
+     * Releases system display listeners and cancels active coroutine scopes.
      */
     fun destroy() {
-        try {
-            displayManager?.unregisterDisplayListener(displayListener)
-        } catch (e: Exception) {
-            Log.e(TAG, "Error unregistering DisplayListener", e)
-        }
+        displayManager?.unregisterDisplayListener(displayListener)
+        scope.cancel()
     }
 }

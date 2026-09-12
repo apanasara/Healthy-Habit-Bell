@@ -1,49 +1,37 @@
-/**
- * # ScreenOrientation
- *
- * Target display orientation specification for mobile screen mirroring and TV display alignment.
- *
- * ## Architectural Role & Component Relationships
- * Domain enum in `com.habitbell.app.cast`:
- * - Consumed by [ScreenMirroringManager] to dictate requested activity orientation.
- * - Bound to [com.habitbell.app.MainActivity] window requested orientation lifecycle (`requestedOrientation`).
- * - Presented across [com.habitbell.app.ui.screens.SessionScreen], [com.habitbell.app.ui.screens.ModernHomeScreenSample],
- *   and [com.habitbell.app.ui.screens.SettingsDrawer].
- *
- * ## Concurrency & Thread Safety
- * Immutable enum type safe across all coroutine dispatchers and UI threads.
- */
 package com.habitbell.app.cast
 
 /**
- * Enumeration of allowable display orientation configurations for TV screen mirroring.
+ * # ScreenOrientation
+ *
+ * Defines display orientation targets for Habit Bell on mobile and external TV mirroring displays.
+ *
+ * ## Architectural Role & Relationships
+ * Dictates requested window orientation in [com.habitbell.app.MainActivity] and coordinates with
+ * [ScreenMirroringManager] to ensure timer visualizations align with the physical orientation of
+ * external television screens, projectors, and wireless mirroring monitors.
+ *
+ * ## Concurrency Model
+ * Immutable enumeration; thread-safe for concurrent read operations across coroutine flows.
  */
 enum class ScreenOrientation {
-    /**
-     * Vertical portrait display orientation (standard mobile device ergonomics, 9:16 aspect ratio).
-     */
+    /** Forced vertical orientation (sensor-assisted portrait mode). */
     PORTRAIT,
 
-    /**
-     * Horizontal landscape display orientation (standard widescreen TV / monitor ergonomics, 16:9 aspect ratio).
-     */
+    /** Forced horizontal orientation (sensor-assisted landscape mode). */
     LANDSCAPE,
 
-    /**
-     * Dynamic device orientation driven organically by the smartphone hardware accelerometer/gyroscope sensors.
-     */
+    /** Unconstrained orientation driven dynamically by hardware accelerometer sensors and system policy. */
     AUTO;
 
     /**
-     * Toggles between [PORTRAIT] and [LANDSCAPE]. If currently [AUTO], defaults to [LANDSCAPE].
+     * Toggles between [LANDSCAPE] (Horizontal) and [PORTRAIT] (Vertical).
+     * If currently [AUTO], defaults to toggling into [LANDSCAPE].
      *
-     * @return Opposite fixed orientation ([LANDSCAPE] if [PORTRAIT] or [AUTO], [PORTRAIT] if [LANDSCAPE]).
+     * @return The opposite explicit [ScreenOrientation].
      */
-    fun toggle(): ScreenOrientation {
-        return when (this) {
-            PORTRAIT -> LANDSCAPE
-            LANDSCAPE -> PORTRAIT
-            AUTO -> LANDSCAPE
-        }
+    fun toggle(): ScreenOrientation = when (this) {
+        LANDSCAPE -> PORTRAIT
+        PORTRAIT -> LANDSCAPE
+        AUTO -> LANDSCAPE
     }
 }

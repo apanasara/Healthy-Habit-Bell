@@ -544,12 +544,12 @@ private fun ModernZenTopBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Screen Mirroring Rotate Button (when screen mirroring active)
+            // TV Screen Mirroring Orientation Rotate Button
             if (isScreenMirroringActive) {
                 IconButton(onClick = onToggleOrientation, modifier = Modifier.size(36.dp)) {
                     Icon(
                         imageVector = if (isLandscape) Icons.Outlined.StayCurrentPortrait else Icons.Outlined.StayCurrentLandscape,
-                        contentDescription = if (isLandscape) "Rotate screen to Vertical for TV" else "Rotate screen to Horizontal for TV",
+                        contentDescription = if (isLandscape) "Rotate to Vertical (Portrait) for TV" else "Rotate to Horizontal (Landscape) for TV",
                         tint = primaryColor,
                         modifier = Modifier.size(20.dp)
                     )

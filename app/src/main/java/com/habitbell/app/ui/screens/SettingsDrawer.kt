@@ -340,7 +340,14 @@ fun SettingsDrawer(
                             isPauseOnBluetoothDisconnect = isPauseOnBluetoothDisconnect,
                             onPauseOnBluetoothDisconnectToggle = onPauseOnBluetoothDisconnectToggle,
                             isPrepCountdownEnabled = isPrepCountdownEnabled,
-                            onPrepCountdownToggle = onPrepCountdownToggle
+                            onPrepCountdownToggle = onPrepCountdownToggle,
+                            isScreenMirroringActive = isScreenMirroringActive,
+                            isScreenMirroringManual = isScreenMirroringManual,
+                            screenMirroringTargetOrientation = screenMirroringTargetOrientation,
+                            externalDisplayName = externalDisplayName,
+                            onToggleScreenMirroringMode = onToggleScreenMirroringMode,
+                            onSetScreenOrientation = onSetScreenOrientation,
+                            onToggleScreenOrientation = onToggleScreenOrientation
                         )
                     }
                 }
@@ -940,7 +947,14 @@ private fun GlobalConfigContent(
     isPauseOnBluetoothDisconnect: Boolean = true,
     onPauseOnBluetoothDisconnectToggle: (Boolean) -> Unit = {},
     isPrepCountdownEnabled: Boolean = true,
-    onPrepCountdownToggle: (Boolean) -> Unit = {}
+    onPrepCountdownToggle: (Boolean) -> Unit = {},
+    isScreenMirroringActive: Boolean = false,
+    isScreenMirroringManual: Boolean = false,
+    screenMirroringTargetOrientation: ScreenOrientation = ScreenOrientation.AUTO,
+    externalDisplayName: String? = null,
+    onToggleScreenMirroringMode: (Boolean) -> Unit = {},
+    onSetScreenOrientation: (ScreenOrientation) -> Unit = {},
+    onToggleScreenOrientation: () -> Unit = {}
 ) {
     val context = LocalContext.current
 
@@ -1316,6 +1330,122 @@ private fun GlobalConfigContent(
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
+                    }
+                }
+
+                // Screen Mirroring TV Orientation Controls
+                Spacer(modifier = Modifier.height(10.dp))
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Text(
+                                        text = "Screen Mirroring Mode",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                    if (isScreenMirroringActive) {
+                                        Surface(
+                                            shape = RoundedCornerShape(4.dp),
+                                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                                        ) {
+                                            Text(
+                                                text = if (externalDisplayName != null) "● $externalDisplayName" else "● Active",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                                Text(
+                                    text = "Force-enable TV orientation controls and keep screen awake when casting screen via Quick Settings or Smart View",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Switch(
+                                checked = isScreenMirroringManual || isScreenMirroringActive,
+                                onCheckedChange = onToggleScreenMirroringMode
+                            )
+                        }
+
+                        if (isScreenMirroringActive) {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            Text(
+                                text = "TV Screen Orientation",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                val orientations = listOf(
+                                    ScreenOrientation.PORTRAIT to "Vertical",
+                                    ScreenOrientation.LANDSCAPE to "Horizontal",
+                                    ScreenOrientation.AUTO to "Auto"
+                                )
+                                orientations.forEach { (orientation, label) ->
+                                    val isSelected = screenMirroringTargetOrientation == orientation
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .clickable { onSetScreenOrientation(orientation) }
+                                    ) {
+                                        Box(
+                                            contentAlignment = Alignment.Center,
+                                            modifier = Modifier.padding(vertical = 8.dp)
+                                        ) {
+                                            Text(
+                                                text = label,
+                                                style = MaterialTheme.typography.labelMedium,
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                                color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(10.dp))
+                            OutlinedButton(
+                                onClick = onToggleScreenOrientation,
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.ScreenRotation,
+                                    contentDescription = "Rotate Screen",
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Rotate Screen ⇄",
+                                    style = MaterialTheme.typography.labelMedium
+                                )
+                            }
+                        }
                     }
                 }
 

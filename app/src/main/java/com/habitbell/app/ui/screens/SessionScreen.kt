@@ -57,8 +57,9 @@ import com.habitbell.app.ui.components.CompoundPoseCard
  * @param onExit Callback to exit session and return to the Home dashboard.
  * @param onToggleTheme Callback to centrally cycle or toggle the application visual theme.
  * @param onUserInteraction Callback triggered when the user interacts with the display to wake from dimming.
- * @param isScreenMirroringActive Whether Screen Mirroring (Miracast / external display) is active.
- * @param onToggleOrientation Callback to rotate screen orientation between Horizontal (Landscape) and Vertical (Portrait).
+ * @param isScreenMirroringActive Whether Screen Mirroring is currently engaged.
+ * @param onToggleOrientation Screen rotation callback.
+ * @param onSkipPreparation Callback to bypass the 5-second preparation countdown.
  * @param modifier Composable layout modifier.
  */
 @Composable
