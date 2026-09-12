@@ -213,50 +213,75 @@ The heartbeat of the mindfulness runtime is a deterministic finite state machine
   - Native Swift 5.10+ / SwiftUI application built for tvOS 17+.
   - Features circular countdown stroke animation, Siri Remote Clickpad gestures, and real-time Bonjour mDNS discovery (`_http._tcp.`) auto-syncing with `LocalCastWebServer` on the Android device via Server-Sent Events.
 
-#### 7. Google Cast Custom Web Receiver & Bidirectional Telemetry Protocol (`docs/index.html` & `tv-platforms/google-cast-receiver/`)
+#### 7. Google Cast Custom Web Receiver & Bidirectional Telemetry Protocol (`docs/index.html`, `tv-platforms/google-cast-receiver/`, & `app/src/main/assets/tv/`)
 - **Architectural Role & TV Sandboxing**: Solves the browserless TV and phone distraction challenges by executing a dedicated, cloud-hosted Custom Web Receiver directly within the Google Cast Application Framework (CAF v3) hardware sandbox on Chromecasts, Google TVs, and Sony Bravia displays. Allows the user's phone to dim or sleep while the TV independently renders the meditation canvas.
+- **Identical Triplicate Target Synchrony**: The receiver codebase is mirrored across three 100% identical targets kept in bit-level synchrony:
+  1. `tv-platforms/google-cast-receiver/index.html`: Authoritative reference source.
+  2. `docs/index.html`: GitHub Pages production endpoint serving Cast Application ID `4662865D` (`https://apanasara.github.io/Healthy-Habit-Bell/`).
+  3. `app/src/main/assets/tv/index.html`: Embedded offline web server asset bundled inside the Android APK on port 8888 for zero-internet LAN casting.
 - **CAF v3 Compliance & Media Player Architecture**:
   - Embedded `<cast-media-player style="display:none;"></cast-media-player>` enables CAF v3 `PlayerManager` to bind cleanly, preventing session initialization crashes when the Android sender attaches `RemoteMediaClient` and `CastMediaOptions`.
   - Custom namespace declaration: Explicitly pre-registers `options.customNamespaces = { ['urn:x-cast:com.habitbell.cast']: cast.framework.system.MessageType.JSON }` prior to `context.start(options)`.
-  - Safe payload deserialization: Handles both pre-parsed JSON objects and raw string transmissions via `const msg = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;`, eliminating `SyntaxError: Unexpected token o in JSON at position 1` crashes that previously dropped all sender state packets.
-- **Multi-Screen Receiver Presentation Engine**:
-  1. **SPLASH Screen (Standby / Idle / Connected)**:
-     - Ambient golden prana aura with breathing animation.
-     - Vector Habit Bell & Lotus sacred crest with gentle living respiration scale.
-     - Dual-state connection indicator: pulsing amber beacon in standby ("Waiting for phone...") transitioning to emerald beacon when bound to the sender ("Connected to Habit Bell • Ready to begin").
-     - Live Queued Routine Preview card displaying the selected mobile profile name, duration, and start prompt even while the session is idle.
-  2. **MINDFUL EATING Screen**:
-     - Warm ambient candlelight color palette (`#E5A93C`, `#D97706`).
-     - **Concentric Dual SVG Rings**:
-       - Outer ring (radius 220, circumference 1382px): Tracks total meal countdown progress (e.g. 45 minutes).
-       - Inner ring (radius 175, circumference 1099px): Tracks the active bite pacing interval cycle (e.g. 60-second bite pacing bell) with glowing amber stroke.
-     - Zen dining bowl and chopsticks vector icon centered within the rings.
-     - Ultra-crisp, extra-large countdown numerals (`45:00`) readable from 15 feet away across dining tables or living rooms.
-     - Bite pacing pill: `"🔔 Bite Bell in 00:42 • CHEW & SAVOR"`.
-     - Dynamic mindful eating prompts carousel rotating evidence-based eating guidelines every 12 seconds ("Chew each bite 30–40 times", "Rest fork between bites", "Tune in to satiety cues").
-     - Radial chime ripple wave expanding outwards from the center bowl upon interval bell completion.
-  3. **PRANAYAMA Screen (Heroic Blooming Lotus)**:
-     - **Heroic 13-Petal Side-View Blooming Lotus SVG** across 7 depth tiers (outer wings, mid-lateral wings, chalice petals, central erect spine, and emerald `#10B981` calyx/stem).
-     - **Smooth Kinematic Bloom Physics**:
-       - *Pūraka (Inhale)*: Petals lift and unfurl organically into full bloom with cubic bezier expansion.
-       - *Antar Kumbhaka (Hold In)*: Sustained open flower floating gently on calm aquatic waves.
-       - *Recaka (Exhale)*: Petals fold softly inward into a serene closed bud.
-       - *Bāhya Kumbhaka (Hold Out / Void)*: Slender resting bud suspended in stillness.
-     - **Dynamic Breath-Phase Color Harmony**:
-       - Pūraka (Inhale): Luminous Cyan (`#4ECDC4`)
-       - Antar Kumbhaka (Hold In): Radiant Golden Amber (`#E5A93C`)
-       - Recaka (Exhale): Meditative Lavender (`#A78BFA`)
-       - Bāhya Kumbhaka (Hold Out): Celestial Azure (`#60A5FA`)
-     - **Upper Sanskrit HUD**: Elevated above the flower to ensure zero visual overlap. Displays Sanskrit phase (`PŪRAKA`), English guidance (`Inhale Deeply`), and large countdown numeral (`4`).
-     - Round milestone tracker (`"Round 3 of 12"`) and total remaining countdown.
-  4. **GENERAL Screen (Surya Namaskar & Meditation Fallback)**:
-     - Posture card displaying active asana names in Sanskrit and English with breath cues (`"Pranamasana • Prayer Pose • Exhale"`).
+  - Safe payload deserialization: Handles both pre-parsed JSON objects and raw string transmissions via `const msg = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;`, eliminating `SyntaxError: Unexpected token o in JSON at position 1` crashes that previously dropped sender state packets.
+- **Bit-Identical Mobile Timer UI Harmonization (`SessionScreen.kt` Parity)**:
+  The receiver UI is engineered to match the Android mobile timer experience (`SessionScreen.kt`) bit-identically across visual structure, typography, component layout, and dynamic modes:
+  1. **Top Action Bar**:
+     - Back button (`ic_ph_back`) with circular frosted surface (`rgba(255,255,255,0.06)`).
+     - Live casting status indicator pill: Cast icon (`ic_ph_tv`) with pulsing emerald beacon and `"CASTING TO TV"` tracking badge.
+     - Centered session header displaying profile title and subtitle.
+     - Sound / Tibetan Bowl indicator pill (`ic_ph_bowl`) indicating active acoustic bell frequency.
+  2. **Four Dynamic Timer Screen Topologies**:
+     - **SPLASH / Standby Screen**: Ambient golden prana breathing glow, sacred Habit Bell crest, dual-state connection status (amber pulsing standby transitioning to emerald connected), and queued routine preview card with profile metadata.
+     - **LINEAR / General Timer Mode (`screenMode == 'GENERAL'`)**:
+       - Primary SVG circular progress ring (radius 180, circumference 1131px) with gradient stroke and animated glowing progress head dot tracking exact completion percentage.
+       - Ultra-crisp, extra-large timer countdown typography (`MM:SS` or `HH:MM:SS`) with elapsed/total subtext (`02:15 elapsed • 15:00 total`).
+       - Health & step-tracking telemetry pill (`👟 1,420 steps • 112 spm • Bell in 580 steps`) dynamically rendered when mindful walking/step tracking is engaged.
+       - Session bell chime indicator (`🔔 Tibetan Bell every 5m`).
+     - **MINDFUL EATING Mode (`screenMode == 'EATING'`)**:
+       - Warm candlelight amber color palette (`#E5A93C`, `#D97706`).
+       - **Concentric Dual SVG Rings**:
+         - Outer meal ring (radius 180, circumference 1131px): Tracks total meal duration countdown.
+         - Inner bite pacing ring (radius 140, circumference 880px): Tracks active bite chewing interval with pulsing amber stroke.
+       - Centered Zen dining bowl and chopsticks vector icon (`ic_ph_bowl`).
+       - Bite pacing pill: `"🔔 Bite Bell in 00:42 • CHEW & SAVOR"`.
+       - Mindful eating guidelines carousel rotating evidence-based eating habits every 12 seconds ("Chew each bite 30–40 times", "Rest fork between bites", "Tune in to satiety cues").
+       - Radial chime ripple wave expanding outwards from the center bowl upon interval bell completion.
+     - **PRANAYAMA Mode (`screenMode == 'PRANAYAMA'`)**:
+       - **Heroic 13-Petal Side-View Blooming Lotus SVG** across 7 depth tiers (outer wings, mid-lateral wings, chalice petals, central erect spine, and emerald `#10B981` calyx/stem).
+       - **Smooth Kinematic Bloom Physics**:
+         - *Pūraka (Inhale)*: Petals lift and unfurl organically into full bloom with cubic bezier expansion.
+         - *Antar Kumbhaka (Hold In)*: Sustained open flower floating gently on calm aquatic waves.
+         - *Recaka (Exhale)*: Petals fold softly inward into a serene closed bud.
+         - *Bāhya Kumbhaka (Hold Out / Void)*: Slender resting bud suspended in stillness.
+       - **Dynamic Breath-Phase Color Harmony**: Luminous Cyan (`#4ECDC4`) for Pūraka, Radiant Amber (`#E5A93C`) for Antar Kumbhaka, Meditative Lavender (`#A78BFA`) for Recaka, and Celestial Azure (`#60A5FA`) for Bāhya Kumbhaka.
+       - **Upper Sanskrit HUD & Devanagari Banner**: Elevated Sanskrit script display (`पूरक`, `कुम्भक`, `रेचक`, `शून्यक`), English guidance (`Inhale Deeply`), and large phase countdown numeral (`4`).
+       - Round milestone tracker (`"Round 3 of 12"`) and interval bell indicator (`"🔔 Interval bell in 2 rounds"`).
+     - **SURYA NAMASKAR Mode (`screenMode == 'SURYA'`)**:
+       - Dedicated compound sequencer layout for 12-step Sun Salutation flows.
+       - **Vector Posture Silhouettes**: 8 unique vector postures extracted directly from Android vector drawables (`yoga_pranamasana.xml`, `yoga_hastauttanasana.xml`, `yoga_padahastasana.xml`, `yoga_ashwa_sanchalanasana.xml`, `yoga_dandasana.xml`, `yoga_ashtanga_namaskara.xml`, `yoga_bhujangasana.xml`, `yoga_parvatasana.xml`) accurately mapped to steps 1 through 12.
+       - 12-step solar progress indicator with numbered dot nodes and active step glow.
+       - Posture headline displaying pose index, English name, and Sanskrit name (`Pose 1/12 • Pranamasana (Prayer Pose)`).
+       - Sacred solar mantra card rendering traditional Devanagari invocation (`ॐ मित्राय नमः`).
+       - Breath cue badge with dynamic inhalation/exhalation color accents (`Inhale & Exhale gently`).
+       - Step countdown timer and master round badge (`Round 1 of 6`).
+  3. **Bottom Transport Control Bar**:
+     - Frosted floating pill container mirroring `SessionScreen.kt` transport controls.
+     - Reset action button (`ic_ph_reset`) sending bidirectional reset command to Android sender.
+     - Master Play / Pause button (`ic_ph_play` / `ic_ph_pause`) with pulsing golden prana halo.
+     - Tune / Settings icon (`ic_ph_tune`) matching mobile layout balance.
 - **Bidirectional Custom Message Bus (`urn:x-cast:com.habitbell.cast`) & Handshake Protocol**:
   - **Receiver Readiness Handshake**: Receiver emits `{ type: 'ready' }` upon startup (`EventType.READY`) and upon sender connection (`EventType.SENDER_CONNECTED`). Android `HabitBellCastManager` triggers `onReceiverReady`, causing `CentralSessionHandler` to immediately dispatch the current session snapshot (even if `IDLE`).
   - **Immediate Telemetry Synchronization**: Binds telemetry push to `castManager.isCasting.collect` regardless of session running status, instantly updating the TV from standby to active profile preview when the user taps Cast from the mobile home screen.
-  - **Extended Telemetry Contract**: Carries `screenMode` (`'SPLASH' | 'EATING' | 'PRANAYAMA' | 'GENERAL'`), `isEating`, `isPranayama`, `isSurya`, `intervalDurationSeconds`, `nextBellSeconds`, `phaseDurationSeconds`, `phaseRemainingSeconds`, and `remainingSeconds`.
-  - **Mixed Content Protection**: Guaranteed HTTPS media stream resolution in `HabitBellCastManager` when targeting custom web receivers to satisfy Chromium security constraints.
-  - **TV Remote Feedback (Receiver -> Phone)**: Captures hardware Play/Pause remote key events via CAF v3 and routes them back to `HabitBellCastManager.onRemotePlaybackAction` to synchronize mobile state.
+  - **Extended Telemetry Schema**:
+    - `screenMode`: `'SPLASH' | 'GENERAL' | 'EATING' | 'PRANAYAMA' | 'SURYA'`
+    - Session metrics: `remainingSeconds`, `elapsedSeconds`, `totalDurationSeconds`, `progress`, `currentRound`, `totalRounds`, `status`
+    - Mindful eating metrics: `intervalDurationSeconds`, `nextBellSeconds`
+    - Pranayama metrics: `pranayamaPhase`, `pranayamaSanskrit`, `pranayamaDisplay`, `pranayamaScript` (Devanagari), `phaseDurationSeconds`, `phaseRemainingSeconds`, `isIntervalBellEnabled`, `roundsUntilBell`
+    - Surya Namaskar metrics: `poseIndex` (1..12), `poseName`, `poseSanskrit`, `poseBreath`, `poseMantra`, `poseRemainingSeconds`
+    - Step / Cadence metrics: `isStepTrackingActive`, `currentSteps`, `formattedStepCount`, `formattedCadence`, `nextStepBellSteps`
+  - **TV Remote & Web Receiver Feedback (Receiver -> Phone)**:
+    - Captures hardware Play/Pause remote key events via CAF v3 and routes them back to `HabitBellCastManager.onRemotePlaybackAction` to synchronize mobile state.
+    - Captures web receiver UI Reset click and routes `{ type: 'reset' }` back to `HabitBellCastManager.onRemoteResetAction` -> `CentralSessionHandler.reset()`.
 - **Zero-Bandwidth In-Memory Web Audio Synthesis**:
   - Synthesizes authentic Tibetan singing bowl chimes directly inside the TV's browser hardware via HTML5 `AudioContext`.
   - Combines 432 Hz fundamental sine wave with 2.76 harmonic overtone (1192.3 Hz), shaped by a 20 ms linear attack ramp and an exponential acoustic decay envelope, delivering rich living room acoustics with zero audio streaming data transfer.
