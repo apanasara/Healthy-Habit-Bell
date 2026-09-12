@@ -1,7 +1,11 @@
 package com.habitbell.app
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.widget.Toast
 import androidx.fragment.app.FragmentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -366,8 +370,8 @@ class MainActivity : FragmentActivity() {
         // Check and restore active ongoing session if present
         viewModel.checkAndRestoreOngoingSession()
 
-        // Handle Google Assistant & Voice Action on initial activity launch
-        handleVoiceIntent(intent)
+        // Handle incoming intents (Google Assistant voice commands, share sheet, deep links)
+        handleIncomingIntent(intent)
     }
 
     /**
@@ -379,20 +383,25 @@ class MainActivity : FragmentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         viewModel.checkAndRestoreOngoingSession()
-        handleVoiceIntent(intent)
+        handleIncomingIntent(intent)
     }
 
     /**
-     * Decodes Assistant actions, deep links, and voice intent parameters to start or control timers.
+     * Decodes Assistant actions, deep links, system share sheet intents, and voice intent parameters.
      *
      * @param intent Incoming intent.
      */
-    private fun handleVoiceIntent(intent: Intent?) {
+    private fun handleIncomingIntent(intent: Intent?) {
         if (intent == null) return
         val action = intent.action ?: ""
         val dataUri = intent.data
 
         when {
+            // Android System Share Sheet: YouTube or URL / text share
+            action == Intent.ACTION_SEND -> {
+                handleShareIntent(intent)
+            }
+
             // Notification tap / direct session restore action
             intent.getBooleanExtra("EXTRA_NAVIGATE_TO_SESSION", false) -> {
                 viewModel.checkAndRestoreOngoingSession()
@@ -448,6 +457,49 @@ class MainActivity : FragmentActivity() {
                 viewModel.startProfileSession(surya)
                 viewModel.openSettingsDrawer(true, com.habitbell.app.ui.viewmodel.SettingsDrawerTab.TIMER)
             }
+        }
+    }
+
+    /**
+     * Handles shared content from Android's system share sheet (e.g. sharing from the YouTube app or browser).
+     *
+     * Extracts the YouTube video ID from the shared text, normalizes it into the canonical shortest URL
+     * (`https://youtu.be/<videoId>`), copies it into the system clipboard, sets it as Habitbell's ambient music URL,
+     * and alerts the user.
+     *
+     * @param intent Incoming [Intent.ACTION_SEND] intent carrying shared text or web URL.
+     */
+    private fun handleShareIntent(intent: Intent) {
+        val sharedText = intent.getStringExtra(Intent.EXTRA_TEXT)
+            ?: intent.getStringExtra(Intent.EXTRA_SUBJECT)
+            ?: intent.clipData?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.text?.toString()
+            ?: intent.data?.toString()
+            ?: return
+
+        val shortestUrl = viewModel.processSharedYouTubeUrl(sharedText)
+        if (shortestUrl != null) {
+            // Copy the canonical shortest URL to the Android system clipboard
+            val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+            val clip = ClipData.newPlainText("Habitbell Ambient Music", shortestUrl)
+            clipboard?.setPrimaryClip(clip)
+
+            // Display clear confirmation toast to the user
+            Toast.makeText(
+                this,
+                "Ambient music URL set: $shortestUrl",
+                Toast.LENGTH_LONG
+            ).show()
+
+            // Open settings drawer to the Timer / Ambient Sound tab if no timer session is currently active
+            if (viewModel.sessionState.value.status != SessionStatus.RUNNING) {
+                viewModel.openSettingsDrawer(true, com.habitbell.app.ui.viewmodel.SettingsDrawerTab.TIMER)
+            }
+        } else {
+            Toast.makeText(
+                this,
+                "No valid YouTube video ID found in shared link",
+                Toast.LENGTH_SHORT
+            ).show()
         }
     }
 

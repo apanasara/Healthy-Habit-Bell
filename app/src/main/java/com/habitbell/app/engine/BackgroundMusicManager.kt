@@ -530,24 +530,66 @@ class BackgroundMusicManager(private val context: Context) {
     }
 
     /**
-     * Extracts an 11-character YouTube video ID from various URL structures (watch, shorts, embed, youtu.be).
+     * Extracts an 11-character YouTube video ID from various URL structures.
      *
      * @param url Raw input URL string.
      * @return 11-character alphanumeric video ID, or null if no valid ID pattern was found.
+     * @see toShortestYouTubeUrl
      */
-    fun extractVideoId(url: String): String? {
-        val cleanUrl = url.trim()
-        val patterns = listOf(
-            "(?:v=|\\/v\\/|youtu\\.be\\/|\\/embed\\/|\\/shorts\\/)([a-zA-Z0-9_-]{11})",
+    fun extractVideoId(url: String): String? = Companion.extractVideoId(url)
+
+    /**
+     * Converts any YouTube URL, shared text, or video ID into the canonical shortest URL format.
+     *
+     * @param text Raw input URL string or shared text.
+     * @return Shortest canonical URL string ("https://youtu.be/<videoId>"), or null if no valid ID pattern was found.
+     */
+    fun toShortestYouTubeUrl(text: String): String? = Companion.toShortestYouTubeUrl(text)
+
+    companion object {
+        /** Regex patterns matching standard YouTube watch, short link, shorts, embed, and live stream identifiers. */
+        private val YOUTUBE_PATTERNS = listOf(
+            "(?:v=|\\/v\\/|youtu\\.be\\/|\\/embed\\/|\\/shorts\\/|\\/live\\/)([a-zA-Z0-9_-]{11})",
             "^([a-zA-Z0-9_-]{11})$"
         )
-        for (pattern in patterns) {
-            val matcher = Pattern.compile(pattern).matcher(cleanUrl)
-            if (matcher.find()) {
-                return matcher.group(1)
+
+        /**
+         * Extracts an 11-character YouTube video ID from various URL structures (watch, shorts, embed, youtu.be, live).
+         *
+         * Automatically URL-decodes the input string to handle redirect or attribution links.
+         *
+         * @param url Raw input URL string or shared text block.
+         * @return 11-character alphanumeric video ID, or null if no valid ID pattern was found.
+         */
+        fun extractVideoId(url: String): String? {
+            val cleanUrl = url.trim()
+            val decodedUrl = try {
+                java.net.URLDecoder.decode(cleanUrl, "UTF-8")
+            } catch (_: Exception) {
+                cleanUrl
             }
+            for (pattern in YOUTUBE_PATTERNS) {
+                val matcher = Pattern.compile(pattern).matcher(decodedUrl)
+                if (matcher.find()) {
+                    return matcher.group(1)
+                }
+            }
+            return null
         }
-        return null
+
+        /**
+         * Converts any YouTube URL, shared text block, or raw video ID into the canonical shortest URL format.
+         *
+         * Strips away extraneous tracking query parameters (e.g., `?si=...`, `&feature=...`, `&t=...`)
+         * yielding a 28-character clean URL: `https://youtu.be/<videoId>`.
+         *
+         * @param text Raw shared text or link.
+         * @return Canonical shortest YouTube URL ("https://youtu.be/<videoId>"), or null if no valid video ID was found.
+         */
+        fun toShortestYouTubeUrl(text: String): String? {
+            val videoId = extractVideoId(text) ?: return null
+            return "https://youtu.be/$videoId"
+        }
     }
 
     /**

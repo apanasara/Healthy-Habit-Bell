@@ -882,18 +882,39 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     /**
-     * Sets a YouTube meditation video link for ad-free background streaming.
+     * Sets a YouTube meditation video link for ad-free background streaming, activating
+     * ambient background music and persisting the selection.
      *
-     * @param url Full YouTube video URL or ID.
+     * @param url Full YouTube video URL or ID (canonical shortest URL preferred).
      */
     fun setBgMusicYouTubeUrl(url: String) {
-        _uiState.update { it.copy(bgMusicYouTubeUrl = url, bgMusicType = BackgroundSoundType.YOUTUBE_LINK) }
+        _uiState.update {
+            it.copy(
+                bgMusicYouTubeUrl = url,
+                bgMusicType = BackgroundSoundType.YOUTUBE_LINK,
+                isBgMusicEnabled = true
+            )
+        }
+        bgMusicManager.isEnabled = true
         bgMusicManager.youtubeUrl = url
         bgMusicManager.soundType = BackgroundSoundType.YOUTUBE_LINK
         if (sessionState.value.status == SessionStatus.RUNNING) {
             bgMusicManager.start()
         }
         saveSettings()
+    }
+
+    /**
+     * Extracts a canonical shortest YouTube URL (`https://youtu.be/<videoId>`) from shared intent
+     * text or links, updates the active ambient background music setting, and persists the configuration.
+     *
+     * @param sharedText Raw text block, message, or URL passed from the system Share sheet.
+     * @return Canonical shortest YouTube URL (`https://youtu.be/<videoId>`), or `null` if no valid YouTube ID was identified.
+     */
+    fun processSharedYouTubeUrl(sharedText: String): String? {
+        val shortestUrl = BackgroundMusicManager.toShortestYouTubeUrl(sharedText) ?: return null
+        setBgMusicYouTubeUrl(shortestUrl)
+        return shortestUrl
     }
 
     /**

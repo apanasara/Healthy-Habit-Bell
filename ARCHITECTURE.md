@@ -87,6 +87,12 @@ The audio architecture guarantees high-fidelity, boundary-free sound reproductio
   - Headless, ad-free YouTube audio extraction and streaming engine using an isolated `WebView`.
   - Injects custom JavaScript to suppress video canvas rendering, minimize CPU usage, and guarantee seamless looping and persistent custom URL playback.
   - Linear 0%..100% dynamic volume scaling (`coerceIn(0, 100)`), eliminating arbitrary lower-bound attenuation clamps.
+- **System Share Sheet Integration & Shortest URL Normalization**:
+  - Registers `android.intent.action.SEND` with MIME type `text/plain` in `AndroidManifest.xml` on `MainActivity`, indexing Habitbell as a direct target in Android's native system Share Sheet.
+  - **Multi-Topology URL Extraction (`extractVideoId`)**: Robust regular expression parsing matching 11-character video IDs across standard watch links (`watch?v=`), short links (`youtu.be/`), Shorts (`/shorts/`), 24/7 ambient live streams (`/live/`), mobile/music domains (`m.youtube.com`, `music.youtube.com`), and URL-encoded attribution redirects (`%2Fwatch%3Fv%3D`).
+  - **Canonical Shortest URL Formatting (`toShortestYouTubeUrl`)**: Automatically converts any shared YouTube link or text block into the canonical 28-character shortest URL format (`https://youtu.be/<videoId>`), cleanly stripping extraneous tracking parameters (`?si=...`, `&feature=share`, `&t=...`).
+  - **Two-Way Synchronization**: Automatically copies the canonical shortest URL into the Android system `ClipboardManager` and applies it to `HabitBellViewModel` / `BackgroundMusicManager` (`isBgMusicEnabled = true`, `soundType = YOUTUBE_LINK`), persisting to `SharedPreferences` (`bg_music_yt_url`).
+  - **Context-Aware Visual Feedback**: Issues an informative `Toast` notification and, if no session is actively running, opens the Settings Drawer directly to `SettingsDrawerTab.TIMER` for instant stream auditioning via `▶ Test Stream`. If a meditation timer is currently running, stream audio updates seamlessly without interrupting the immersion screen.
 - **Raised-Cosine S-Curve Crossfader & Dynamic Gain Adaptation**:
   - `smoothFadeTo(targetGain, durationMs)`: Smoothly interpolates volume transitions via raised-cosine S-curve easing: `0.5 * (1 - cos(π * progress))`.
   - `duckVolume(0.20f, 350L)`: Temporarily and smoothly lowers ambient background audio during voice guidance cues to ensure crystalline vocal clarity.
@@ -228,7 +234,11 @@ The heartbeat of the mindfulness runtime is a deterministic finite state machine
   1. **Two-Column Horizontal Split Architecture**:
      - **Left Column (Visualizer Area, weight 1.15)**: Dedicated to the hero visualizer centerpiece across all topologies.
        - *Linear*: SVG circular progress ring (radius 190, circumference 1194px) with animated glowing progress head dot, large timer numerals (`88px`), step count, elapsed/total subtext (`00:00 elapsed • 15:00 total`).
-       - *Mindful Eating*: Concentric dual rings (outer meal countdown ring + inner bite pacing arc) centered around the Phosphor dining bowl icon (`ic_ph_bowl`) with flickering candlelight radial aura.
+       - *Mindful Eating (`MindfulEatingLandscapeContent` Parity)*:
+         - Concentric dual rings: Outer meal countdown ring (radius 190, circumference 1194px) with animated glowing head dot + inner bite-pacing arc (radius 54, circumference 339px) with rounded caps sweeping clockwise from 12 o'clock.
+         - Authentic Phosphor food bowl icon (`ic_ph_bowl.xml`) centered inside the bite arc with chopsticks, food basin, and steam curls.
+         - Candlelit radial breathing aura behind the bowl and dynamic acoustic chime wave expanding radially on every interval bell chime.
+         - Right column HUD featuring large meal countdown numerals (`78px`), bite bell countdown capsule (`ic_ph_bell.xml` + `🔔 Bite in MM:SS • CHEW & SAVOR`), `"● Mindful Chewing Rhythm"` status badge, and rotating 12-second mindful eating guidelines carousel.
        - *Pranayama (`BreathIndicator.kt` 1:1 Procedural Canvas Engine)*: High-performance HTML5 canvas rendering:
          - **13 Curved Petals Across 7 Depth Layers**: Implements dynamic dual morphing where each petal interpolates both angle (`angleBud` $\to$ `angleBloom`, $-84^\circ \dots +84^\circ$) and length (`lengthRatioBud` $\to$ `lengthRatioBloom`, $0.555\times \dots 1.0\times$) so resting bud petals remain tall and slender, while blooming petals form an organic cupped water lily.
          - **Dynamic 3-Leaf Calyx ("Patte") & Receptacle**: Three downward-pointing leaves spreading organically from $22^\circ$ to $58^\circ$ with bloom, a vertical stem with rounded caps, and a lime seed receptacle (`#84CC16`).
