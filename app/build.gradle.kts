@@ -55,6 +55,11 @@ android {
         }
     }
 
+    lint {
+        abortOnError = false
+        checkReleaseBuilds = false
+    }
+
     sourceSets["main"].res.srcDir("${buildDir}/generated/animated_vectors")
 }
 

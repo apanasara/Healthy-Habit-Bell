@@ -144,6 +144,34 @@ The audio architecture guarantees high-fidelity, boundary-free sound reproductio
   - **Pause/Resume Idempotence**: Resuming an existing paused session directly re-enters `SessionStatus.RUNNING` without re-triggering the 5-second preparation countdown.
   - **User Configurable Toggle**: Can be enabled or disabled globally via **Settings Drawer > Global Config** (`is_prep_countdown_enabled`, default `true`).
 
+#### 6. Direct Hardware & Connected Device Volume Synchronization Subsystem (Requirement E7)
+- **Problem Statement & Cognitive Duality Resolution**:
+  - In legacy audio architectures, apps typically apply an internal software gain multiplier (`MediaPlayer.setVolume` or YouTube IFrame volume) completely decoupled from Android's hardware stream volume (`AudioManager.STREAM_MUSIC`) or the TV's Google Cast device volume (`CastSession.setVolume`).
+  - This created severe user confusion due to multiplicative attenuation (e.g. 30% in-app gain $\times$ 30% system volume $= 9\%$ effective output) and lack of feedback when using physical phone volume rocker keys or TV remote controls.
+- **Unified Hardware Volume Law**:
+  - The in-app Ambient Volume slider is architected to directly inspect and govern the physical hardware volume of the **active audio endpoint**:
+  - **In Mobile App Mode**:
+    - **`SystemVolumeObserver.kt` Subsystem**: Registers a lifecycle-aware `ContentObserver` on Android's `Settings.System.CONTENT_URI` listening for changes to `AudioManager.STREAM_MUSIC`.
+    - **Bi-Directional Hardware Synchronization**:
+      - Dragging the in-app slider directly invokes `audioManager.setStreamVolume(AudioManager.STREAM_MUSIC, targetIndex, 0)`, adjusting device media output without intrusive system HUD overlays.
+      - Pressing the smartphone's physical volume rocker buttons, Bluetooth headset buttons, or steering wheel volume knobs triggers `ContentObserver.onChange()`, instantly updating `SystemVolumeObserver.volume` and moving the in-app Compose slider in real-time.
+  - **In Chromecast Mode**:
+    - **`HabitBellCastManager.kt` Volume Integration**: Binds `Cast.Listener` to the active `CastSession` and implements `onVolumeChanged()`.
+    - **Bi-Directional TV Remote Synchronization**:
+      - Dragging the in-app slider calls `castManager.setDeviceVolume(clamped)` which invokes `CastSession.setVolume(double)` and broadcasts custom JSON volume telemetry (`{"type":"volume", "volume": volume}`) across `urn:x-cast:com.habitbell.cast` to the living room TV.
+      - Adjusting the TV volume using the physical TV remote, Google TV remote, or Google Home app triggers `Cast.Listener.onVolumeChanged()`, which updates `HabitBellCastManager.castVolume` and updates the in-app slider dynamically.
+- **Dynamic Mode-Switching & Reactive Flow Topology**:
+  - `HabitBellViewModel.kt` utilizes Kotlin Coroutines `castManager.isCasting.collectLatest`:
+    - When `isCasting == true`, it cancels mobile observation and collects `castManager.castVolume`, initializing the slider to the TV's current volume level.
+    - When `isCasting == false`, it cancels Cast observation and collects `systemVolumeObserver.volume`, initializing the slider to the phone's current media volume.
+- **Unity Gain & Unimpaired Voice Guidance Ducking (`BackgroundMusicManager.kt`)**:
+  - Internal player output gain defaults to unity ($1.0\text{f}$), delegating master acoustic attenuation entirely to the phone or TV hardware.
+  - During voice guidance cues (e.g., Pranayama breath pacing or pre-session preparation countdown), `duckVolume(0.20f, 350L)` attenuates internal gain to $0.20\text{f}$ and restores it to $1.0\text{f}$ upon completion, guaranteeing crystal-clear vocal clarity without modifying the user's master system volume setting.
+- **Context-Aware Presentation Layer (`SettingsDrawer.kt`)**:
+  - The UI dynamically labels the volume section and displays the active target device:
+    - TV Mode: `"TV Volume (<Device Name>)"` with `"Directly controlling connected TV master volume"`.
+    - Mobile Mode: `"Phone Media Volume"` with `"Directly controlling mobile device media volume"`.
+
 ---
 
 ### 2.3. Timer Engine & State Machine (`TimerEngine.kt`)

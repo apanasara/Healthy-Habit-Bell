@@ -364,7 +364,53 @@ class MainActivity : FragmentActivity() {
                                     customPaceSeconds = customPace,
                                     voiceCueMode = voiceMode
                                 )
-                            }
+                            },
+                            onOpenVolumeSettings = { viewModel.openVolumeSheet(true) },
+                            onOpenCastSettings = { viewModel.openCastSheet(true) }
+                        )
+                    }
+
+                    // Volume & Audio Settings Dedicated Bottom Sheet (Requirement E6 & E7)
+                    if (uiState.isVolumeSheetOpen) {
+                        com.habitbell.app.ui.screens.VolumeSettingsSheet(
+                            intervalVolume = uiState.intervalVolume,
+                            bellVolume = uiState.bellVolume,
+                            bgMusicVolume = uiState.bgMusicVolume,
+                            isBgMusicEnabled = uiState.isBgMusicEnabled,
+                            bgMusicType = uiState.bgMusicType,
+                            bgMusicCustomName = uiState.bgMusicCustomName,
+                            bgMusicYouTubeUrl = uiState.bgMusicYouTubeUrl,
+                            isCasting = isCasting,
+                            castDeviceName = castDeviceName,
+                            onDismiss = { viewModel.openVolumeSheet(false) },
+                            onIntervalVolumeChange = { viewModel.setIntervalVolume(it) },
+                            onBellVolumeChange = { viewModel.setBellVolume(it) },
+                            onBgMusicVolumeChange = { viewModel.setBgMusicVolume(it) },
+                            onBgMusicToggle = { viewModel.setBgMusicEnabled(it) },
+                            onBgMusicTypeSelected = { viewModel.setBgMusicType(it) },
+                            onPickCustomAudio = { audioPickerLauncher.launch("audio/*") },
+                            onBgMusicYouTubeUrlChange = { viewModel.setBgMusicYouTubeUrl(it) },
+                            onTestIntervalBell = { viewModel.playOptionCPreview() },
+                            onTestCompletionBell = { viewModel.playGongPreview() },
+                            onPreviewBgMusic = { viewModel.previewBgMusic(it) }
+                        )
+                    }
+
+                    // TV Casting & Screen Mirroring Dedicated Bottom Sheet (Requirement E8)
+                    if (uiState.isCastSheetOpen) {
+                        com.habitbell.app.ui.screens.CastMirroringSheet(
+                            isCasting = isCasting,
+                            castDeviceName = castDeviceName,
+                            isScreenMirroringActive = isScreenMirroringActive,
+                            isScreenMirroringManual = isScreenMirroringManual,
+                            screenMirroringTargetOrientation = targetOrientation,
+                            externalDisplayName = externalDisplayName,
+                            tvCastUrl = viewModel.getTvCastUrl(),
+                            onDismiss = { viewModel.openCastSheet(false) },
+                            onDisconnectCast = { viewModel.castManager.disconnect() },
+                            onToggleScreenMirroringMode = { viewModel.setScreenMirroringMode(it) },
+                            onSetScreenOrientation = { viewModel.setScreenOrientation(it) },
+                            onToggleScreenOrientation = { viewModel.toggleScreenOrientation() }
                         )
                     }
 
@@ -379,11 +425,17 @@ class MainActivity : FragmentActivity() {
                     }
 
                     // System Back button interceptor
-                    androidx.activity.compose.BackHandler(enabled = uiState.currentScreen != AppScreen.HOME || uiState.isSettingsDrawerOpen) {
-                        if (uiState.isSettingsDrawerOpen) {
-                            viewModel.openSettingsDrawer(false)
-                        } else {
-                            viewModel.exitSessionToHome()
+                    androidx.activity.compose.BackHandler(
+                        enabled = uiState.currentScreen != AppScreen.HOME ||
+                                uiState.isSettingsDrawerOpen ||
+                                uiState.isVolumeSheetOpen ||
+                                uiState.isCastSheetOpen
+                    ) {
+                        when {
+                            uiState.isVolumeSheetOpen -> viewModel.openVolumeSheet(false)
+                            uiState.isCastSheetOpen -> viewModel.openCastSheet(false)
+                            uiState.isSettingsDrawerOpen -> viewModel.openSettingsDrawer(false)
+                            else -> viewModel.exitSessionToHome()
                         }
                     }
 

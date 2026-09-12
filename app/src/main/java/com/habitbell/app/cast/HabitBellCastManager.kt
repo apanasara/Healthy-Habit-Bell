@@ -112,6 +112,27 @@ class HabitBellCastManager private constructor(private val context: Context) {
     /** Public read-only stream emitting the active [CastState]. */
     val castState: StateFlow<Int> = _castState.asStateFlow()
 
+    /** Backing flow holding current connected Cast TV hardware volume level (0.0f..1.0f). */
+    private val _castVolume = MutableStateFlow(1.0f)
+
+    /** Public read-only stream emitting the connected TV hardware volume level (0.0f..1.0f). */
+    val castVolume: StateFlow<Float> = _castVolume.asStateFlow()
+
+    /** Cast listener observing hardware volume modifications dispatched from physical TV remotes. */
+    private val castListener = object : Cast.Listener() {
+        override fun onVolumeChanged() {
+            val session = currentCastSession ?: return
+            if (isDispatchingLocally) return
+            try {
+                val vol = session.volume.toFloat()
+                Log.d(TAG, "Remote TV hardware volume changed: $vol (isMute=${session.isMute})")
+                _castVolume.value = vol
+            } catch (e: Exception) {
+                Log.w(TAG, "Error querying Cast session volume: ${e.message}")
+            }
+        }
+    }
+
     /** Callback interface notifying central session orchestration of TV remote interactions. */
     var onRemotePlaybackAction: ((isPlay: Boolean) -> Unit)? = null
 
@@ -267,6 +288,16 @@ class HabitBellCastManager private constructor(private val context: Context) {
             Log.w(TAG, "Could not register custom message channel on Cast session: ${e.message}")
         }
 
+        // Attach CastListener to observe physical TV remote volume adjustments
+        try {
+            session.addCastListener(castListener)
+            val currentVol = session.volume.toFloat()
+            _castVolume.value = currentVol
+            Log.i(TAG, "Attached castListener to CastSession (initial TV volume: $currentVol)")
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not attach castListener or query initial volume: ${e.message}")
+        }
+
         Log.i(TAG, "Bound Cast session to device: $deviceName")
         onReceiverReady?.invoke()
     }
@@ -275,6 +306,11 @@ class HabitBellCastManager private constructor(private val context: Context) {
      * Unbinds the active Cast session, detaches custom message bus, and clears device references.
      */
     private fun unbindSession() {
+        try {
+            currentCastSession?.removeCastListener(castListener)
+        } catch (e: Exception) {
+            Log.w(TAG, "Error removing castListener: ${e.message}")
+        }
         try {
             currentCastSession?.removeMessageReceivedCallbacks(CUSTOM_NAMESPACE)
         } catch (e: Exception) {
@@ -458,12 +494,56 @@ class HabitBellCastManager private constructor(private val context: Context) {
                     Log.i(TAG, "TV Custom Receiver signaled ready/ping; synchronizing session state")
                     onReceiverReady?.invoke()
                 }
+                "volume" -> {
+                    val vol = json.optDouble("volume", -1.0)
+                    if (vol in 0.0..1.0) {
+                        _castVolume.value = vol.toFloat()
+                        Log.i(TAG, "TV Custom Receiver signaled volume update: $vol")
+                    }
+                }
                 else -> {
                     Log.d(TAG, "Unhandled TV receiver message type: ${json.optString("type")}")
                 }
             }
         } catch (e: Exception) {
             Log.w(TAG, "Failed to parse incoming Cast message: $message", e)
+        }
+    }
+
+    /**
+     * Sets the physical Google Cast / TV hardware master volume directly.
+     *
+     * Dispatches volume update across the Google Cast SDK [CastSession], immediately alters the
+     * connected TV's master output volume, and broadcasts a custom JSON message to the Web Receiver.
+     *
+     * @param volume Target volume gain in the closed interval `[0.0f, 1.0f]`.
+     */
+    fun setDeviceVolume(volume: Float) {
+        val session = currentCastSession ?: return
+        val safeGain = volume.coerceIn(0f, 1f)
+        isDispatchingLocally = true
+        try {
+            session.volume = safeGain.toDouble()
+            _castVolume.value = safeGain
+            Log.d(TAG, "Dispatched volume $safeGain directly to Cast device")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed setting volume on CastSession", e)
+        } finally {
+            scope.launch {
+                delay(300)
+                isDispatchingLocally = false
+            }
+        }
+
+        // Also transmit volume event across custom namespace for Web Receiver display
+        try {
+            val payload = JSONObject().apply {
+                put("type", "volume")
+                put("volume", safeGain.toDouble())
+            }
+            sendCustomMessage(payload.toString())
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed sending volume telemetry to Cast receiver: ${e.message}")
         }
     }
 
