@@ -40,6 +40,7 @@ import com.habitbell.app.sync.SuryaSyncManager
 import com.habitbell.app.ui.AnimatedPoseView
 import com.habitbell.app.ui.components.CastButton
 import com.habitbell.app.ui.viewmodel.SettingsDrawerTab
+import com.habitbell.app.ui.viewmodel.GlobalSettingsCategory
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -172,7 +173,9 @@ fun SettingsDrawer(
     externalDisplayName: String? = null,
     onToggleScreenMirroringMode: (Boolean) -> Unit = {},
     onSetScreenOrientation: (ScreenOrientation) -> Unit = {},
-    onToggleScreenOrientation: () -> Unit = {}
+    onToggleScreenOrientation: () -> Unit = {},
+    onOpenVolumeSettings: () -> Unit = {},
+    onOpenCastSettings: () -> Unit = {}
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -314,40 +317,23 @@ fun SettingsDrawer(
                             isPocketMode = isPocketMode,
                             isDisplayMode = isDisplayMode,
                             isAutoDim = isAutoDim,
-                            bellVolume = bellVolume,
-                            bgMusicVolume = bgMusicVolume,
-                            isBgMusicEnabled = isBgMusicEnabled,
                             onThemeSelected = onThemeSelected,
                             onZenModeToggle = onZenModeToggle,
                             onPocketModeToggle = onPocketModeToggle,
                             onDisplayModeToggle = onDisplayModeToggle,
                             onAutoDimToggle = onAutoDimToggle,
-                            onVolumeChange = onVolumeChange,
-                            onBgMusicVolumeChange = onBgMusicVolumeChange,
-                            onBgMusicToggle = onBgMusicToggle,
-                            onTestOptionC = onTestOptionC,
-                            onPreviewBgMusic = onPreviewBgMusic,
                             onToggleSunMoonTheme = onToggleSunMoonTheme,
                             selectedHealthProvider = selectedHealthProvider,
                             onHealthProviderSelected = onHealthProviderSelected,
                             hasActivityPermission = hasActivityPermission,
                             onRequestActivityPermission = onRequestActivityPermission,
                             onTestStep = onTestStep,
-                            isCasting = isCasting,
-                            castDeviceName = castDeviceName,
-                            onDisconnectCast = onDisconnectCast,
-                            tvCastUrl = tvCastUrl,
                             isPauseOnBluetoothDisconnect = isPauseOnBluetoothDisconnect,
                             onPauseOnBluetoothDisconnectToggle = onPauseOnBluetoothDisconnectToggle,
                             isPrepCountdownEnabled = isPrepCountdownEnabled,
                             onPrepCountdownToggle = onPrepCountdownToggle,
-                            isScreenMirroringActive = isScreenMirroringActive,
-                            isScreenMirroringManual = isScreenMirroringManual,
-                            screenMirroringTargetOrientation = screenMirroringTargetOrientation,
-                            externalDisplayName = externalDisplayName,
-                            onToggleScreenMirroringMode = onToggleScreenMirroringMode,
-                            onSetScreenOrientation = onSetScreenOrientation,
-                            onToggleScreenOrientation = onToggleScreenOrientation
+                            onOpenVolumeSettings = onOpenVolumeSettings,
+                            onOpenCastSettings = onOpenCastSettings
                         )
                     }
                 }
@@ -881,38 +867,31 @@ private fun TimerSettingsContent(
 }
 
 /**
- * Renders the persistent Global App Configuration tab content.
- * Houses Zen mode, Sun-Moon eye-comfort themes, master audio gain (bells and ambient music),
- * pedometer connectivity, TV casting, and battery blanking.
+ * Renders the logically bifurcated Global App Configuration content (Requirement E5).
+ * Disaggregates configuration into 3 compact categories with quick access tiles for Volume (E6) and TV Casting (E8).
  *
- * @param currentTheme Active theme profile ([ThemeMode]).
- * @param isZenMode Whether Zen focus mode (DND) is active.
- * @param isPocketMode Whether proximity battery-blanking is active.
- * @param isDisplayMode Whether keep-screen-on wake-lock is engaged.
- * @param isAutoDim Whether auto-dimming during countdown is enabled.
- * @param bellVolume Master bell gain level (0.0f..1.0f).
- * @param bgMusicVolume Ambient background music gain level (0.0f..1.0f).
- * @param isBgMusicEnabled Whether ambient soundscapes are globally enabled.
- * @param onThemeSelected Callback when theme profile is picked.
- * @param onZenModeToggle Callback to toggle DND.
+ * @param currentTheme Currently applied visual theme mode ([ThemeMode]).
+ * @param isZenMode Whether minimalist Zen mode (DND) is active.
+ * @param isPocketMode Whether proximity-based Pocket Mode blanking is toggled.
+ * @param isDisplayMode Whether display is kept awake during active timer.
+ * @param isAutoDim Whether display automatically dims during rest.
+ * @param onThemeSelected Callback when user selects a theme variant.
+ * @param onZenModeToggle Callback to toggle Zen mode.
  * @param onPocketModeToggle Callback to toggle pocket mode.
- * @param onDisplayModeToggle Callback to toggle display wake lock.
- * @param onAutoDimToggle Callback to toggle auto dim.
- * @param onVolumeChange Callback when bell master volume is adjusted (0.0f..1.0f).
- * @param onBgMusicVolumeChange Callback when ambient music volume slider is adjusted (0.0f..1.0f).
- * @param onBgMusicToggle Callback to toggle global ambient background audio on or off.
- * @param onTestOptionC Callback triggering test audition of signature Option C triple bell chime.
- * @param onPreviewBgMusic Callback toggling temporary audition preview of selected ambient sound.
+ * @param onDisplayModeToggle Callback to toggle screen awake mode.
+ * @param onAutoDimToggle Callback to toggle auto dimming.
  * @param onToggleSunMoonTheme Callback to toggle between Sun Day and Moon Night eye-comfort modes.
- * @param selectedHealthProvider Currently active step provider bridge.
- * @param onHealthProviderSelected Callback when provider changes.
+ * @param selectedHealthProvider Currently active step provider bridge ([HealthProviderType]).
+ * @param onHealthProviderSelected Callback when user changes health platform provider.
  * @param hasActivityPermission Whether runtime sensor permission is granted.
- * @param onRequestActivityPermission Callback to request permission.
- * @param onTestStep Callback to inject synthetic test steps.
- * @param isCasting Whether active TV casting is underway.
- * @param castDeviceName Target Cast receiver device name.
- * @param onDisconnectCast Callback to disconnect Cast session.
- * @param tvCastUrl Local HTTP playback URL for Smart TVs.
+ * @param onRequestActivityPermission Callback to trigger Android runtime permission request.
+ * @param onTestStep Callback to inject synthetic steps for testing.
+ * @param isPauseOnBluetoothDisconnect Whether timer auto-pauses on peripheral disconnect.
+ * @param onPauseOnBluetoothDisconnectToggle Callback to toggle Bluetooth disconnect behavior.
+ * @param isPrepCountdownEnabled Whether 5-second lead time countdown is enabled.
+ * @param onPrepCountdownToggle Callback to toggle preparation countdown.
+ * @param onOpenVolumeSettings Callback to open the dedicated volume sheet (Requirement E6).
+ * @param onOpenCastSettings Callback to open the dedicated TV casting sheet (Requirement E8).
  */
 @Composable
 private fun GlobalConfigContent(
@@ -921,625 +900,409 @@ private fun GlobalConfigContent(
     isPocketMode: Boolean,
     isDisplayMode: Boolean,
     isAutoDim: Boolean,
-    bellVolume: Float,
-    bgMusicVolume: Float,
-    isBgMusicEnabled: Boolean = true,
     onThemeSelected: (ThemeMode) -> Unit,
     onZenModeToggle: (Boolean) -> Unit,
     onPocketModeToggle: (Boolean) -> Unit,
     onDisplayModeToggle: (Boolean) -> Unit,
     onAutoDimToggle: (Boolean) -> Unit,
-    onVolumeChange: (Float) -> Unit,
-    onBgMusicVolumeChange: (Float) -> Unit,
-    onBgMusicToggle: (Boolean) -> Unit = {},
-    onTestOptionC: () -> Unit = {},
-    onPreviewBgMusic: (Boolean) -> Unit = {},
     onToggleSunMoonTheme: () -> Unit,
     selectedHealthProvider: HealthProviderType,
     onHealthProviderSelected: (HealthProviderType) -> Unit,
     hasActivityPermission: Boolean,
     onRequestActivityPermission: () -> Unit,
     onTestStep: () -> Unit,
-    isCasting: Boolean,
-    castDeviceName: String?,
-    onDisconnectCast: () -> Unit,
-    tvCastUrl: String,
     isPauseOnBluetoothDisconnect: Boolean = true,
     onPauseOnBluetoothDisconnectToggle: (Boolean) -> Unit = {},
     isPrepCountdownEnabled: Boolean = true,
     onPrepCountdownToggle: (Boolean) -> Unit = {},
-    isScreenMirroringActive: Boolean = false,
-    isScreenMirroringManual: Boolean = false,
-    screenMirroringTargetOrientation: ScreenOrientation = ScreenOrientation.AUTO,
-    externalDisplayName: String? = null,
-    onToggleScreenMirroringMode: (Boolean) -> Unit = {},
-    onSetScreenOrientation: (ScreenOrientation) -> Unit = {},
-    onToggleScreenOrientation: () -> Unit = {}
+    onOpenVolumeSettings: () -> Unit = {},
+    onOpenCastSettings: () -> Unit = {}
 ) {
-    val context = LocalContext.current
+    var selectedCategory by remember { mutableStateOf(GlobalSettingsCategory.THEME_DISPLAY) }
 
-    Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         // -------------------------------------------------------------
-        // 1. Zen Mode (DND Focus)
+        // 0. Quick Action Navigation Tiles to Dedicated Sheets (E6 & E8)
         // -------------------------------------------------------------
-        Card(
-            shape = RoundedCornerShape(14.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
-            modifier = Modifier.fillMaxWidth()
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                SettingsSectionHeader(title = "Zen Focus")
-                Spacer(modifier = Modifier.height(6.dp))
-                SettingsToggleRow(
-                    title = "Do Not Disturb Focus",
-                    subtitle = "Suppress distracting system notifications during active sessions",
-                    checked = isZenMode,
-                    onCheckedChange = onZenModeToggle
-                )
-            }
-        }
-
-        // -------------------------------------------------------------
-        // 2. Sun-Moon Circadian Mode & Themes (Blue-Light Reduced)
-        // -------------------------------------------------------------
-        Card(
-            shape = RoundedCornerShape(14.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable { onOpenVolumeSettings() }
+            ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
-                        SettingsSectionHeader(title = "Sun-Moon & Themes")
+                    Icon(
+                        imageVector = Icons.Outlined.VolumeUp,
+                        contentDescription = "Volume & Audio",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "Blue-light reduced in both Day & Night modes",
+                            text = "Volume Settings",
                             style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Bell & ambient gains",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-
-                    // 1-Tap Sun / Moon Circadian Switcher Button
-                    FilledTonalButton(
-                        onClick = onToggleSunMoonTheme,
-                        shape = RoundedCornerShape(10.dp),
-                        contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
-                    ) {
-                        val icon = if (currentTheme.isSunDayTheme) Icons.Default.WbSunny else Icons.Default.Nightlight
-                        val label = if (currentTheme.isSunDayTheme) "☀️ Day" else "🌙 Night"
-                        Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(label, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
-                    }
+                    Icon(
+                        imageVector = Icons.Outlined.ChevronRight,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(16.dp)
+                    )
                 }
+            }
 
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Theme Preset Chips
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                modifier = Modifier
+                    .weight(1f)
+                    .clickable { onOpenCastSettings() }
+            ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    ThemeMode.values().forEach { mode ->
-                        val isSelected = currentTheme == mode
-                        Surface(
-                            shape = RoundedCornerShape(10.dp),
-                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
-                            modifier = Modifier
-                                .weight(1f)
-                                .clickable { onThemeSelected(mode) }
-                        ) {
-                            Text(
-                                text = when (mode) {
-                                    ThemeMode.AMOLED -> "AMOLED"
-                                    ThemeMode.EYE_COMFORT -> "Eye Comfort"
-                                    ThemeMode.DARK -> "Dark"
-                                    ThemeMode.LIGHT -> "Light (Day)"
-                                },
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onBackground,
-                                modifier = Modifier
-                                    .padding(vertical = 10.dp)
-                                    .wrapContentWidth(Alignment.CenterHorizontally)
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        // -------------------------------------------------------------
-        // 3. Master Audio Gain & Ambient Sound Controls
-        // -------------------------------------------------------------
-        Card(
-            shape = RoundedCornerShape(14.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                SettingsSectionHeader(title = "Master Audio Gain")
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // 1. Bell Master Volume
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text("Bell Master Volume", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                    Text("${(bellVolume * 100).toInt()}%", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
-                }
-                Slider(
-                    value = bellVolume,
-                    onValueChange = onVolumeChange,
-                    valueRange = 0f..1f,
-                    colors = SliderDefaults.colors(
-                        thumbColor = MaterialTheme.colorScheme.primary,
-                        activeTrackColor = MaterialTheme.colorScheme.primary
+                    Icon(
+                        imageVector = Icons.Outlined.Tv,
+                        contentDescription = "Living Room & TV Casting",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
                     )
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
-                ) {
-                    OutlinedButton(
-                        onClick = onTestOptionC,
-                        shape = RoundedCornerShape(8.dp),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
-                    ) {
-                        Text("▶ Test Bell Chime", style = MaterialTheme.typography.labelSmall)
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(14.dp))
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-                Spacer(modifier = Modifier.height(14.dp))
-
-                // 2. Ambient Soundscape Mute Switch (Bug 2: ambient mute in Global setting)
-                SettingsToggleRow(
-                    title = "Background Ambient Sound",
-                    subtitle = "Continuous soothing frequency while timers run",
-                    checked = isBgMusicEnabled,
-                    onCheckedChange = onBgMusicToggle
-                )
-
-                if (isBgMusicEnabled) {
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text("Background Ambient Volume", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                        Text("${(bgMusicVolume * 100).toInt()}%", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
-                    }
-                    Slider(
-                        value = bgMusicVolume,
-                        onValueChange = onBgMusicVolumeChange,
-                        valueRange = 0f..1f,
-                        colors = SliderDefaults.colors(
-                            thumbColor = MaterialTheme.colorScheme.primary,
-                            activeTrackColor = MaterialTheme.colorScheme.primary
-                        )
-                    )
-
-                    var isPreviewingAmbient by remember { mutableStateOf(false) }
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End
-                    ) {
-                        OutlinedButton(
-                            onClick = {
-                                isPreviewingAmbient = !isPreviewingAmbient
-                                onPreviewBgMusic(isPreviewingAmbient)
-                            },
-                            shape = RoundedCornerShape(8.dp),
-                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
-                        ) {
-                            Text(
-                                text = if (isPreviewingAmbient) "⏹ Stop Ambient Sound" else "▶ Test Ambient Sound",
-                                style = MaterialTheme.typography.labelSmall
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        // -------------------------------------------------------------
-        // 4. Pedometer & Health Platform Connectivity
-        // -------------------------------------------------------------
-        Card(
-            shape = RoundedCornerShape(14.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                SettingsSectionHeader(title = "Pedometer & Health Connectivity")
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Text("Active Step Provider", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Spacer(modifier = Modifier.height(6.dp))
-
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    HealthProviderType.values().forEach { provider ->
-                        val isSelected = selectedHealthProvider == provider
-                        Surface(
-                            shape = RoundedCornerShape(10.dp),
-                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { onHealthProviderSelected(provider) }
-                        ) {
-                            Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = provider.displayName,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onBackground
-                                    )
-                                    if (isSelected) {
-                                        Text("Active", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimary)
-                                    }
-                                }
-                                Text(
-                                    text = provider.description,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    fontSize = 11.sp,
-                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.85f) else MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                // Activity Permission status
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Sensor Permission", style = MaterialTheme.typography.bodyMedium)
                         Text(
-                            text = if (hasActivityPermission) "Granted • Sub-second hardware tracking" else "Required for device pedometer",
+                            text = "TV & Casting",
                             style = MaterialTheme.typography.bodySmall,
-                            color = if (hasActivityPermission) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Mirroring & rotation",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                    if (!hasActivityPermission) {
-                        Button(
-                            onClick = onRequestActivityPermission,
-                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-                        ) {
-                            Text("Grant", style = MaterialTheme.typography.labelSmall)
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // Test Step Button
-                Button(
-                    onClick = onTestStep,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(10.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.surface,
-                        contentColor = MaterialTheme.colorScheme.onSurface
+                    Icon(
+                        imageVector = Icons.Outlined.ChevronRight,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(16.dp)
                     )
-                ) {
-                    Icon(Icons.AutoMirrored.Outlined.DirectionsWalk, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Test Step Cadence (+250 steps)", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold)
                 }
             }
         }
 
         // -------------------------------------------------------------
-        // 5. Living Room & TV Casting
+        // Segmented Category Filter (Requirement E5 Bifurcation)
         // -------------------------------------------------------------
-        Card(
-            shape = RoundedCornerShape(14.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
-            modifier = Modifier.fillMaxWidth()
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                SettingsSectionHeader(title = "Casting & Living Room")
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // Google Cast Device
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    CastButton(modifier = Modifier.size(36.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("Google Cast • TV Streaming", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                        Text(
-                            text = if (isCasting) "Connected: ${castDeviceName ?: "Living Room TV"}" else "Tap icon to stream to Chromecast or Google TV",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = if (isCasting) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    if (isCasting) {
-                        OutlinedButton(
-                            onClick = onDisconnectCast,
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
-                        ) {
-                            Text("Disconnect", style = MaterialTheme.typography.labelSmall)
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                // Screen Mirroring (Miracast / Any TV / Projectors)
-                val screenMirrorContext = LocalContext.current
+            val categories = listOf(
+                GlobalSettingsCategory.THEME_DISPLAY to "🎨 Theme",
+                GlobalSettingsCategory.SENSORS_HEALTH to "🏃 Health",
+                GlobalSettingsCategory.AUTOMATION_BATTERY to "⚡ Automation"
+            )
+            categories.forEach { (cat, label) ->
+                val isSelected = selectedCategory == cat
                 Surface(
-                    shape = RoundedCornerShape(10.dp),
-                    color = MaterialTheme.colorScheme.surface,
+                    shape = RoundedCornerShape(8.dp),
+                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable {
-                            try {
-                                screenMirrorContext.startActivity(android.content.Intent(android.provider.Settings.ACTION_CAST_SETTINGS))
-                            } catch (e: Exception) {
-                                try {
-                                    screenMirrorContext.startActivity(android.content.Intent(android.provider.Settings.ACTION_WIRELESS_SETTINGS))
-                                } catch (_: Exception) {}
-                            }
-                        }
+                        .weight(1f)
+                        .clickable { selectedCategory = cat }
                 ) {
-                    Row(
-                        modifier = Modifier.padding(12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.Cast,
-                            contentDescription = "Screen Mirroring",
-                            tint = MaterialTheme.colorScheme.primary
-                        )
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Screen Mirroring (Miracast / Any TV)",
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Medium
-                            )
-                            Text(
-                                text = "Mirror live phone screen (breathing lotus, poses & timer) to Miracast dongles, projectors & TVs",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        Icon(
-                            imageVector = Icons.Outlined.ChevronRight,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
+                    Text(
+                        text = label,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(vertical = 8.dp)
+                    )
                 }
+            }
+        }
 
-                // Screen Mirroring TV Orientation Controls
-                Spacer(modifier = Modifier.height(10.dp))
-                Surface(
-                    shape = RoundedCornerShape(10.dp),
-                    color = MaterialTheme.colorScheme.surface,
+        when (selectedCategory) {
+            GlobalSettingsCategory.THEME_DISPLAY -> {
+                // 1. Sun-Moon Circadian Mode & Themes (Blue-Light Reduced)
+                Card(
+                    shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
+                    Column(modifier = Modifier.padding(16.dp)) {
                         Row(
-                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
-                            modifier = Modifier.fillMaxWidth()
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                ) {
-                                    Text(
-                                        text = "Screen Mirroring Mode",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                    if (isScreenMirroringActive) {
-                                        Surface(
-                                            shape = RoundedCornerShape(4.dp),
-                                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
-                                        ) {
-                                            Text(
-                                                text = if (externalDisplayName != null) "● $externalDisplayName" else "● Active",
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = MaterialTheme.colorScheme.primary,
-                                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                                            )
-                                        }
-                                    }
-                                }
+                            Column(modifier = Modifier.weight(1f).padding(end = 12.dp)) {
+                                SettingsSectionHeader(title = "Sun-Moon & Themes")
                                 Text(
-                                    text = "Force-enable TV orientation controls and keep screen awake when casting screen via Quick Settings or Smart View",
-                                    style = MaterialTheme.typography.labelSmall,
+                                    text = "Blue-light reduced in both Day & Night modes",
+                                    style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
-                            Switch(
-                                checked = isScreenMirroringManual || isScreenMirroringActive,
-                                onCheckedChange = onToggleScreenMirroringMode
-                            )
+
+                            // 1-Tap Sun / Moon Circadian Switcher Button
+                            FilledTonalButton(
+                                onClick = onToggleSunMoonTheme,
+                                shape = RoundedCornerShape(10.dp),
+                                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
+                            ) {
+                                val icon = if (currentTheme.isSunDayTheme) Icons.Default.WbSunny else Icons.Default.Nightlight
+                                val label = if (currentTheme.isSunDayTheme) "☀️ Day" else "🌙 Night"
+                                Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(label, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                            }
                         }
 
-                        if (isScreenMirroringActive) {
-                            Spacer(modifier = Modifier.height(12.dp))
-                            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                            Spacer(modifier = Modifier.height(10.dp))
+                        Spacer(modifier = Modifier.height(12.dp))
 
-                            Text(
-                                text = "TV Screen Orientation",
-                                style = MaterialTheme.typography.labelMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Spacer(modifier = Modifier.height(6.dp))
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                val orientations = listOf(
-                                    ScreenOrientation.PORTRAIT to "Vertical",
-                                    ScreenOrientation.LANDSCAPE to "Horizontal",
-                                    ScreenOrientation.AUTO to "Auto"
-                                )
-                                orientations.forEach { (orientation, label) ->
-                                    val isSelected = screenMirroringTargetOrientation == orientation
-                                    Surface(
-                                        shape = RoundedCornerShape(8.dp),
-                                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        // Theme Preset Chips
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            ThemeMode.values().forEach { mode ->
+                                val isSelected = currentTheme == mode
+                                Surface(
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clickable { onThemeSelected(mode) }
+                                ) {
+                                    Text(
+                                        text = when (mode) {
+                                            ThemeMode.AMOLED -> "AMOLED"
+                                            ThemeMode.EYE_COMFORT -> "Eye Comfort"
+                                            ThemeMode.DARK -> "Dark"
+                                            ThemeMode.LIGHT -> "Light (Day)"
+                                        },
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onBackground,
                                         modifier = Modifier
-                                            .weight(1f)
-                                            .clickable { onSetScreenOrientation(orientation) }
-                                    ) {
-                                        Box(
-                                            contentAlignment = Alignment.Center,
-                                            modifier = Modifier.padding(vertical = 8.dp)
-                                        ) {
-                                            Text(
-                                                text = label,
-                                                style = MaterialTheme.typography.labelMedium,
-                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                                color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-                                        }
-                                    }
+                                            .padding(vertical = 10.dp)
+                                            .wrapContentWidth(Alignment.CenterHorizontally)
+                                    )
                                 }
-                            }
-
-                            Spacer(modifier = Modifier.height(10.dp))
-                            OutlinedButton(
-                                onClick = onToggleScreenOrientation,
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(8.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.ScreenRotation,
-                                    contentDescription = "Rotate Screen",
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "Rotate Screen ⇄",
-                                    style = MaterialTheme.typography.labelMedium
-                                )
                             }
                         }
                     }
                 }
 
-                if (tvCastUrl.isNotBlank()) {
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Surface(
-                        shape = RoundedCornerShape(10.dp),
-                        color = MaterialTheme.colorScheme.surface,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
+                // 2. Zen Mode (DND Focus)
+                Card(
+                    shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        SettingsSectionHeader(title = "Zen Focus")
+                        Spacer(modifier = Modifier.height(6.dp))
+                        SettingsToggleRow(
+                            title = "Do Not Disturb Focus",
+                            subtitle = "Suppress distracting system notifications during active sessions",
+                            checked = isZenMode,
+                            onCheckedChange = onZenModeToggle
+                        )
+                    }
+                }
+
+                // 3. Display Awake & Auto Dimming
+                Card(
+                    shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        SettingsSectionHeader(title = "Display Management")
+                        Spacer(modifier = Modifier.height(6.dp))
+                        SettingsToggleRow(
+                            title = "Display Mode",
+                            subtitle = "Keeps screen awake with countdown visible",
+                            checked = isDisplayMode,
+                            onCheckedChange = onDisplayModeToggle
+                        )
+                        SettingsToggleRow(
+                            title = "Auto Dimming",
+                            subtitle = "Reduces brightness after 15s of stillness",
+                            checked = isAutoDim,
+                            onCheckedChange = onAutoDimToggle
+                        )
+                    }
+                }
+            }
+
+            GlobalSettingsCategory.SENSORS_HEALTH -> {
+                // Pedometer & Health Platform Connectivity
+                Card(
+                    shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        SettingsSectionHeader(title = "Pedometer & Health Connectivity")
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Text("Active Step Provider", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            HealthProviderType.values().forEach { provider ->
+                                val isSelected = selectedHealthProvider == provider
+                                Surface(
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable { onHealthProviderSelected(provider) }
+                                ) {
+                                    Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = provider.displayName,
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                                color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onBackground
+                                            )
+                                            if (isSelected) {
+                                                Text("Active", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimary)
+                                            }
+                                        }
+                                        Text(
+                                            text = provider.description,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            fontSize = 11.sp,
+                                            color = if (isSelected) MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.85f) else MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(14.dp))
+
+                        // Activity Permission status
                         Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
-                                Text("Smart TV Browser Link", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
-                                Text(tvCastUrl, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                                Text("Sensor Permission", style = MaterialTheme.typography.bodyMedium)
+                                Text(
+                                    text = if (hasActivityPermission) "Granted • Sub-second hardware tracking" else "Required for device pedometer",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (hasActivityPermission) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error
+                                )
                             }
-                            TextButton(
-                                onClick = {
-                                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                    clipboard.setPrimaryClip(ClipData.newPlainText("TV URL", tvCastUrl))
+                            if (!hasActivityPermission) {
+                                Button(
+                                    onClick = onRequestActivityPermission,
+                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                                ) {
+                                    Text("Grant", style = MaterialTheme.typography.labelSmall)
                                 }
-                            ) {
-                                Text("Copy Link", style = MaterialTheme.typography.labelSmall)
                             }
+                        }
+
+                        Spacer(modifier = Modifier.height(10.dp))
+
+                        // Test Step Button
+                        Button(
+                            onClick = onTestStep,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.surface,
+                                contentColor = MaterialTheme.colorScheme.onSurface
+                            )
+                        ) {
+                            Icon(Icons.AutoMirrored.Outlined.DirectionsWalk, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Test Step Cadence (+250 steps)", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }
             }
-        }
 
-        // -------------------------------------------------------------
-        // 6. Hardware Battery Modes
-        // -------------------------------------------------------------
-        Card(
-            shape = RoundedCornerShape(14.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                SettingsSectionHeader(title = "Display & Hardware Conservation")
-                Spacer(modifier = Modifier.height(6.dp))
-                SettingsToggleRow(
-                    title = "Display Mode",
-                    subtitle = "Keeps screen awake with countdown visible",
-                    checked = isDisplayMode,
-                    onCheckedChange = onDisplayModeToggle
-                )
-                SettingsToggleRow(
-                    title = "Pocket Mode",
-                    subtitle = "Black AMOLED blanking with proximity & haptics",
-                    checked = isPocketMode,
-                    onCheckedChange = onPocketModeToggle
-                )
-                SettingsToggleRow(
-                    title = "Auto Dimming",
-                    subtitle = "Reduces brightness after 15s of stillness",
-                    checked = isAutoDim,
-                    onCheckedChange = onAutoDimToggle
-                )
-                SettingsToggleRow(
-                    title = "Pause on Bluetooth Disconnect",
-                    subtitle = "Automatically pause active timer when car or Bluetooth headphones disconnect",
-                    checked = isPauseOnBluetoothDisconnect,
-                    onCheckedChange = onPauseOnBluetoothDisconnectToggle
-                )
-                SettingsToggleRow(
-                    title = "Preparation Countdown",
-                    subtitle = "5-second lead time with voice cue to put down mobile and take position",
-                    checked = isPrepCountdownEnabled,
-                    onCheckedChange = onPrepCountdownToggle
-                )
-            }
-        }
+            GlobalSettingsCategory.AUTOMATION_BATTERY -> {
+                // Hardware Automation & Conservation
+                Card(
+                    shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        SettingsSectionHeader(title = "Hardware & Automation")
+                        Spacer(modifier = Modifier.height(6.dp))
+                        SettingsToggleRow(
+                            title = "Pocket Mode",
+                            subtitle = "Black AMOLED blanking with proximity & haptics",
+                            checked = isPocketMode,
+                            onCheckedChange = onPocketModeToggle
+                        )
+                        SettingsToggleRow(
+                            title = "Pause on Bluetooth Disconnect",
+                            subtitle = "Automatically pause active timer when car or Bluetooth headphones disconnect",
+                            checked = isPauseOnBluetoothDisconnect,
+                            onCheckedChange = onPauseOnBluetoothDisconnectToggle
+                        )
+                        SettingsToggleRow(
+                            title = "Preparation Countdown",
+                            subtitle = "5-second lead time with voice cue to put down mobile and take position",
+                            checked = isPrepCountdownEnabled,
+                            onCheckedChange = onPrepCountdownToggle
+                        )
+                    }
+                }
 
-        // -------------------------------------------------------------
-        // 7. About Habit Bell
-        // -------------------------------------------------------------
-        Card(
-            shape = RoundedCornerShape(14.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f)),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(modifier = Modifier.padding(16.dp)) {
-                SettingsSectionHeader(title = "About Habit Bell")
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "Habit Bell v0.1 • Distraction-Free Wellness Operating System. AMOLED-optimized, SoundPool acoustic chimes, zero busy-wait battery conservation.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    lineHeight = 18.sp
-                )
+                // About Habit Bell
+                Card(
+                    shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        SettingsSectionHeader(title = "About Habit Bell")
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "Habit Bell v0.1 • Distraction-Free Wellness Operating System. AMOLED-optimized, SoundPool acoustic chimes, zero busy-wait battery conservation.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            lineHeight = 18.sp
+                        )
+                    }
+                }
             }
         }
     }

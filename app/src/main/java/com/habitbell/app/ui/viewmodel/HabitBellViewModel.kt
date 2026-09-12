@@ -70,6 +70,23 @@ enum class SettingsDrawerTab {
     GLOBAL
 }
 
+/**
+ * # GlobalSettingsCategory
+ *
+ * Categorization segments for the bifurcated Global Settings view (Requirement E5).
+ * Disaggregates configuration cards into compact, logically bounded, non-scroll-heavy panels.
+ */
+enum class GlobalSettingsCategory {
+    /** Sun-Moon Day/Night circadian switch, theme palettes, Zen DND, display awake, and auto-dimming. */
+    THEME_DISPLAY,
+
+    /** Pedometer step provider bridges, runtime sensor permissions, and test step injection. */
+    SENSORS_HEALTH,
+
+    /** Proximity pocket blanking, Bluetooth disconnect auto-pause, 5-second preparation countdown, and about info. */
+    AUTOMATION_BATTERY
+}
+
 data class AppUiState(
     val currentScreen: AppScreen = AppScreen.HOME,
     val selectedTheme: ThemeMode = ThemeMode.AMOLED,
@@ -77,10 +94,14 @@ data class AppUiState(
     val isPocketModeManual: Boolean = false,
     val isDisplayMode: Boolean = true,
     val isAutoDim: Boolean = true,
+    val intervalVolume: Float = 0.9f,
     val bellVolume: Float = 0.9f,
     val bellStyle: com.habitbell.app.engine.BellSoundStyle = com.habitbell.app.engine.BellSoundStyle.ZEN_TINGSHA,
     val isSettingsDrawerOpen: Boolean = false,
     val settingsDrawerTab: SettingsDrawerTab = SettingsDrawerTab.TIMER,
+    val isVolumeSheetOpen: Boolean = false,
+    val isCastSheetOpen: Boolean = false,
+    val globalCategory: GlobalSettingsCategory = GlobalSettingsCategory.THEME_DISPLAY,
     val isBgMusicEnabled: Boolean = true,
     val bgMusicType: BackgroundSoundType = BackgroundSoundType.DEFAULT_AUM,
     val bgMusicCustomUri: String? = null,
@@ -138,6 +159,9 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
 
     /** Embedded local HTTP daemon and NSD service for auxiliary Smart TV web browsers (Samsung/LG). */
     val castServer = com.habitbell.app.cast.LocalCastWebServer(application)
+
+    /** Hardware media volume coordinator managing bi-directional synchronization with phone volume (E7). */
+    val systemVolumeObserver = com.habitbell.app.audio.SystemVolumeObserver(application)
 
     /** Subsystem managing Screen Mirroring, external display detection, and TV orientation rotation. */
     val screenMirroringManager: com.habitbell.app.cast.ScreenMirroringManager = sessionHandler.screenMirroringManager
@@ -241,6 +265,23 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
                     batteryOptimizer.startProximityMonitoring()
                 } else if (state.status != SessionStatus.RUNNING) {
                     batteryOptimizer.stopProximityMonitoring()
+                }
+            }
+        }
+
+        // Synchronize ambient volume directly with hardware/system volume (Requirement E7)
+        viewModelScope.launch {
+            castManager.isCasting.collectLatest { isCasting ->
+                if (isCasting) {
+                    // Chromecast Mode: In-app slider observes and mirrors TV hardware volume
+                    castManager.castVolume.collect { tvVol ->
+                        _uiState.update { it.copy(bgMusicVolume = tvVol) }
+                    }
+                } else {
+                    // Mobile App Mode: In-app slider observes and mirrors Android STREAM_MUSIC volume
+                    systemVolumeObserver.volume.collect { phoneVol ->
+                        _uiState.update { it.copy(bgMusicVolume = phoneVol) }
+                    }
                 }
             }
         }
@@ -437,20 +478,41 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     /**
-     * Adjusts the Tibetan bell audio gain.
+     * Adjusts the session completion bell (Temple Gong) audio gain.
      *
-     * @param volume Normalized floating-point volume (0.0f..1.0f).
+     * @param volume Normalized floating-point volume in the closed interval `[0.0f, 1.0f]`.
      */
     fun setBellVolume(volume: Float) {
-        _uiState.update { it.copy(bellVolume = volume) }
-        audioManager.setVolume(volume)
+        val clamped = volume.coerceIn(0f, 1f)
+        _uiState.update { it.copy(bellVolume = clamped) }
+        audioManager.setCompletionBellVolume(clamped)
         if (castManager.isCasting.value) {
             val json = org.json.JSONObject().apply {
                 put("type", "volume")
-                put("bellVolume", volume.toDouble())
+                put("bellVolume", clamped.toDouble())
             }.toString()
             castManager.sendCustomMessage(json)
         }
+        saveSettings()
+    }
+
+    /**
+     * Adjusts the periodic interval bell audio gain (Requirement E6).
+     *
+     * @param volume Normalized floating-point volume in the closed interval `[0.0f, 1.0f]`.
+     */
+    fun setIntervalVolume(volume: Float) {
+        val clamped = volume.coerceIn(0f, 1f)
+        _uiState.update { it.copy(intervalVolume = clamped) }
+        audioManager.setIntervalVolume(clamped)
+        if (castManager.isCasting.value) {
+            val json = org.json.JSONObject().apply {
+                put("type", "volume")
+                put("intervalVolume", clamped.toDouble())
+            }.toString()
+            castManager.sendCustomMessage(json)
+        }
+        saveSettings()
     }
 
     /**
@@ -576,6 +638,33 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
      */
     fun setSettingsDrawerTab(tab: SettingsDrawerTab) {
         _uiState.update { it.copy(settingsDrawerTab = tab) }
+    }
+
+    /**
+     * Opens or dismisses the dedicated Volume & Audio Settings Sheet (Requirement E6).
+     *
+     * @param open True to display volume sheet; false to dismiss.
+     */
+    fun openVolumeSheet(open: Boolean) {
+        _uiState.update { it.copy(isVolumeSheetOpen = open) }
+    }
+
+    /**
+     * Opens or dismisses the dedicated TV Casting & Screen Mirroring Sheet (Requirement E8).
+     *
+     * @param open True to display casting sheet; false to dismiss.
+     */
+    fun openCastSheet(open: Boolean) {
+        _uiState.update { it.copy(isCastSheetOpen = open) }
+    }
+
+    /**
+     * Selects the active category panel inside the bifurcated Global Settings view (Requirement E5).
+     *
+     * @param category Target [GlobalSettingsCategory] to display.
+     */
+    fun setGlobalCategory(category: GlobalSettingsCategory) {
+        _uiState.update { it.copy(globalCategory = category) }
     }
 
     /**
@@ -884,13 +973,21 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     /**
-     * Adjusts the ambient background music volume gain.
+     * Adjusts the ambient background music volume gain directly on the active hardware target (Requirement E7).
+     *
+     * In Chromecast mode, directly updates connected TV volume via [HabitBellCastManager.setDeviceVolume].
+     * In Mobile mode, directly updates Android system media volume via [SystemVolumeObserver.setNormalizedVolume].
      *
      * @param volume Normalized floating-point volume (0.0f..1.0f).
      */
     fun setBgMusicVolume(volume: Float) {
-        _uiState.update { it.copy(bgMusicVolume = volume) }
-        bgMusicManager.volume = volume
+        val clamped = volume.coerceIn(0f, 1f)
+        _uiState.update { it.copy(bgMusicVolume = clamped) }
+        if (castManager.isCasting.value) {
+            castManager.setDeviceVolume(clamped)
+        } else {
+            systemVolumeObserver.setNormalizedVolume(clamped)
+        }
         saveSettings()
     }
 
@@ -982,9 +1079,13 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
         }
 
         val savedAutoDim = prefs.getBoolean("is_auto_dim", true)
+        val savedIntervalVol = prefs.getFloat("interval_volume", 0.9f)
         val savedBellVol = prefs.getFloat("bell_volume", 0.9f)
         val savedPauseOnBluetooth = prefs.getBoolean("is_pause_on_bluetooth_disconnect", true)
         val savedPrepCountdown = prefs.getBoolean("is_prep_countdown_enabled", true)
+
+        val currentHardwareVol = systemVolumeObserver.readCurrentNormalizedVolume()
+        val initialVol = if (currentHardwareVol > 0f) currentHardwareVol else savedVol
 
         _uiState.update {
             it.copy(
@@ -992,9 +1093,10 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
                 bgMusicType = savedType,
                 bgMusicCustomUri = savedUri,
                 bgMusicCustomName = savedName,
-                bgMusicVolume = savedVol,
+                bgMusicVolume = initialVol,
                 bgMusicYouTubeUrl = savedYt,
                 bellStyle = savedStyle,
+                intervalVolume = savedIntervalVol,
                 bellVolume = savedBellVol,
                 isAutoDim = savedAutoDim,
                 isPauseOnBluetoothDisconnect = savedPauseOnBluetooth,
@@ -1003,13 +1105,14 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
         }
 
         audioManager.bellStyle = savedStyle
-        audioManager.setVolume(savedBellVol)
+        audioManager.setIntervalVolume(savedIntervalVol)
+        audioManager.setCompletionBellVolume(savedBellVol)
         sessionHandler.bluetoothDisconnectionManager.isEnabled = savedPauseOnBluetooth
         engine.isPreparationCountdownEnabled = savedPrepCountdown
         bgMusicManager.isEnabled = savedEnabled
         bgMusicManager.soundType = savedType
         bgMusicManager.customAudioUri = savedUri
-        bgMusicManager.volume = savedVol
+        bgMusicManager.volume = 1.0f
         bgMusicManager.youtubeUrl = savedYt
     }
 
@@ -1024,6 +1127,7 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
             .putString("bg_music_custom_uri", state.bgMusicCustomUri)
             .putString("bg_music_custom_name", state.bgMusicCustomName)
             .putFloat("bg_music_volume", state.bgMusicVolume)
+            .putFloat("interval_volume", state.intervalVolume)
             .putFloat("bell_volume", state.bellVolume)
             .putString("bg_music_yt_url", state.bgMusicYouTubeUrl)
             .putString("bell_style", state.bellStyle.name)
@@ -1085,6 +1189,7 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
      */
     override fun onCleared() {
         super.onCleared()
+        systemVolumeObserver.unregister()
         castServer.stop()
     }
 }

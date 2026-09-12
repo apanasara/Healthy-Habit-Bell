@@ -46,6 +46,9 @@ class AudioBellManager(private val context: Context) {
     private var crystalQuartzSoundId = 0
 
     private var isLoaded = false
+    /** Active gain scale for periodic interval bells and countdown strikes, normalized in [0.0f, 1.0f]. */
+    private var intervalVolume = 0.9f
+    /** Active gain scale for session completion bells (Temple Gong), normalized in [0.0f, 1.0f]. */
     private var bellVolume = 0.9f
     private val scope = CoroutineScope(Dispatchers.Default)
 
@@ -105,7 +108,30 @@ class AudioBellManager(private val context: Context) {
         }
     }
 
+    /**
+     * Updates the master volume for session completion bells (Temple Gong).
+     *
+     * @param volume Target volume gain in the closed interval `[0.0f, 1.0f]`.
+     */
     fun setVolume(volume: Float) {
+        bellVolume = volume.coerceIn(0f, 1f)
+    }
+
+    /**
+     * Updates the gain scale specifically for periodic interval bells and countdown strikes.
+     *
+     * @param volume Target volume gain in the closed interval `[0.0f, 1.0f]`.
+     */
+    fun setIntervalVolume(volume: Float) {
+        intervalVolume = volume.coerceIn(0f, 1f)
+    }
+
+    /**
+     * Updates the gain scale specifically for session completion bells (Temple Gong).
+     *
+     * @param volume Target volume gain in the closed interval `[0.0f, 1.0f]`.
+     */
+    fun setCompletionBellVolume(volume: Float) {
         bellVolume = volume.coerceIn(0f, 1f)
     }
 
@@ -119,39 +145,39 @@ class AudioBellManager(private val context: Context) {
         when (bellStyle) {
             BellSoundStyle.ZEN_TINGSHA -> {
                 if (isLoaded && optionCIntervalSoundId != 0) {
-                    soundPool?.play(optionCIntervalSoundId, bellVolume, bellVolume, 1, 0, 1.0f)
+                    soundPool?.play(optionCIntervalSoundId, intervalVolume, intervalVolume, 1, 0, 1.0f)
                 } else if (isLoaded && intervalSoundId != 0) {
-                    soundPool?.play(intervalSoundId, bellVolume, bellVolume, 1, 0, 1.0f)
+                    soundPool?.play(intervalSoundId, intervalVolume, intervalVolume, 1, 0, 1.0f)
                 } else {
                     // Procedural Option C 3-bell fallback
                     scope.launch {
-                        playSynthesizedChime(f0 = 2048.0, durationSeconds = 4.0, volumeScale = 0.45f)
+                        playSynthesizedChime(f0 = 2048.0, durationSeconds = 4.0, volumeScale = 0.45f * intervalVolume)
                         kotlinx.coroutines.delay(1000)
-                        playSynthesizedChime(f0 = 1536.0, durationSeconds = 4.5, volumeScale = 0.70f)
+                        playSynthesizedChime(f0 = 1536.0, durationSeconds = 4.5, volumeScale = 0.70f * intervalVolume)
                         kotlinx.coroutines.delay(1000)
-                        playSynthesizedChime(f0 = 1024.0, durationSeconds = 7.5, volumeScale = 1.00f)
+                        playSynthesizedChime(f0 = 1024.0, durationSeconds = 7.5, volumeScale = 1.00f * intervalVolume)
                     }
                 }
             }
             BellSoundStyle.TEMPLE_GONG -> {
                 if (isLoaded && templeGongSoundId != 0) {
-                    soundPool?.play(templeGongSoundId, bellVolume, bellVolume, 1, 0, 1.0f)
+                    soundPool?.play(templeGongSoundId, intervalVolume, intervalVolume, 1, 0, 1.0f)
                 } else {
-                    scope.launch { playSynthesizedChime(f0 = 324.0, durationSeconds = 8.5, volumeScale = 0.90f) }
+                    scope.launch { playSynthesizedChime(f0 = 324.0, durationSeconds = 8.5, volumeScale = 0.90f * intervalVolume) }
                 }
             }
             BellSoundStyle.CRYSTAL_QUARTZ -> {
                 if (isLoaded && crystalQuartzSoundId != 0) {
-                    soundPool?.play(crystalQuartzSoundId, bellVolume, bellVolume, 1, 0, 1.0f)
+                    soundPool?.play(crystalQuartzSoundId, intervalVolume, intervalVolume, 1, 0, 1.0f)
                 } else {
-                    scope.launch { playSynthesizedChime(f0 = 528.0, durationSeconds = 8.0, volumeScale = 0.90f) }
+                    scope.launch { playSynthesizedChime(f0 = 528.0, durationSeconds = 8.0, volumeScale = 0.90f * intervalVolume) }
                 }
             }
             BellSoundStyle.TIBETAN_BOWL -> {
                 if (isLoaded && intervalSoundId != 0) {
-                    soundPool?.play(intervalSoundId, bellVolume, bellVolume, 1, 0, 1.0f)
+                    soundPool?.play(intervalSoundId, intervalVolume, intervalVolume, 1, 0, 1.0f)
                 } else {
-                    scope.launch { playSynthesizedChime(f0 = 432.0, durationSeconds = 8.5, volumeScale = 0.88f) }
+                    scope.launch { playSynthesizedChime(f0 = 432.0, durationSeconds = 8.5, volumeScale = 0.88f * intervalVolume) }
                 }
             }
         }
@@ -170,28 +196,28 @@ class AudioBellManager(private val context: Context) {
         when (secondsRemaining) {
             3 -> {
                 if (isLoaded && strike3SoundId != 0) {
-                    soundPool?.play(strike3SoundId, bellVolume * 0.45f, bellVolume * 0.45f, 2, 0, 1.0f)
+                    soundPool?.play(strike3SoundId, intervalVolume * 0.45f, intervalVolume * 0.45f, 2, 0, 1.0f)
                 } else {
                     scope.launch {
-                        playSynthesizedChime(f0 = 2048.0, durationSeconds = 4.0, volumeScale = 0.45f)
+                        playSynthesizedChime(f0 = 2048.0, durationSeconds = 4.0, volumeScale = 0.45f * intervalVolume)
                     }
                 }
             }
             2 -> {
                 if (isLoaded && strike2SoundId != 0) {
-                    soundPool?.play(strike2SoundId, bellVolume * 0.70f, bellVolume * 0.70f, 2, 0, 1.0f)
+                    soundPool?.play(strike2SoundId, intervalVolume * 0.70f, intervalVolume * 0.70f, 2, 0, 1.0f)
                 } else {
                     scope.launch {
-                        playSynthesizedChime(f0 = 1536.0, durationSeconds = 4.5, volumeScale = 0.70f)
+                        playSynthesizedChime(f0 = 1536.0, durationSeconds = 4.5, volumeScale = 0.70f * intervalVolume)
                     }
                 }
             }
             1 -> {
                 if (isLoaded && strike1SoundId != 0) {
-                    soundPool?.play(strike1SoundId, bellVolume, bellVolume, 3, 0, 1.0f)
+                    soundPool?.play(strike1SoundId, intervalVolume, intervalVolume, 3, 0, 1.0f)
                 } else {
                     scope.launch {
-                        playSynthesizedChime(f0 = 1024.0, durationSeconds = 7.5, volumeScale = 1.00f)
+                        playSynthesizedChime(f0 = 1024.0, durationSeconds = 7.5, volumeScale = 1.00f * intervalVolume)
                     }
                 }
             }
@@ -210,7 +236,7 @@ class AudioBellManager(private val context: Context) {
             soundPool?.play(templeGongSoundId, bellVolume, bellVolume, 1, 0, 1.0f)
         } else {
             scope.launch {
-                playSynthesizedChime(f0 = 324.0, durationSeconds = 8.5, volumeScale = 0.95f)
+                playSynthesizedChime(f0 = 324.0, durationSeconds = 8.5, volumeScale = 0.95f * bellVolume)
             }
         }
     }
@@ -247,12 +273,12 @@ class AudioBellManager(private val context: Context) {
      */
     fun playPranayamaIntervalBell() {
         requestTransientAudioFocus(durationMs = 6000L)
-        val gentleVolume = bellVolume * 0.38f
+        val gentleVolume = intervalVolume * 0.38f
         if (isLoaded && intervalSoundId != 0) {
             soundPool?.play(intervalSoundId, gentleVolume, gentleVolume, 1, 0, 1.0f)
         } else {
             scope.launch {
-                playSynthesizedChime(f0 = 432.0, durationSeconds = 7.0, volumeScale = 0.38f)
+                playSynthesizedChime(f0 = 432.0, durationSeconds = 7.0, volumeScale = 0.38f * intervalVolume)
             }
         }
     }

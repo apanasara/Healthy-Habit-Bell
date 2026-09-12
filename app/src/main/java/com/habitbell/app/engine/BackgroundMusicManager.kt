@@ -80,8 +80,10 @@ class BackgroundMusicManager(private val context: Context) {
      * Normalized audio volume gain (0.0f to 1.0f).
      * Synchronously propagates volume changes to both [MediaPlayer] and the YouTube IFrame player.
      * Cancels any active fade animator to provide immediate, responsive slider feedback.
+     * Defaults to unity gain (1.0f) since hardware/system volume (AudioManager or CastSession)
+     * governs overall physical output per Requirement E7.
      */
-    var volume: Float = 0.35f
+    var volume: Float = 1.0f
         set(value) {
             val safeGain = value.coerceIn(0f, 1f)
             field = safeGain
@@ -90,15 +92,15 @@ class BackgroundMusicManager(private val context: Context) {
             fadeAnimator = null
             if (isDucked) {
                 // If temporarily ducked for voice guidance, recompute attenuated gain from user's new base volume
-                val ducked = (safeGain * 0.20f).coerceIn(0.04f, 0.15f)
+                val ducked = (safeGain * 0.20f).coerceIn(0.04f, 0.25f)
                 applyVolumeToOutputs(ducked)
             } else {
                 applyVolumeToOutputs(safeGain)
             }
         }
 
-    /** Current actual output gain applied to audio outputs (0.0f..1.0f). */
-    private var currentOutputGain: Float = 0.35f
+    /** Current actual output gain applied to audio outputs (0.0f..1.0f). Defaults to unity (1.0f). */
+    private var currentOutputGain: Float = 1.0f
 
     /** Active smooth volume crossfading animator runnable handle. */
     private var fadeAnimator: Runnable? = null
