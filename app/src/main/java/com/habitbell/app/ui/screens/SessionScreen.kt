@@ -12,6 +12,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.VolumeUp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.animation.core.animateFloatAsState
@@ -60,6 +61,8 @@ import com.habitbell.app.ui.components.CompoundPoseCard
  * @param isScreenMirroringActive Whether Screen Mirroring is currently engaged.
  * @param onToggleOrientation Screen rotation callback.
  * @param onSkipPreparation Callback to bypass the 5-second preparation countdown.
+ * @param onOpenVolumeSettings Callback opening the dedicated Volume Settings sheet (Requirement E6).
+ * @param onOpenCastSettings Callback opening the dedicated TV Casting sheet (Requirement E8).
  * @param modifier Composable layout modifier.
  */
 @Composable
@@ -74,6 +77,8 @@ fun SessionScreen(
     isScreenMirroringActive: Boolean = false,
     onToggleOrientation: () -> Unit = {},
     onSkipPreparation: () -> Unit = {},
+    onOpenVolumeSettings: () -> Unit = {},
+    onOpenCastSettings: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val configuration = LocalConfiguration.current
@@ -110,7 +115,9 @@ fun SessionScreen(
                 onToggleTheme = onToggleTheme,
                 isScreenMirroringActive = isScreenMirroringActive,
                 onToggleOrientation = onToggleOrientation,
-                onSkipPreparation = onSkipPreparation
+                onSkipPreparation = onSkipPreparation,
+                onOpenVolumeSettings = onOpenVolumeSettings,
+                onOpenCastSettings = onOpenCastSettings
             )
         } else {
             PortraitSessionLayout(
@@ -122,7 +129,9 @@ fun SessionScreen(
                 onToggleTheme = onToggleTheme,
                 isScreenMirroringActive = isScreenMirroringActive,
                 onToggleOrientation = onToggleOrientation,
-                onSkipPreparation = onSkipPreparation
+                onSkipPreparation = onSkipPreparation,
+                onOpenVolumeSettings = onOpenVolumeSettings,
+                onOpenCastSettings = onOpenCastSettings
             )
         }
 
@@ -184,6 +193,9 @@ fun SessionScreen(
  * @param onToggleTheme Central theme switcher callback.
  * @param isScreenMirroringActive Whether Screen Mirroring is active.
  * @param onToggleOrientation Screen rotation callback.
+ * @param onSkipPreparation Callback to skip preparation countdown.
+ * @param onOpenVolumeSettings Callback opening the dedicated Volume Settings sheet (Requirement E6).
+ * @param onOpenCastSettings Callback opening the dedicated TV Casting sheet (Requirement E8).
  */
 @Composable
 private fun LandscapeSessionLayout(
@@ -195,7 +207,9 @@ private fun LandscapeSessionLayout(
     onToggleTheme: () -> Unit,
     isScreenMirroringActive: Boolean = false,
     onToggleOrientation: () -> Unit = {},
-    onSkipPreparation: () -> Unit = {}
+    onSkipPreparation: () -> Unit = {},
+    onOpenVolumeSettings: () -> Unit = {},
+    onOpenCastSettings: () -> Unit = {}
 ) {
     val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val buttonPillBg = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (isDark) 0.35f else 0.75f)
@@ -368,6 +382,36 @@ private fun LandscapeSessionLayout(
                                 modifier = Modifier.size(18.dp)
                             )
                         }
+                    }
+                    // TV Casting & Screen Mirroring Sheet (Requirement E8)
+                    IconButton(
+                        onClick = onOpenCastSettings,
+                        modifier = Modifier
+                            .size(38.dp)
+                            .background(buttonPillBg, CircleShape)
+                            .border(buttonBorder, CircleShape)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Tv,
+                            contentDescription = "Living Room & TV Casting",
+                            tint = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                    // Volume Controller Quick Access Button (Requirement E6 - Always available at top right corner)
+                    IconButton(
+                        onClick = onOpenVolumeSettings,
+                        modifier = Modifier
+                            .size(38.dp)
+                            .background(buttonPillBg, CircleShape)
+                            .border(buttonBorder, CircleShape)
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Outlined.VolumeUp,
+                            contentDescription = "Volume Settings",
+                            tint = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(18.dp)
+                        )
                     }
                     IconButton(
                         onClick = onToggleTheme,
@@ -578,6 +622,9 @@ private fun LandscapeSessionLayout(
  * @param onToggleTheme Central theme switcher callback.
  * @param isScreenMirroringActive Whether Screen Mirroring is active.
  * @param onToggleOrientation Screen rotation callback.
+ * @param onSkipPreparation Callback to bypass the 5-second preparation countdown.
+ * @param onOpenVolumeSettings Callback opening the dedicated Volume Settings sheet (Requirement E6).
+ * @param onOpenCastSettings Callback opening the dedicated TV Casting sheet (Requirement E8).
  */
 @Composable
 private fun PortraitSessionLayout(
@@ -589,7 +636,9 @@ private fun PortraitSessionLayout(
     onToggleTheme: () -> Unit,
     isScreenMirroringActive: Boolean = false,
     onToggleOrientation: () -> Unit = {},
-    onSkipPreparation: () -> Unit = {}
+    onSkipPreparation: () -> Unit = {},
+    onOpenVolumeSettings: () -> Unit = {},
+    onOpenCastSettings: () -> Unit = {}
 ) {
     Column(
         modifier = Modifier
@@ -671,6 +720,36 @@ private fun PortraitSessionLayout(
                                 modifier = Modifier.size(20.dp)
                             )
                         }
+                    }
+                    // TV Casting & Screen Mirroring Sheet (Requirement E8)
+                    IconButton(
+                        onClick = onOpenCastSettings,
+                        modifier = Modifier
+                            .size(42.dp)
+                            .background(buttonPillBg, CircleShape)
+                            .border(buttonBorder, CircleShape)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Tv,
+                            contentDescription = "Living Room & TV Casting",
+                            tint = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    // Volume Controller Quick Access Button (Requirement E6 - Always available at top right corner)
+                    IconButton(
+                        onClick = onOpenVolumeSettings,
+                        modifier = Modifier
+                            .size(42.dp)
+                            .background(buttonPillBg, CircleShape)
+                            .border(buttonBorder, CircleShape)
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Outlined.VolumeUp,
+                            contentDescription = "Volume Settings",
+                            tint = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(20.dp)
+                        )
                     }
                     val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
                     IconButton(

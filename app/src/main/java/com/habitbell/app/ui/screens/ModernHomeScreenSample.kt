@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.VolumeUp
 import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Stop
@@ -69,6 +70,11 @@ private data class IntentCategory(
  * @param sessionState Reactive snapshot of ongoing timer session state, or null if uninitialized.
  * @param onResumeSession Callback navigating the user back to the fullscreen session screen.
  * @param onStopSession Callback immediately halting the ongoing session and silencing audio.
+ * @param onOpenVolumeSettings Callback opening the dedicated Volume Settings sheet (Requirement E6).
+ * @param onOpenCastSettings Callback opening the dedicated Living Room & TV Casting sheet (Requirement E8).
+ * @param isScreenMirroringActive Whether active screen mirroring or external display is connected.
+ * @param isLandscape Device orientation status.
+ * @param onToggleOrientation Callback to cycle or toggle orientation.
  * @param modifier Composable layout modifier.
  */
 @Composable
@@ -85,6 +91,8 @@ fun ModernHomeScreenSample(
     sessionState: TimerSessionState? = null,
     onResumeSession: () -> Unit = {},
     onStopSession: () -> Unit = {},
+    onOpenVolumeSettings: () -> Unit = {},
+    onOpenCastSettings: () -> Unit = {},
     isScreenMirroringActive: Boolean = false,
     isLandscape: Boolean = false,
     onToggleOrientation: () -> Unit = {},
@@ -117,6 +125,8 @@ fun ModernHomeScreenSample(
                 onToggleZenMode = onToggleZenMode,
                 onCycleTheme = onCycleTheme,
                 onOpenSettings = onOpenSettings,
+                onOpenVolumeSettings = onOpenVolumeSettings,
+                onOpenCastSettings = onOpenCastSettings,
                 isScreenMirroringActive = isScreenMirroringActive,
                 isLandscape = isLandscape,
                 onToggleOrientation = onToggleOrientation
@@ -495,7 +505,17 @@ private fun ModernProfileRow(
 }
 
 /**
- * Top bar with Phosphor line icons for theme and settings.
+ * Top bar with Phosphor line icons for theme, dedicated volume controller, TV casting, and settings.
+ *
+ * @param isZenMode Whether minimalist Zen focus mode is active.
+ * @param onToggleZenMode Callback toggling Zen mode.
+ * @param onCycleTheme Callback toggling between Sun Day and Moon Night eye-comfort themes.
+ * @param onOpenSettings Callback opening the main settings drawer.
+ * @param onOpenVolumeSettings Callback opening the dedicated volume sheet (Requirement E6).
+ * @param onOpenCastSettings Callback opening the dedicated TV casting sheet (Requirement E8).
+ * @param isScreenMirroringActive Whether active TV screen mirroring is active.
+ * @param isLandscape Device orientation status.
+ * @param onToggleOrientation Screen rotation callback.
  */
 @Composable
 private fun ModernZenTopBar(
@@ -503,6 +523,8 @@ private fun ModernZenTopBar(
     onToggleZenMode: () -> Unit,
     onCycleTheme: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenVolumeSettings: () -> Unit = {},
+    onOpenCastSettings: () -> Unit = {},
     isScreenMirroringActive: Boolean = false,
     isLandscape: Boolean = false,
     onToggleOrientation: () -> Unit = {}
@@ -554,6 +576,26 @@ private fun ModernZenTopBar(
                         modifier = Modifier.size(20.dp)
                     )
                 }
+            }
+
+            // TV / Google Cast Quick Access Button (Requirement E8)
+            IconButton(onClick = onOpenCastSettings, modifier = Modifier.size(36.dp)) {
+                Icon(
+                    imageVector = Icons.Outlined.Tv,
+                    contentDescription = "Living Room & TV Casting",
+                    tint = onSurfaceVariant,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
+            // Volume Controller Quick Access Button (Requirement E6 - Always available at top right corner)
+            IconButton(onClick = onOpenVolumeSettings, modifier = Modifier.size(36.dp)) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Outlined.VolumeUp,
+                    contentDescription = "Volume Settings",
+                    tint = onSurfaceVariant,
+                    modifier = Modifier.size(20.dp)
+                )
             }
 
             // Zen Mode Pill Toggle
