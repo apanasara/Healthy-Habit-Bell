@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ # yoga_padahastasana.xml
+  ~ Vector silhouette representing Padahastasana / Hastapadasana (Standing Forward Bend).
+  ~ Step 3 and Step 10 of the classical 12-step Surya Namaskar cycle.
+  ~ Viewport: 512x512, scalable monochrome fill for dynamic Compose theme tinting.
+  -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="512dp"
+    android:height="512dp"
+    android:viewportWidth="512"
+    android:viewportHeight="512">
+    <group android:name="figure">
+        <path
+            android:name="silhouette"
+            android:fillColor="#FF000000"
+            android:pathData="
+                M 190,460
+                L 230,460
+                C 230,420 228,370 226,310
+                C 224,260 222,230 225,210
+                C 228,190 240,180 255,190
+                C 265,200 270,225 272,260
+                C 274,300 274,350 273,400
+                C 272,425 270,445 268,460
+                L 295,460
+                C 298,435 300,405 300,360
+                C 300,300 295,240 285,195
+                C 275,160 250,145 220,150
+                C 190,155 175,185 175,230
+                C 175,290 178,380 180,440
+                C 180,452 184,458 190,460
+                Z
+                M 255,390
+                C 265,390 275,398 275,410
+                C 275,422 265,430 255,430
+                C 245,430 235,422 235,410
+                C 235,398 245,390 255,390
+                Z" />
+    </group>
+</vector>

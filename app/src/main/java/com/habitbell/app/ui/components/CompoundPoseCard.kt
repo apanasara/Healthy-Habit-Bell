@@ -2,12 +2,13 @@
  * # CompoundPoseCard
  *
  * Visual card displaying the current posture, round index, breathing cue, solar mantra,
- * and animated vector illustration for compound sequential timers (such as Surya Namaskar).
+ * 12-step cyclical flow indicator, and vector illustration for compound sequential timers.
  *
  * ## Architectural Role & Component Relationships
  * Presentation layer UI component in `com.habitbell.app.ui.components`:
  * - Hosted by [com.habitbell.app.ui.screens.SessionScreen] when `TimerType.COMPOUND` is active.
- * - Embeds [com.habitbell.app.ui.AnimatedPoseView] to illustrate the active posture dynamically.
+ * - Embeds [com.habitbell.app.ui.AnimatedPoseView] and [com.habitbell.app.ui.SuryaPoseAssets]
+ *   to illustrate the active posture dynamically with its distinct silhouette.
  * - Displays live pose countdown and round progress derived from [com.habitbell.app.engine.TimerSessionState].
  *
  * ## Concurrency & Thread Safety
@@ -26,9 +27,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.habitbell.app.R
 import com.habitbell.app.data.model.CompoundPose
 import com.habitbell.app.ui.AnimatedPoseView
+import com.habitbell.app.ui.SuryaPoseAssets
 
 /**
  * Visual card displaying active posture illustration, round progress, countdown, and yogic cues.
@@ -62,7 +63,36 @@ fun CompoundPoseCard(
             fontWeight = FontWeight.Bold
         )
 
-        Spacer(modifier = Modifier.height(10.dp))
+        // 12-Step Cyclical Flow Progress Indicator
+        Row(
+            modifier = Modifier
+                .padding(top = 8.dp, bottom = 8.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            (1..12).forEach { stepIdx ->
+                val isCurrent = stepIdx == pose.index
+                val isCompleted = stepIdx < pose.index
+                Box(
+                    modifier = Modifier
+                        .padding(horizontal = 2.5.dp)
+                        .size(
+                            width = if (isCurrent) 20.dp else 6.dp,
+                            height = 6.dp
+                        )
+                        .background(
+                            color = when {
+                                isCurrent -> MaterialTheme.colorScheme.primary
+                                isCompleted -> MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
+                                else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                            },
+                            shape = RoundedCornerShape(3.dp)
+                        )
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(4.dp))
 
         // Primary Posture Name (e.g., "Pranamasana", "Bhujangasana")
         Text(
@@ -79,7 +109,7 @@ fun CompoundPoseCard(
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
-        // Solar Mantra (e.g., "ॐ मित्राय नमः")
+        // Solar Mantra (e.g., "☀️ ॐ मित्राय नमः")
         if (pose.mantra.isNotBlank()) {
             Spacer(modifier = Modifier.height(4.dp))
             Text(
@@ -92,14 +122,14 @@ fun CompoundPoseCard(
 
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Animated Posture Illustration
+        // Distinct Animated Posture Silhouette Illustration for active pose
         AnimatedPoseView(
-            drawableResId = R.drawable.avd_yoga_pranamasana,
-            size = 110.dp,
+            drawableResId = SuryaPoseAssets.getDrawableForStep(pose.index),
+            size = 120.dp,
             contentDescription = pose.name
         )
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(14.dp))
 
         // Synchronized Breath Cue & Pose Countdown Row
         Row(

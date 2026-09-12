@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ # yoga_ashwa_sanchalanasana.xml
+  ~ Vector silhouette representing Ashwa Sanchalanasana (Equestrian Pose / Low Lunge).
+  ~ Step 4 and Step 9 of the classical 12-step Surya Namaskar cycle.
+  ~ Viewport: 512x512, scalable monochrome fill for dynamic Compose theme tinting.
+  -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="512dp"
+    android:height="512dp"
+    android:viewportWidth="512"
+    android:viewportHeight="512">
+    <group android:name="figure">
+        <path
+            android:name="silhouette"
+            android:fillColor="#FF000000"
+            android:pathData="
+                M 60,460
+                L 160,460
+                C 180,455 210,430 240,400
+                C 260,380 290,360 320,350
+                C 345,340 370,345 385,360
+                C 395,370 395,410 395,460
+                L 420,460
+                C 420,400 415,355 395,335
+                C 375,315 340,315 305,325
+                C 275,335 250,350 230,370
+                C 225,350 230,310 245,270
+                C 260,230 280,200 300,185
+                C 315,175 330,180 340,195
+                C 350,210 345,230 330,240
+                C 315,250 305,245 295,235
+                C 285,250 280,280 280,310
+                L 330,460
+                L 305,460
+                L 265,340
+                C 255,360 235,390 205,420
+                C 175,445 130,455 60,460
+                Z
+                M 315,160
+                C 328,160 338,150 338,138
+                C 338,125 328,115 315,115
+                C 302,115 292,125 292,138
+                C 292,150 302,160 315,160
+                Z" />
+    </group>
+</vector>
