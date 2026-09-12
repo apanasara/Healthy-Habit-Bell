@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.habitbell.app.R
 import com.habitbell.app.audio.VoiceCueMode
+import com.habitbell.app.cast.ScreenOrientation
 import com.habitbell.app.data.SuryaDatabase
 import com.habitbell.app.data.model.*
 import com.habitbell.app.engine.BackgroundSoundType
@@ -162,7 +163,16 @@ fun SettingsDrawer(
     onOpenSuryaEditor: () -> Unit = {},
     onUpdateSurya: (poses: List<CompoundPose>, targetRounds: Int, speedPreset: String, customPaceSeconds: Int, voiceCueMode: VoiceCueMode) -> Unit = { _, _, _, _, _ -> },
     isPauseOnBluetoothDisconnect: Boolean = true,
-    onPauseOnBluetoothDisconnectToggle: (Boolean) -> Unit = {}
+    onPauseOnBluetoothDisconnectToggle: (Boolean) -> Unit = {},
+    isPrepCountdownEnabled: Boolean = true,
+    onPrepCountdownToggle: (Boolean) -> Unit = {},
+    isScreenMirroringActive: Boolean = false,
+    isScreenMirroringManual: Boolean = false,
+    screenMirroringTargetOrientation: ScreenOrientation = ScreenOrientation.AUTO,
+    externalDisplayName: String? = null,
+    onToggleScreenMirroringMode: (Boolean) -> Unit = {},
+    onSetScreenOrientation: (ScreenOrientation) -> Unit = {},
+    onToggleScreenOrientation: () -> Unit = {}
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -328,7 +338,9 @@ fun SettingsDrawer(
                             onDisconnectCast = onDisconnectCast,
                             tvCastUrl = tvCastUrl,
                             isPauseOnBluetoothDisconnect = isPauseOnBluetoothDisconnect,
-                            onPauseOnBluetoothDisconnectToggle = onPauseOnBluetoothDisconnectToggle
+                            onPauseOnBluetoothDisconnectToggle = onPauseOnBluetoothDisconnectToggle,
+                            isPrepCountdownEnabled = isPrepCountdownEnabled,
+                            onPrepCountdownToggle = onPrepCountdownToggle
                         )
                     }
                 }
@@ -926,7 +938,9 @@ private fun GlobalConfigContent(
     onDisconnectCast: () -> Unit,
     tvCastUrl: String,
     isPauseOnBluetoothDisconnect: Boolean = true,
-    onPauseOnBluetoothDisconnectToggle: (Boolean) -> Unit = {}
+    onPauseOnBluetoothDisconnectToggle: (Boolean) -> Unit = {},
+    isPrepCountdownEnabled: Boolean = true,
+    onPrepCountdownToggle: (Boolean) -> Unit = {}
 ) {
     val context = LocalContext.current
 
@@ -1369,6 +1383,12 @@ private fun GlobalConfigContent(
                     subtitle = "Automatically pause active timer when car or Bluetooth headphones disconnect",
                     checked = isPauseOnBluetoothDisconnect,
                     onCheckedChange = onPauseOnBluetoothDisconnectToggle
+                )
+                SettingsToggleRow(
+                    title = "Preparation Countdown",
+                    subtitle = "5-second lead time with voice cue to put down mobile and take position",
+                    checked = isPrepCountdownEnabled,
+                    onCheckedChange = onPrepCountdownToggle
                 )
             }
         }

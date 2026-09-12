@@ -94,14 +94,14 @@ class HabitBellMediaService : MediaBrowserServiceCompat() {
                 lastRecordedStatus = state.status
 
                 when (state.status) {
-                    SessionStatus.RUNNING -> {
+                    SessionStatus.PREPARING, SessionStatus.RUNNING -> {
                         if (!isForeground) {
                             // Promote to foreground once on active transition
                             val notification = buildNotification(state)
                             startForeground(NOTIFICATION_ID, notification)
                             isForeground = true
-                        } else if (statusChanged || state.remainingSeconds % 5 == 0) {
-                            // Non-blocking content update throttled to every 5s to eliminate 1Hz IPC spam
+                        } else if (statusChanged || state.status == SessionStatus.PREPARING || state.remainingSeconds % 5 == 0) {
+                            // Non-blocking content update throttled to every 5s (or every second during preparation)
                             val notification = buildNotification(state)
                             notificationManager.notify(NOTIFICATION_ID, notification)
                         }
@@ -170,9 +170,13 @@ class HabitBellMediaService : MediaBrowserServiceCompat() {
      * @return Formatted ongoing [Notification] instance.
      */
     private fun buildNotification(state: TimerSessionState): Notification {
-        val isPlaying = state.status == SessionStatus.RUNNING
+        val isPlaying = state.status == SessionStatus.RUNNING || state.status == SessionStatus.PREPARING
         val title = state.profile.name
-        val subtitle = "${state.formattedRemainingTime} • ${if (isPlaying) "Active" else "Paused"}"
+        val subtitle = if (state.status == SessionStatus.PREPARING) {
+            "Get Ready • ${state.preparationSecondsRemaining}s"
+        } else {
+            "${state.formattedRemainingTime} • ${if (isPlaying) "Active" else "Paused"}"
+        }
 
         val contentIntent = PendingIntent.getActivity(
             this,

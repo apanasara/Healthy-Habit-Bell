@@ -16,6 +16,9 @@ enum class SessionStatus {
     /** Timer is idle, initialized with a profile, waiting to start. */
     IDLE,
 
+    /** 5-second preparation countdown lead time to lay down phone and take position. */
+    PREPARING,
+
     /** Timer is actively counting down with background heartbeat running. */
     RUNNING,
 
@@ -32,7 +35,7 @@ enum class SessionStatus {
  * This data structure is observed by UI Composables, Android Auto templates, TV Cast servers,
  * and ongoing Notification channels to render unified countdown timings and visual progress.
  *
- * @property status Current execution state of the session ([SessionStatus.IDLE], [SessionStatus.RUNNING], etc.).
+ * @property status Current execution state of the session ([SessionStatus.IDLE], [SessionStatus.PREPARING], [SessionStatus.RUNNING], etc.).
  * @property profile Active [TimerProfile] configuration governing duration, intervals, and bells.
  * @property remainingSeconds Total seconds remaining until the entire session completes.
  * @property totalSeconds Total configured duration of the session in seconds.
@@ -52,6 +55,8 @@ enum class SessionStatus {
  * @property stepCadence Live cadence in steps per minute (SPM).
  * @property isStepTrackingActive Whether step monitoring is active for this session.
  * @property healthProvider Active health platform source providing step metrics.
+ * @property preparationSecondsRemaining Seconds remaining in the pre-session preparation countdown (5..0).
+ * @property totalPreparationSeconds Total duration configured for pre-session preparation in seconds (default 5s).
  */
 data class TimerSessionState(
     val status: SessionStatus = SessionStatus.IDLE,
@@ -77,8 +82,16 @@ data class TimerSessionState(
     val nextStepBellSteps: Int? = null,
     val stepCadence: Int = 0,
     val isStepTrackingActive: Boolean = false,
-    val healthProvider: com.habitbell.app.health.HealthProviderType = com.habitbell.app.health.HealthProviderType.HARDWARE_SENSOR
+    val healthProvider: com.habitbell.app.health.HealthProviderType = com.habitbell.app.health.HealthProviderType.HARDWARE_SENSOR,
+    // Pre-session preparation countdown tracking
+    val preparationSecondsRemaining: Int = 0,
+    val totalPreparationSeconds: Int = 5
 ) {
+    /**
+     * Whether the session is currently in the 5-second lead-in preparation countdown.
+     */
+    val isPreparing: Boolean
+        get() = status == SessionStatus.PREPARING
     /**
      * Normalized completion progress ranging from `0.0f` (start) to `1.0f` (complete).
      * Used directly by progress rings, arc canvases, and car dashboard gauges.
@@ -161,6 +174,15 @@ class TimerEngine(
 
     /** Voice guidance player articulating classical Asana cues and Solar Mantras for Surya Namaskar. */
     var suryaVoicePlayer: com.habitbell.app.audio.SuryaVoicePlayer? = null
+
+    /** Voice guidance player articulating 5-second countdown cues and strikes before session begins. */
+    var preparationVoiceGuide: com.habitbell.app.audio.PreparationVoiceGuide? = null
+
+    /** Toggle determining whether the 5-second preparation countdown is executed before starting. */
+    var isPreparationCountdownEnabled: Boolean = true
+
+    /** Configured duration of the preparation lead-in countdown in seconds (default 5s). */
+    var preparationCountdownSeconds: Int = 5
 
     /** Coroutine scope bound to Default dispatcher with a SupervisorJob to prevent cancellation cascading. */
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
@@ -288,18 +310,85 @@ class TimerEngine(
     /**
      * Initiates or resumes countdown execution.
      *
-     * Launches a non-blocking coroutine ticker on [Dispatchers.Default] pulsing once every 1,000 milliseconds.
-     * If the session was previously completed, it resets to the beginning before starting.
+     * If the session is initiated from [SessionStatus.IDLE] and preparation countdown is enabled,
+     * it enters [SessionStatus.PREPARING] for 5 seconds with auditory cues ("Take your position", 3, 2, 1)
+     * before automatically transitioning to [SessionStatus.RUNNING].
+     *
+     * @param skipPreparation If true, bypasses the 5-second preparation lead-in and starts running immediately.
      */
-    fun startOrResume() {
-        if (_state.value.status == SessionStatus.RUNNING) return
+    fun startOrResume(skipPreparation: Boolean = false) {
+        if (_state.value.status == SessionStatus.RUNNING || _state.value.status == SessionStatus.PREPARING) return
         val wasIdle = _state.value.status == SessionStatus.IDLE
         if (_state.value.status == SessionStatus.COMPLETED) {
             reset()
         }
 
-        _state.update { it.copy(status = SessionStatus.RUNNING) }
+        if (wasIdle && isPreparationCountdownEnabled && !skipPreparation && preparationCountdownSeconds > 0) {
+            startPreparation()
+            return
+        }
+
+        transitionToRunning(wasIdle)
+    }
+
+    /**
+     * Initiates the 5-second preparation countdown lead-in with voice guidance and cymbal strikes.
+     */
+    private fun startPreparation() {
+        val totalPrep = preparationCountdownSeconds
+        _state.update {
+            it.copy(
+                status = SessionStatus.PREPARING,
+                preparationSecondsRemaining = totalPrep,
+                totalPreparationSeconds = totalPrep,
+                isDimmed = false,
+                isVisualAlertActive = false
+            )
+        }
+        preparationVoiceGuide?.playPreparationCue(totalPrep)
+
+        timerJob?.cancel()
+        timerJob = scope.launch {
+            var remaining = totalPrep
+            while (isActive && remaining > 0) {
+                delay(1000L)
+                remaining--
+                _state.update { it.copy(preparationSecondsRemaining = remaining) }
+                if (remaining > 0) {
+                    preparationVoiceGuide?.playPreparationCue(remaining)
+                } else {
+                    transitionToRunning(wasIdle = true)
+                }
+            }
+        }
+    }
+
+    /**
+     * Skips the ongoing preparation countdown and commences active session countdown immediately.
+     */
+    fun skipPreparation() {
+        if (_state.value.status == SessionStatus.PREPARING) {
+            timerJob?.cancel()
+            transitionToRunning(wasIdle = true)
+        }
+    }
+
+    /**
+     * Transitions from idle or preparation state into [SessionStatus.RUNNING].
+     * Triggers opening bell chime for linear sessions, activates posture or breathwork cues,
+     * and launches the 1Hz heartbeat tick loop.
+     *
+     * @param wasIdle True if this is the start of a fresh session rather than resuming from pause.
+     */
+    private fun transitionToRunning(wasIdle: Boolean) {
+        preparationVoiceGuide?.stop()
+        _state.update { it.copy(status = SessionStatus.RUNNING, preparationSecondsRemaining = 0) }
         sessionStartRealtime = SystemClock.elapsedRealtime()
+
+        // Ring opening bell for linear timers to mark the commencement of mindful practice
+        if (wasIdle && _state.value.profile.type == TimerType.LINEAR) {
+            audioManager.playIntervalBell()
+        }
 
         // If initiating a Pranayama session from start, articulate the initial phase cue
         if (wasIdle && _state.value.profile.type == TimerType.MULTI_INTERVAL) {
@@ -320,6 +409,7 @@ class TimerEngine(
             }
         }
 
+        timerJob?.cancel()
         timerJob = scope.launch {
             // Heartbeat loop optimized for battery conservation: 1Hz tick rate
             while (isActive && _state.value.status == SessionStatus.RUNNING) {
@@ -333,14 +423,15 @@ class TimerEngine(
      * Pauses the ongoing timer session, halting the ticker loop and cancelling any pending haptic cues.
      */
     fun pause() {
-        if (_state.value.status == SessionStatus.RUNNING) {
+        if (_state.value.status == SessionStatus.RUNNING || _state.value.status == SessionStatus.PREPARING) {
             timerJob?.cancel()
             timerJob = null
             visualAlertRemainingTicks = 0
             hapticManager.cancel()
             voiceGuide?.stop()
             suryaVoicePlayer?.stop()
-            _state.update { it.copy(status = SessionStatus.PAUSED, isDimmed = false, isVisualAlertActive = false) }
+            preparationVoiceGuide?.stop()
+            _state.update { it.copy(status = SessionStatus.PAUSED, isDimmed = false, isVisualAlertActive = false, preparationSecondsRemaining = 0) }
         }
     }
 
@@ -354,7 +445,8 @@ class TimerEngine(
         hapticManager.cancel()
         voiceGuide?.stop()
         suryaVoicePlayer?.stop()
-        _state.update { it.copy(status = SessionStatus.IDLE, isDimmed = false, isVisualAlertActive = false) }
+        preparationVoiceGuide?.stop()
+        _state.update { it.copy(status = SessionStatus.IDLE, isDimmed = false, isVisualAlertActive = false, preparationSecondsRemaining = 0) }
     }
 
     /**
@@ -366,6 +458,7 @@ class TimerEngine(
         timerJob = null
         voiceGuide?.shutdown()
         suryaVoicePlayer?.release()
+        preparationVoiceGuide?.shutdown()
         hapticManager.cancel()
         scope.cancel()
     }

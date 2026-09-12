@@ -124,7 +124,7 @@ class MainActivity : FragmentActivity() {
             // Keep screen awake dynamically while session is running to prevent Android OS display sleep
             // from terminating the real-time Screen Mirroring capture encoder or dropping Chromecast streams
             LaunchedEffect(sessionState.status) {
-                val shouldKeepAwake = sessionState.status == SessionStatus.RUNNING
+                val shouldKeepAwake = sessionState.status == SessionStatus.RUNNING || sessionState.status == SessionStatus.PREPARING
                 viewModel.batteryOptimizer.applyScreenAwake(this@MainActivity, shouldKeepAwake)
             }
 
@@ -222,6 +222,9 @@ class MainActivity : FragmentActivity() {
                                 },
                                 onUserInteraction = {
                                     viewModel.userInteractionWake()
+                                },
+                                onSkipPreparation = {
+                                    viewModel.skipPreparation()
                                 }
                             )
                         }
@@ -308,6 +311,8 @@ class MainActivity : FragmentActivity() {
                             onToggleSunMoonTheme = { viewModel.toggleSunMoonTheme() },
                             isPauseOnBluetoothDisconnect = uiState.isPauseOnBluetoothDisconnect,
                             onPauseOnBluetoothDisconnectToggle = { viewModel.setPauseOnBluetoothDisconnect(it) },
+                            isPrepCountdownEnabled = uiState.isPrepCountdownEnabled,
+                            onPrepCountdownToggle = { viewModel.setPrepCountdownEnabled(it) },
                             onOpenSuryaEditor = {
                                 viewModel.openSettingsDrawer(false)
                                 viewModel.navigateTo(AppScreen.SURYA_TIMER)
