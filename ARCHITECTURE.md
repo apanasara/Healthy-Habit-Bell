@@ -483,21 +483,51 @@ To eliminate vertical clutter and decouple dynamic session parameters from persi
   - Source selection between bundled 432Hz Aum loop, sandboxed ad-free YouTube audio stream, or local audio file via Storage Access Framework (SAF).
   - **De-duplicated Audio Surface**: Redundant volume sliders have been cleanly excised from Timer Settings, Pranayama Settings, and Surya Namaskar Sheets, routing all gain management exclusively through the unified Master Audio Gain controls in Global Config.
 
-#### 2. Domain 2: Persistent Global Configuration (`SettingsDrawerTab.GLOBAL`)
-- **Zen Focus (Do Not Disturb)**: Suppresses distracting system notifications during active mindfulness sessions.
-- **Sun-Moon Circadian Mode with Blue-Light Attenuation**:
-  - **Sun (Day Mode)**: Blue-light-reduced warm parchment palette (`#FAF6EE` background, gentle amber `#D97706` accents) engineered to prevent ocular fatigue and daylight glare without harsh cool blue emissions.
-  - **Moon (Night Mode)**: Circadian wind-down palette featuring warm amber tones on deep charcoal (`#16130F`) or pure `#000000` AMOLED to power off OLED pixels entirely.
-  - 1-tap Sun ☀️ ⇄ Moon 🌙 toggle plus granular theme selection (`AMOLED`, `EYE_COMFORT`, `DARK`, `LIGHT`).
-- **Master Audio Gain & Ambient Sound Controls**:
-  - **Bell Master Volume Slider** ($0\%..100\%$) with persistent storage in SharedPreferences (`bell_volume`) and immediate `[▶ Test Bell Chime]` audition button.
-  - **Global Ambient Soundscape Mute Switch (`isBgMusicEnabled`)**: Centrally located in Global Config alongside volume sliders for 1-tap soundscape toggling across all timers.
-  - **Background Ambient Volume Slider** ($0\%..100\%$) with active slider override, ducking compensation, and real-time audition preview toggle (`[▶ Test Ambient Sound]` / `[⏹ Stop Ambient Sound]`).
-- **Pedometer & Health Platform Connectivity**: Centralized selection of active step providers (`Hardware Sensor`, `Health Connect`, `Apple Health Bridge`, `Step Simulator`), sensor permission status indicators, and synthetic step injection tools.
-- **Living Room & TV Casting**: Embedded Google Cast route controls (`CastButton`), Miracast Screen Mirroring shortcut, and Smart TV browser link copy.
-- **Hardware Battery Protections**: Proximity-driven AMOLED Pocket Mode blanking, Auto-Dimming, and Display Awake management.
+#### 2. Domain 2: Persistent Global Configuration & Bifurcation (Requirement E5)
+To eliminate vertical scroll clutter and reduce cognitive load, Global App Configuration has been logically bifurcated into three distinct, non-scroll-heavy panels managed via a segmented category chip selector (`GlobalSettingsCategory`):
 
-#### 3. Permanent Signature Acoustic Identity (Zero Timbre Configuration)
+- **Quick Action Navigation Tiles**: Prominently pinned at the top of Global Config for 1-tap direct navigation to:
+  - **Volume & Audio Settings** (Requirement E6): Opens the dedicated volume sheet.
+  - **Living Room & TV Casting** (Requirement E8): Opens the dedicated TV casting & screen mirroring sheet.
+- **Category 1: Theme & Display (`GlobalSettingsCategory.THEME_DISPLAY`)**:
+  - **Zen Focus (Do Not Disturb)**: Suppresses distracting system notifications during active mindfulness sessions.
+  - **Sun-Moon Circadian Mode with Blue-Light Attenuation**:
+    - **Sun (Day Mode)**: Blue-light-reduced warm parchment palette (`#FAF6EE` background, gentle amber `#D97706` accents) preventing ocular fatigue without harsh blue spectrum emissions.
+    - **Moon (Night Mode)**: Circadian wind-down palette featuring warm amber tones on deep charcoal (`#16130F`) or pure `#000000` AMOLED.
+    - 1-tap Sun ☀️ ⇄ Moon 🌙 toggle plus granular theme selection (`AMOLED`, `EYE_COMFORT`, `DARK`, `LIGHT`).
+  - **Display Management**: Display Awake (`FLAG_KEEP_SCREEN_ON`) and Auto-Dimming during countdown rest periods.
+- **Category 2: Sensors & Health (`GlobalSettingsCategory.SENSORS_HEALTH`)**:
+  - Centralized step provider bridges (`Hardware Sensor`, `Health Connect`, `Apple Health Bridge`, `Step Simulator`).
+  - Runtime sensor permission status indicators and Android `ACTIVITY_RECOGNITION` permission launcher.
+  - Synthetic step injection debugging tool (`+250 Steps`).
+- **Category 3: Automation & Battery (`GlobalSettingsCategory.AUTOMATION_BATTERY`)**:
+  - Proximity-driven AMOLED Pocket Mode blanking.
+  - Bluetooth Disconnect Auto-Pause toggle for peripheral wireless headphones.
+  - 5-Second Preparation Countdown toggle (`is_prep_countdown_enabled`).
+  - About Habit Bell operating system version info.
+
+#### 3. Dedicated Volume Controller Subsystem (Requirement E6)
+Global volume controls are completely decoupled from the main settings drawer into a dedicated, persistent bottom sheet (`VolumeSettingsSheet.kt`) that is **always available at the top right corner** across all application screens (`ModernHomeScreenSample`, `SessionScreen` in portrait and landscape):
+
+- **Decoupled Bell Controls**:
+  - **Interval Bell Volume Slider** ($0\%..100\%$, `intervalVolume`): Governs intermediate pacing cues (Option C triple bell cadence, countdown lead-in strikes, Pranayama phase cues). Includes an immediate `[▶ Test Option C]` audition button.
+  - **Completion Gong Volume Slider** ($0\%..100\%$, `bellVolume`): Governs the end-of-session resonant Temple Gong chime. Includes an immediate `[▶ Test Gong]` audition button.
+- **Global Ambient Soundscape Engine**:
+  - **Master Soundscape Toggle (`isBgMusicEnabled`)**: 1-tap master switch to silence or enable background sound across all timer sessions.
+  - **Direct Hardware / TV Volume Synchronization (Requirement E7)**: Displays active audio endpoint with real-time bi-directional synchronization:
+    - TV Mode (`isCasting == true`): Synchronizes directly with connected TV master volume via `HabitBellCastManager` and `CastSession.setVolume`.
+    - Phone Mode (`isCasting == false`): Synchronizes directly with device media stream (`AudioManager.STREAM_MUSIC`) via `SystemVolumeObserver`.
+  - **Soundscape Strategy Selector**: Select between ॐ Continuous Aum drone (`DEFAULT_AUM`), YouTube audio link stream (`YOUTUBE_LINK`), or Custom local audio file (`CUSTOM_FILE`) via Storage Access Framework (SAF).
+  - **Ambient Audition Button**: Real-time `[▶ Test Ambient Sound]` / `[⏹ Stop Ambient Sound]` preview button.
+
+#### 4. Decoupled Living Room & TV Casting Subsystem (Requirement E8)
+Google Cast and Miracast Screen Mirroring are completely decoupled from global settings into a dedicated, persistent bottom sheet (`CastMirroringSheet.kt`) directly accessible via top-right TV action buttons:
+
+- **Native Google Cast Discovery**: Integrates AndroidX `MediaRouteButton` wrapped via `CastButton` for native Cast framework discovery (Chromecast, Google TV, Android TV) without third-party browser hops.
+- **Miracast Screen Mirroring Controls**: Dedicated master toggle, external display name indicator, and dynamic target orientation modes (`Auto`, `Vertical (Portrait)`, `Horizontal (Landscape)`, and 1-tap `Rotate Screen ⇄`).
+- **Smart TV Browser Connectivity**: Local embedded HTTP playback link (`tvCastUrl`) with 1-tap clipboard copy and QR launch code for web browsers on Samsung Tizen, LG webOS, and Apple TV.
+
+#### 5. Permanent Signature Acoustic Identity (Zero Timbre Configuration)
 - **Brand Sound Integrity**: All user-facing chime timbre selection dropdowns/chips (`Tingsha`, `Singing Bowl`, `Temple Gong`, `Crystal Quartz`) are intentionally removed.
 - **Acoustic Enforcement**:
   - **Separator (Interval) Bell**: Exclusively configured to the **Option C Triple Bell** ($2048\text{ Hz} \rightarrow 1536\text{ Hz} \rightarrow 1024\text{ Hz}$) — an acoustically distinct, non-startling mindful pacing cue.

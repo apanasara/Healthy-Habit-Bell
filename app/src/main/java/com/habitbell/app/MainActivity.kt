@@ -220,6 +220,12 @@ class MainActivity : FragmentActivity() {
                                 isLandscape = isLandscape,
                                 onToggleOrientation = {
                                     viewModel.toggleScreenOrientation()
+                                },
+                                onOpenVolumeSettings = {
+                                    viewModel.openVolumeSheet(true)
+                                },
+                                onOpenCastSettings = {
+                                    viewModel.openCastSheet(true)
                                 }
                             )
                         }
@@ -249,6 +255,12 @@ class MainActivity : FragmentActivity() {
                                 isScreenMirroringActive = isScreenMirroringActive,
                                 onToggleOrientation = {
                                     viewModel.toggleScreenOrientation()
+                                },
+                                onOpenVolumeSettings = {
+                                    viewModel.openVolumeSheet(true)
+                                },
+                                onOpenCastSettings = {
+                                    viewModel.openCastSheet(true)
                                 }
                             )
                         }
