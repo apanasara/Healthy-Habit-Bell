@@ -139,9 +139,14 @@ class AudioBellManager(private val context: Context) {
      * Triggers the interval bell according to the configured [bellStyle].
      * For the primary [BellSoundStyle.ZEN_TINGSHA] (Option C), it plays the 3-bell sequence:
      * Strike 1 (2048 Hz) -> Strike 2 (1536 Hz) -> Strike 3 (1024 Hz, 7.5s sustained ringout).
+     *
+     * ## Acoustic Layering Standard (Requirement E2)
+     * Bell chimes layer additively over ongoing ambient background music (`USAGE_MEDIA`) without
+     * requesting OS-level transient ducking audio focus. This guarantees that ambient soundscapes
+     * remain at a completely constant, uninterrupted volume throughout the entire session as set
+     * by the user, eliminating jarring volume drops and sudden snap-backs.
      */
     fun playIntervalBell() {
-        requestTransientAudioFocus(durationMs = 8000L)
         when (bellStyle) {
             BellSoundStyle.ZEN_TINGSHA -> {
                 if (isLoaded && optionCIntervalSoundId != 0) {
@@ -185,14 +190,14 @@ class AudioBellManager(private val context: Context) {
 
     /**
      * Plays an individual countdown chime strike if required by a multi-phase countdown.
+     * Layers harmoniously over background ambient audio without ducking.
      *
-     * @param secondsRemaining Number of seconds remaining:
+     * @param secondsRemaining Number of seconds remaining in countdown phase:
      *   - 3: Strike 1 (2048 Hz crystalline bell, 45% volume)
      *   - 2: Strike 2 (1536 Hz centering bell, 70% volume)
      *   - 1: Strike 3 (1024 Hz deep resonance finish, 100% volume)
      */
     fun playCountdownStrike(secondsRemaining: Int) {
-        requestTransientAudioFocus(durationMs = 4500L)
         when (secondsRemaining) {
             3 -> {
                 if (isLoaded && strike3SoundId != 0) {
@@ -228,10 +233,10 @@ class AudioBellManager(private val context: Context) {
      * Triggers the session completion bell: Deep Resonant Temple Gong.
      *
      * Emits a rich 324 Hz harmonic temple gong with long acoustic decay
-     * to honor the conclusion of the wellness session.
+     * to honor the conclusion of the wellness session. Layers smoothly
+     * over ambient soundscapes without triggering abrupt ducking.
      */
     fun playCompletionBell() {
-        requestTransientAudioFocus(durationMs = 9000L)
         if (isLoaded && templeGongSoundId != 0) {
             soundPool?.play(templeGongSoundId, bellVolume, bellVolume, 1, 0, 1.0f)
         } else {
@@ -261,7 +266,7 @@ class AudioBellManager(private val context: Context) {
     /**
      * Triggers the dedicated meditative Pranayama milestone interval chime.
      *
-     * ## Acoustic Design for Meditative Absorption
+     * ## Acoustic Design for Meditative Absorption (Requirement E2)
      * Unlike standard interval bells or triple-chime sequences, this bell is engineered
      * specifically to prevent breaking the practitioner's deep meditative (dhyana) state
      * or triggering the autonomic startle reflex:
@@ -269,10 +274,10 @@ class AudioBellManager(private val context: Context) {
      * - **Fundamental Pitch**: Warm 432 Hz Tibetan singing bowl resonance (Om harmonic frequency).
      * - **Soft Mallet Attack**: Raised inverted cosine envelope over 60ms eliminating click transients.
      * - **Subdued Volume**: Scaled to 38% of master volume to act as a subconscious milestone whisper.
-     * - **Transient Ducking**: Gently ducks background media for 6 seconds with gradual release.
+     * - **Constant Ambient Volume**: Layers additively over background ambient drones without ducking,
+     *   preventing sudden volume drops or abrupt snap-backs.
      */
     fun playPranayamaIntervalBell() {
-        requestTransientAudioFocus(durationMs = 6000L)
         val gentleVolume = intervalVolume * 0.38f
         if (isLoaded && intervalSoundId != 0) {
             soundPool?.play(intervalSoundId, gentleVolume, gentleVolume, 1, 0, 1.0f)
@@ -291,48 +296,7 @@ class AudioBellManager(private val context: Context) {
     }
 
     /**
-     * Requests temporary ducking audio focus on the primary media channel so background music
-     * decreases in volume while the bell resonates over vehicle or device media speakers.
-     * Automatically schedules abandonment of focus once the chime ringout completes to eliminate leaks.
-     *
-     * @param durationMs Length of time in milliseconds to retain ducking audio focus.
-     */
-    private fun requestTransientAudioFocus(durationMs: Long = 5000L) {
-        abandonTransientAudioFocus()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val focusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK)
-                .setAudioAttributes(
-                    AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_MEDIA)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                        .build()
-                )
-                .setOnAudioFocusChangeListener { /* Background media automatically ducked/restored */ }
-                .build()
-            activeFocusRequest = focusRequest
-            audioManager.requestAudioFocus(focusRequest)
-
-            scope.launch {
-                kotlinx.coroutines.delay(durationMs)
-                abandonTransientAudioFocus()
-            }
-        } else {
-            @Suppress("DEPRECATION")
-            audioManager.requestAudioFocus(
-                null,
-                AudioManager.STREAM_MUSIC,
-                AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK
-            )
-            scope.launch {
-                kotlinx.coroutines.delay(durationMs)
-                @Suppress("DEPRECATION")
-                try { audioManager.abandonAudioFocus(null) } catch (_: Exception) {}
-            }
-        }
-    }
-
-    /**
-     * Abandons the active audio focus request, restoring full media volume and preventing stack bloat.
+     * Abandons any active audio focus request, restoring full media volume and preventing stack bloat.
      */
     private fun abandonTransientAudioFocus() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
