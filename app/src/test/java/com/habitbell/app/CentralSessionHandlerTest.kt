@@ -194,5 +194,27 @@ class CentralSessionHandlerTest {
         )
         val isPranayama = pranayamaState.profile.type == com.habitbell.app.data.model.TimerType.MULTI_INTERVAL
         assertEquals(true, isPranayama)
+
+        // Verify Surya Namaskar / Compound sequence state mapping
+        val suryaPose = com.habitbell.app.data.model.CompoundPose(
+            index = 1,
+            name = "Pranamasana",
+            sanskritName = "Prayer Pose",
+            durationSeconds = 5,
+            breathCue = "Inhale & Exhale gently",
+            mantra = "ॐ मित्राय नमः"
+        )
+        val suryaState = TimerSessionState(
+            status = SessionStatus.RUNNING,
+            profile = DefaultProfiles.SURYA_NAMASKAR,
+            currentPose = suryaPose,
+            poseRemainingSeconds = 5,
+            currentRound = 1,
+            totalRounds = 6
+        )
+        val isSurya = suryaState.profile.type == com.habitbell.app.data.model.TimerType.COMPOUND
+        assertEquals(true, isSurya)
+        assertEquals(1, suryaState.currentPose?.index)
+        assertEquals("ॐ मित्राय नमः", suryaState.currentPose?.mantra)
     }
 }

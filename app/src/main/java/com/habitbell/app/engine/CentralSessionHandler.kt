@@ -185,6 +185,10 @@ class CentralSessionHandler(private val application: Application) {
             if (isPlay) resume() else pause()
         }
 
+        castManager.onRemoteResetAction = {
+            reset()
+        }
+
         castManager.onReceiverReady = {
             // Push full telemetry immediately upon TV receiver online readiness
             val state = engine.state.value
@@ -455,6 +459,7 @@ class CentralSessionHandler(private val application: Application) {
             state.status == SessionStatus.IDLE -> "SPLASH"
             isEating -> "EATING"
             isPranayama -> "PRANAYAMA"
+            isSurya -> "SURYA"
             else -> "GENERAL"
         }
         json.put("screenMode", screenMode)
@@ -468,27 +473,55 @@ class CentralSessionHandler(private val application: Application) {
             json.put("pranayamaPhase", pranayamaPhase.name)
             json.put("pranayamaSanskrit", pranayamaPhase.sanskritName)
             json.put("pranayamaDisplay", pranayamaPhase.displayName)
+            json.put("pranayamaScript", pranayamaPhase.sanskritScript)
             json.put("phaseDurationSeconds", state.phaseDurationSeconds)
             json.put("phaseRemainingSeconds", state.phaseRemainingSeconds)
+
+            val pConfig = state.profile.pranayamaConfig
+            val isIntervalBell = pConfig?.isIntervalBellEnabled == true
+            json.put("isIntervalBellEnabled", isIntervalBell)
+            if (isIntervalBell) {
+                val intervalCadence = pConfig?.intervalBellRoundCadence?.takeIf { it > 0 } ?: 5
+                val roundsUntilBell = intervalCadence - ((state.currentRound - 1) % intervalCadence)
+                json.put("roundsUntilBell", roundsUntilBell)
+            } else {
+                json.put("roundsUntilBell", 0)
+            }
         } else {
             json.put("pranayamaPhase", "")
             json.put("pranayamaSanskrit", "")
             json.put("pranayamaDisplay", "")
+            json.put("pranayamaScript", "")
             json.put("phaseDurationSeconds", 0)
             json.put("phaseRemainingSeconds", 0)
+            json.put("isIntervalBellEnabled", false)
+            json.put("roundsUntilBell", 0)
         }
 
         // Compound Sequencer / Surya Namaskar tracking
         val currentPose = state.currentPose
         if (currentPose != null) {
+            json.put("poseIndex", currentPose.index)
             json.put("poseName", currentPose.name)
             json.put("poseSanskrit", currentPose.sanskritName)
             json.put("poseBreath", currentPose.breathCue)
+            json.put("poseMantra", currentPose.mantra)
+            json.put("poseRemainingSeconds", state.poseRemainingSeconds)
         } else {
+            json.put("poseIndex", 0)
             json.put("poseName", "")
             json.put("poseSanskrit", "")
             json.put("poseBreath", "")
+            json.put("poseMantra", "")
+            json.put("poseRemainingSeconds", 0)
         }
+
+        // Health / Step tracking telemetry
+        json.put("isStepTrackingActive", state.isStepTrackingActive)
+        json.put("currentSteps", state.currentSteps)
+        json.put("formattedStepCount", state.formattedStepCount)
+        json.put("formattedCadence", state.formattedCadence)
+        json.put("nextStepBellSteps", state.nextStepBellSteps ?: 0)
 
         json.put("triggerBell", triggerBell)
         json.put("bellFrequency", bellFrequency)

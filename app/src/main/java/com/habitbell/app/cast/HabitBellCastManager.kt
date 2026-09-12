@@ -115,6 +115,9 @@ class HabitBellCastManager private constructor(private val context: Context) {
     /** Callback interface notifying central session orchestration of TV remote interactions. */
     var onRemotePlaybackAction: ((isPlay: Boolean) -> Unit)? = null
 
+    /** Callback interface notifying central session orchestration of TV remote reset interactions. */
+    var onRemoteResetAction: (() -> Unit)? = null
+
     /** Callback interface notifying central session orchestration that the TV web receiver is ready for immediate telemetry sync. */
     var onReceiverReady: (() -> Unit)? = null
 
@@ -446,6 +449,10 @@ class HabitBellCastManager private constructor(private val context: Context) {
                 "toggle" -> {
                     Log.i(TAG, "TV Custom Receiver requested TOGGLE")
                     togglePlayPause()
+                }
+                "reset" -> {
+                    Log.i(TAG, "TV Custom Receiver requested RESET")
+                    onRemoteResetAction?.invoke()
                 }
                 "ready", "ping" -> {
                     Log.i(TAG, "TV Custom Receiver signaled ready/ping; synchronizing session state")
