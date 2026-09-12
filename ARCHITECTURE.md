@@ -200,8 +200,8 @@ The heartbeat of the mindfulness runtime is a deterministic finite state machine
 
 - **Timer Topologies**:
   1. **`LINEAR`**: Single duration countdown with customizable periodic interval chimes (e.g. Mindful Eating default 45m with 1m interval chime, Zen Meditation).
-  2. **`MULTI_INTERVAL`**: 4-phase cyclic Pranayama breathwork (`INHALE`, `HOLD_IN`, `EXHALE`, `HOLD_OUT`) with dynamic ratio scaling and round counting.
-  3. **`COMPOUND`**: Multi-step sequencer iterating through distinct named poses (Yoga sequences, Reiki hand placements) with transition bells.
+  2. **`MULTI_INTERVAL`**: 4-phase cyclic Pranayama breathwork (`INHALE`, `HOLD_IN`, `EXHALE`, `HOLD_OUT`) with dynamic ratio scaling, dynamic 0-second step skipping via `activeSteps`, strict terminal boundary completion (zero Puraka spillover), and round counting.
+  3. **`COMPOUND`**: Multi-step sequencer iterating through distinct named poses (Yoga sequences, Reiki hand placements) with transition bells and terminal round boundary completion.
 - **Clock Manipulation & Sleep Skew Prevention**:
   - Relies on monotonic `SystemClock.elapsedRealtime()` calculations rather than wall-clock time (`System.currentTimeMillis()`) to protect against time drift, timezone changes, and device sleep states.
 - **Ambient Auto-Dimming & Pocket Mode**:
@@ -758,6 +758,21 @@ Grounded in *Hatha Yoga Pradipika* (2.12) & *Gheranda Samhita* (5.49):
   6. **Meditative Interval Bell**: Default OFF toggle, cadence selector, and 432 Hz audition button.
   7. **Subtle Background Music**: Ambient sound toggle, Aum drone / YouTube / Custom file, and subtle volume slider.
 - Bypasses generic timer countdown and signature 3-bell cards, maintaining a serene, focused user experience.
+
+#### 8. Dynamic Step Skipping & Strict Terminal Completion Law (`PranayamaConfig.kt`, `TimerEngine.kt`)
+- **Dynamic 0-Second Step Skipping (`activeSteps` Law)**:
+  - In `PranayamaConfig.kt`, the computed property `val activeSteps: List<PranayamaStep>` dynamically filters `steps.filter { it.durationSeconds > 0 }.ifEmpty { steps }`.
+  - Breathwork phases configured with `0s` duration (e.g., *Antar Kumbhaka* internal retention = 0s in beginner/anxiety-relief patterns, or *Bahya Kumbhaka* external retention = 0s in classical 3-phase breathwork) are completely bypassed during runtime execution.
+  - Zero-second steps consume 0 clock ticks, trigger no audio bells, voice prompts, or haptic pulses, and never manifest as 0s ghost states on the visual HUD.
+  - The canonical 4-element `steps` list (`[INHALE, HOLD_IN, EXHALE, HOLD_OUT]`) is strictly preserved for Room database entity serialization, Settings Drawer sliders, and proportional ratio stage recalculation.
+- **Strict Terminal Boundary & Zero Puraka Spillover Law**:
+  - In `TimerEngine.kt` (`tickPranayama()`), cycle completion is evaluated at the true terminal step of the active configuration: `isLastStepInRound = (pranayamaStepIndex >= activeSteps.size - 1)`.
+  - When *Bahya Kumbhaka* is active (`durationSeconds > 0`), the cycle concludes on *Bahya Kumbhaka*; when *Bahya Kumbhaka* is 0s, the cycle cleanly concludes on *Rechaka* (Exhalation).
+  - When the final active step completes on the terminal round (`pranayamaRound >= config.targetRounds`), `TimerEngine` immediately dispatches `onSessionCompleted()`.
+  - State preservation: Does NOT wrap `pranayamaStepIndex` to 0, does NOT increment `pranayamaRound` beyond `targetRounds`, does NOT announce or transition into *Puraka*, and firmly pins `currentPranayamaPhase` to the final active phase (`HOLD_OUT` or `EXHALE`) with `phaseRemainingSeconds = 0` and `sessionState = SessionStatus.COMPLETED`.
+  - Eliminates post-completion breath cycle overrun where the app previously lingered or jumped into *Puraka* after completing the configured number of rounds.
+- **Compound Timer Completion Parity**:
+  - The same deterministic terminal boundary logic is enforced in `tickCompound()` (`isLastPoseInRound` and `compoundRound >= config.targetRounds`), preventing wrap-around on posture sequences.
 
 ---
 

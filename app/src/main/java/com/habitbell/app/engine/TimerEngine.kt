@@ -159,8 +159,8 @@ data class TimerSessionState(
  * @param hapticManager Manager generating tactile vibration pulses.
  */
 class TimerEngine(
-    private val audioManager: AudioBellManager,
-    private val hapticManager: HapticManager
+    private val audioManager: AudioBellManager? = null,
+    private val hapticManager: HapticManager? = null
 ) {
     /**
      * External predicate evaluated to verify if Hardware Pocket Mode is currently engaged.
@@ -270,8 +270,9 @@ class TimerEngine(
             TimerType.MULTI_INTERVAL -> {
                 // Initialize Pranayama multi-phase breathwork parameters
                 val config = profile.pranayamaConfig ?: return
-                val firstStep = config.steps.firstOrNull() ?: return
-                val totalSeconds = config.steps.sumOf { it.durationSeconds } * config.targetRounds
+                val activeSteps = config.activeSteps
+                val firstStep = activeSteps.firstOrNull() ?: return
+                val totalSeconds = activeSteps.sumOf { it.durationSeconds } * config.targetRounds
                 pranayamaStepIndex = 0
                 pranayamaRound = 1
                 _state.value = TimerSessionState(
@@ -387,7 +388,7 @@ class TimerEngine(
 
         // Ring opening bell for linear timers to mark the commencement of mindful practice
         if (wasIdle && _state.value.profile.type == TimerType.LINEAR) {
-            audioManager.playIntervalBell()
+            audioManager?.playIntervalBell()
         }
 
         // If initiating a Pranayama session from start, articulate the initial phase cue
@@ -427,7 +428,7 @@ class TimerEngine(
             timerJob?.cancel()
             timerJob = null
             visualAlertRemainingTicks = 0
-            hapticManager.cancel()
+            hapticManager?.cancel()
             voiceGuide?.stop()
             suryaVoicePlayer?.stop()
             preparationVoiceGuide?.stop()
@@ -442,7 +443,7 @@ class TimerEngine(
         timerJob?.cancel()
         timerJob = null
         visualAlertRemainingTicks = 0
-        hapticManager.cancel()
+        hapticManager?.cancel()
         voiceGuide?.stop()
         suryaVoicePlayer?.stop()
         preparationVoiceGuide?.stop()
@@ -459,7 +460,7 @@ class TimerEngine(
         voiceGuide?.shutdown()
         suryaVoicePlayer?.release()
         preparationVoiceGuide?.shutdown()
-        hapticManager.cancel()
+        hapticManager?.cancel()
         scope.cancel()
     }
 
@@ -516,10 +517,10 @@ class TimerEngine(
         if (triggerStepBell) {
             if (isPocketModeActive()) {
                 // Pocket Mode: 3 distinct heavy tactile pulses
-                hapticManager.triggerIntervalHaptic()
+                hapticManager?.triggerIntervalHaptic()
             } else {
                 // Audible 3-bell sequence + brighten display
-                audioManager.playIntervalBell()
+                audioManager?.playIntervalBell()
                 visualAlertRemainingTicks = 5
             }
         }
@@ -537,15 +538,21 @@ class TimerEngine(
      * Heartbeat handler invoked every 1,000ms by the coroutine loop.
      * Evaluates boundary completion and dispatches to profile-specific topology tick algorithms.
      */
-    private fun tickOneSecond() {
+    internal fun tickOneSecond() {
         val current = _state.value
-        // If 1 second or less remains, evaluate completion semantics
-        if (current.remainingSeconds <= 1) {
+        // If 1 second or less remains in linear mode, evaluate completion semantics
+        if (current.profile.type == TimerType.LINEAR && current.remainingSeconds <= 1) {
             if (current.profile.stepTriggerMode == StepTriggerMode.STEPS_ONLY) {
                 // In STEPS_ONLY mode, countdown reaches 00:00 but session continues until step goal is met
                 _state.update { it.copy(remainingSeconds = 0) }
                 return
             }
+            onSessionCompleted()
+            return
+        }
+
+        // Defensive guard: if countdown has elapsed completely, finalize session
+        if (current.remainingSeconds <= 0) {
             onSessionCompleted()
             return
         }
@@ -572,10 +579,10 @@ class TimerEngine(
             if (inPocket) {
                 // Pocket Mode: Absolute public eating silence. DO NOT play audible bell!
                 // Trigger 3 heavy vibration pulses
-                hapticManager.triggerIntervalHaptic()
+                hapticManager?.triggerIntervalHaptic()
             } else {
                 // Open Air / Mobile Display Mode: Play Option C 3-bell sequence
-                audioManager.playIntervalBell()
+                audioManager?.playIntervalBell()
                 // Keep screen bright during 3-bell playback (~4.5s)
                 visualAlertRemainingTicks = 5
             }
@@ -617,49 +624,66 @@ class TimerEngine(
 
     /**
      * Advances Pranayama multi-interval breathwork countdown and manages phase transitions
-     * between Inhale, Retention, Exhale, and Empty Hold.
+     * between Inhale (Puraka), Internal Retention (Antar Kumbhaka), Exhale (Rechaka),
+     * and External Retention (Bahya Kumbhaka).
+     *
+     * ## Execution Rules & Boundary Conditions
+     * 1. **Zero-Second Step Skipping**: Any breathwork phase with `durationSeconds <= 0` (such as
+     *    disabled Antar Kumbhaka or Bahya Kumbhaka) is completely excluded from [PranayamaConfig.activeSteps].
+     *    The state machine never visits, delays for, or speaks voice cues for zero-duration steps.
+     * 2. **Clean Final-Phase Completion**: When the final active breath phase of the final configured round
+     *    concludes (Rechaka if Bahya Kumbhaka is 0s, or Bahya Kumbhaka if > 0s), the session completes
+     *    immediately without advancing [pranayamaStepIndex] to 0 or spilling into Puraka.
+     * 3. **State Preservation**: On completion, [TimerSessionState.currentPranayamaPhase] remains pinned
+     *    to the final completed phase with `phaseRemainingSeconds = 0` and `currentRound == targetRounds`.
      */
     private fun tickPranayama() {
         val config = _state.value.profile.pranayamaConfig ?: return
+        val activeSteps = config.activeSteps
+        if (activeSteps.isEmpty()) return
+
         val newPhaseSec = _state.value.phaseRemainingSeconds - 1
         val newRemaining = _state.value.remainingSeconds - 1
 
         if (newPhaseSec <= 0) {
-            // Advance to the subsequent breathwork phase
-            pranayamaStepIndex++
-            var completedFullCycle = false
-            if (pranayamaStepIndex >= config.steps.size) {
-                // Completed one full breath cycle (all 4 phases)
-                pranayamaStepIndex = 0
+            val isLastStepInRound = pranayamaStepIndex >= activeSteps.size - 1
+
+            if (isLastStepInRound) {
+                // Completed all active breath phases of the current round
+                if (pranayamaRound >= config.targetRounds) {
+                    // All target practice rounds have finished! Conclude session strictly at the final phase
+                    // without resetting to Puraka or incrementing round counter past target.
+                    onSessionCompleted()
+                    return
+                }
+
+                // Advance to the subsequent practice round and reset step pointer to the initial active phase
                 pranayamaRound++
-                completedFullCycle = true
-            }
+                pranayamaStepIndex = 0
 
-            // Verify if target repetition rounds have been reached
-            if (pranayamaRound > config.targetRounds) {
-                onSessionCompleted()
-                return
-            }
-
-            // Milestone interval chime check! (chimes every N completed rounds if enabled)
-            if (completedFullCycle && config.isIntervalBellEnabled) {
-                val cadence = config.intervalBellRoundCadence.takeIf { it > 0 } ?: 5
-                if ((pranayamaRound - 1) % cadence == 0) {
-                    if (isPocketModeActive()) {
-                        hapticManager.triggerIntervalHaptic()
-                    } else {
-                        // Play dedicated gentle, non-startling 432 Hz meditative singing bowl
-                        audioManager.playPranayamaIntervalBell()
-                        visualAlertRemainingTicks = 5
+                // Milestone interval chime check (chimes every N completed rounds if enabled)
+                if (config.isIntervalBellEnabled) {
+                    val cadence = config.intervalBellRoundCadence.takeIf { it > 0 } ?: 5
+                    if ((pranayamaRound - 1) % cadence == 0) {
+                        if (isPocketModeActive()) {
+                            hapticManager?.triggerIntervalHaptic()
+                        } else {
+                            // Play dedicated gentle, non-startling 432 Hz meditative singing bowl
+                            audioManager?.playPranayamaIntervalBell()
+                            visualAlertRemainingTicks = 5
+                        }
                     }
                 }
+            } else {
+                // Advance to the next active sequential breathwork phase within the current round
+                pranayamaStepIndex++
             }
 
-            val nextStep = config.steps[pranayamaStepIndex]
+            val nextStep = activeSteps[pranayamaStepIndex]
             if (isPocketModeActive()) {
-                hapticManager.triggerBreathPhaseHaptic()
+                hapticManager?.triggerBreathPhaseHaptic()
             } else {
-                // Articulate gentle lady voice instruction for the upcoming phase
+                // Articulate gentle lady voice instruction for the upcoming active phase
                 if (config.isVoiceGuidanceEnabled) {
                     voiceGuide?.speakPhaseCue(
                         nextStep.phase,
@@ -716,33 +740,37 @@ class TimerEngine(
      */
     private fun tickCompound() {
         val config = _state.value.profile.compoundConfig ?: return
+        val poses = config.poses
+        if (poses.isEmpty()) return
+
         val newPoseSec = _state.value.poseRemainingSeconds - 1
         val newRemaining = _state.value.remainingSeconds - 1
 
         if (newPoseSec <= 0) {
-            // Advance to the next sequential posture
-            compoundPoseIndex++
-            if (compoundPoseIndex >= config.poses.size) {
-                // Sequence completed one full round
+            val isLastPoseInRound = compoundPoseIndex >= poses.size - 1
+
+            if (isLastPoseInRound) {
+                if (compoundRound >= config.targetRounds) {
+                    onSessionCompleted()
+                    return
+                }
+
+                // Sequence completed one full round; advance to next round
                 compoundPoseIndex = 0
                 compoundRound++
-                audioManager.playIntervalBell()
+                audioManager?.playIntervalBell()
                 if (isPocketModeActive()) {
-                    hapticManager.triggerIntervalHaptic()
+                    hapticManager?.triggerIntervalHaptic()
                 }
             } else {
+                // Advance to the next sequential posture within the current round
+                compoundPoseIndex++
                 if (isPocketModeActive()) {
-                    hapticManager.triggerBreathPhaseHaptic()
+                    hapticManager?.triggerBreathPhaseHaptic()
                 }
             }
 
-            // Verify if sequence target rounds have finished
-            if (compoundRound > config.targetRounds) {
-                onSessionCompleted()
-                return
-            }
-
-            val nextPose = config.poses[compoundPoseIndex]
+            val nextPose = poses[compoundPoseIndex]
             if (!isPocketModeActive()) {
                 suryaVoicePlayer?.playPoseCue(nextPose, config.voiceCueMode)
             }
@@ -807,10 +835,10 @@ class TimerEngine(
         val inPocket = isPocketModeActive()
         if (inPocket) {
             // Pocket Mode: Silent completion, distinct sustained vibration pattern
-            hapticManager.triggerCompletionHaptic()
+            hapticManager?.triggerCompletionHaptic()
         } else {
             // Open Air / Display Mode: Trigger session completion chime: Deep Resonant Temple Gong
-            audioManager.playCompletionBell()
+            audioManager?.playCompletionBell()
         }
     }
 }
