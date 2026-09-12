@@ -131,6 +131,15 @@ data class PranayamaConfig(
     val bahyaKumbhakSeconds: Int
         get() = steps.find { it.phase == PranayamaPhase.HOLD_OUT }?.durationSeconds ?: 16
 
+    /**
+     * Active breathwork steps containing strictly phases with [PranayamaStep.durationSeconds] > 0.
+     * Zero-second phases (e.g. disabled internal or external retention holds) are completely filtered
+     * out so the state machine, visual lotus renderer, and speech engine seamlessly bypass them.
+     * If all steps have non-positive durations, falls back defensively to [steps].
+     */
+    val activeSteps: List<PranayamaStep>
+        get() = steps.filter { it.durationSeconds > 0 }.ifEmpty { steps }
+
     /** Total duration in seconds of a single 4-phase breathwork round. */
     val cycleDurationSeconds: Int
         get() = steps.sumOf { it.durationSeconds }
