@@ -19,6 +19,13 @@
           * Continuous calm water ripple ellipses propagating along the waterline
           * C2-continuous aquatic floating buoyancy wave & breath-dependent lateral sway
           * Breathing prana radial aura behind the flower
+      - MindfulEatingLandscapeContent 1:1 Parity:
+          * Outer mealtime circular progress ring with glowing head dot
+          * Inner bite-cycle progress arc with smooth round cap sweeping clockwise
+          * Authentic Phosphor food bowl icon (ic_ph_bowl.xml) with chopsticks & steam
+          * Authentic Phosphor bell icon (ic_ph_bell.xml) in bite pacing capsule
+          * Candlelit radial prana breathing aura and interval bell acoustic ripple wave
+          * "● Mindful Chewing Rhythm" status badge and rotating mindful eating tips
       - Bidirectional CAF v3 Custom Message Bus ('urn:x-cast:com.habitbell.cast') supporting
         state synchronization and remote 'toggle' & 'reset' action dispatching.
       - Zero-Bandwidth In-Memory Tibetan Singing Bowl Web Audio synthesis (432 Hz fundamental + 1192 Hz).
@@ -420,7 +427,7 @@
       stroke: var(--primary-color);
       stroke-width: 10px;
       stroke-linecap: round;
-      stroke-dasharray: 1256;
+      stroke-dasharray: 1194;
       stroke-dashoffset: 0;
       transition: stroke-dashoffset 0.8s cubic-bezier(0.4, 0, 0.2, 1);
     }
@@ -494,11 +501,11 @@
     }
 
     /* -------------------------------------------------------------------------
-       SCREEN 3: MINDFUL EATING (Dual Rings + Inner Chewing Arc + Dining Bowl)
+       SCREEN 3: MINDFUL EATING (MindfulEatingLandscapeContent 1:1 Parity)
        ------------------------------------------------------------------------- */
     .eating-visualizer-container {
-      width: 440px;
-      height: 440px;
+      width: 420px;
+      height: 420px;
       position: relative;
       display: flex;
       justify-content: center;
@@ -510,13 +517,14 @@
       width: 360px;
       height: 360px;
       border-radius: 50%;
-      background: radial-gradient(circle, rgba(229, 169, 60, 0.18) 0%, rgba(229, 169, 60, 0.04) 55%, transparent 70%);
+      background: radial-gradient(circle, rgba(229, 169, 60, 0.20) 0%, rgba(229, 169, 60, 0.05) 55%, transparent 70%);
       animation: candleFlicker 4s ease-in-out infinite alternate;
+      pointer-events: none;
     }
 
     @keyframes candleFlicker {
-      0% { transform: scale(0.95); opacity: 0.6; }
-      100% { transform: scale(1.05); opacity: 0.9; }
+      0% { transform: scale(0.94); opacity: 0.6; }
+      100% { transform: scale(1.08); opacity: 0.95; }
     }
 
     .eating-ring-svg {
@@ -536,7 +544,7 @@
       stroke: var(--primary-color);
       stroke-width: 10px;
       stroke-linecap: round;
-      stroke-dasharray: 1256;
+      stroke-dasharray: 1194;
       stroke-dashoffset: 0;
       transition: stroke-dashoffset 0.8s cubic-bezier(0.4, 0, 0.2, 1);
     }
@@ -547,6 +555,27 @@
       flex-direction: column;
       justify-content: center;
       align-items: center;
+    }
+
+    .eating-acoustic-ripple {
+      position: absolute;
+      width: 140px;
+      height: 140px;
+      border-radius: 50%;
+      border: 2px solid var(--primary-color);
+      opacity: 0;
+      pointer-events: none;
+      transform: scale(1);
+    }
+
+    .eating-acoustic-ripple.animate {
+      animation: acousticRippleWave 2.8s cubic-bezier(0.1, 0.8, 0.3, 1) forwards;
+    }
+
+    @keyframes acousticRippleWave {
+      0% { transform: scale(1); opacity: 0.9; }
+      50% { opacity: 0.45; }
+      100% { transform: scale(2.8); opacity: 0; }
     }
 
     .eating-bite-box {
@@ -578,14 +607,14 @@
       stroke: var(--primary-color);
       stroke-width: 6px;
       stroke-linecap: round;
-      stroke-dasharray: 408;
+      stroke-dasharray: 339;
       stroke-dashoffset: 0;
       transition: stroke-dashoffset 0.5s ease-out;
     }
 
     .eating-bowl-icon {
-      width: 58px;
-      height: 58px;
+      width: 62px;
+      height: 62px;
       fill: var(--primary-color);
       z-index: 2;
       filter: drop-shadow(0 0 16px rgba(229, 169, 60, 0.45));
@@ -597,21 +626,21 @@
       letter-spacing: -2px;
       color: var(--text-main);
       line-height: 1;
-      margin-bottom: 12px;
+      margin-bottom: 8px;
     }
 
     .eating-bite-capsule {
       display: inline-flex;
       align-items: center;
-      gap: 10px;
-      padding: 10px 22px;
+      gap: 8px;
+      padding: 8px 20px;
       background: var(--pill-bg);
       border: 1px solid rgba(229, 169, 60, 0.35);
-      border-radius: 24px;
-      font-size: 16px;
+      border-radius: 20px;
+      font-size: 15px;
       font-weight: 600;
       color: var(--primary-color);
-      margin-bottom: 16px;
+      margin-bottom: 12px;
     }
 
     .eating-bite-capsule svg {
@@ -880,7 +909,7 @@
         <!-- Top Bar -->
         <div class="landscape-top-bar">
           <button class="action-circle-btn" onclick="sendRemoteAction('toggle')" title="Exit / Pause">
-            <svg viewBox="0 0 256 256"><path d="M224,128a8,8,0,0,1-8,8H59.31l58.35,58.34a8,8,0,0,1-11.32,11.32l-72-72a8,8,0,0,1,0-11.32l72-72a8,8,0,0,1,11.32,11.32L59.31,120H216A8,8,0,0,1,224,128Z"/></svg>
+            <svg viewBox="0 0 256 256"><path d="M164.24,203.76a6,6,0,1,1-8.48,8.48l-80-80a6,6,0,0,1,0-8.48l80-80a6,6,0,0,1,8.48,8.48L88.49,128Z"/></svg>
           </button>
           <div id="linearProfileTitle" class="landscape-profile-title">General Timer</div>
           <div class="landscape-top-actions-right">
@@ -888,8 +917,11 @@
               <div class="pulse-dot"></div>
               <span>TV CAST</span>
             </div>
-            <div class="action-circle-btn" title="Tibetan Bowl">
-              <svg viewBox="0 0 256 256"><path d="M208,80H48A16,16,0,0,0,32,96v16a96.11,96.11,0,0,0,88,95.66V224H104a8,8,0,0,0,0,16h48a8,8,0,0,0,0-16H136V207.66A96.11,96.11,0,0,0,224,112V96A16,16,0,0,0,208,80Zm0,32a80.09,80.09,0,0,1-80,80,80.09,80.09,0,0,1-80-80V96H208Z"/></svg>
+            <div class="action-circle-btn" title="Theme Toggle">
+              <svg viewBox="0 0 256 256"><path d="M122,40V16a6,6,0,0,1,12,0V40a6,6,0,0,1-12,0Zm68,88a62,62,0,1,1-62-62A62.07,62.07,0,0,1,190,128Zm-12,0a50,50,0,1,0-50,50A50.06,50.06,0,0,0,178,128ZM59.76,68.24a6,6,0,1,0,8.48-8.48l-16-16a6,6,0,0,0-8.48,8.48Zm0,119.52-16,16a6,6,0,1,0,8.48,8.48l16-16a6,6,0,1,0-8.48-8.48ZM192,70a6,6,0,0,0,4.24-1.76l16-16a6,6,0,0,0-8.48-8.48l-16,16A6,6,0,0,0,192,70Zm4.24,117.76a6,6,0,0,0-8.48,8.48l16,16a6,6,0,0,0,8.48-8.48ZM46,128a6,6,0,0,0-6-6H16a6,6,0,0,0,0,12H40A6,6,0,0,0,46,128Zm82,82a6,6,0,0,0-6,6v24a6,6,0,0,0,12,0V216A6,6,0,0,0,128,210Zm112-88H216a6,6,0,0,0,0,12h24a6,6,0,0,0,0-12Z"/></svg>
+            </div>
+            <div class="action-circle-btn" title="Settings">
+              <svg viewBox="0 0 256 256"><path d="M40,86H74.6a30,30,0,0,0,58.8,0H216a6,6,0,0,0,0-12H133.4a30,30,0,0,0-58.8,0H40a6,6,0,0,0,0,12Zm64-24A18,18,0,1,1,86,80,18,18,0,0,1,104,62ZM216,170H197.4a30,30,0,0,0-58.8,0H40a6,6,0,0,0,0,12h98.6a30,30,0,0,0,58.8,0H216a6,6,0,0,0,0-12Zm-48,24a18,18,0,1,1,18-18A18,18,0,0,1,168,194Z"/></svg>
             </div>
           </div>
         </div>
@@ -908,14 +940,14 @@
         <!-- Bottom Transport Controls -->
         <div class="landscape-bottom-controls">
           <button class="btn-ctrl-circle" onclick="sendRemoteAction('reset')" title="Reset Session">
-            <svg viewBox="0 0 256 256"><path d="M224,128A96,96,0,0,1,60.8,195.92a8,8,0,0,1,11.32-11.31A80,80,0,1,0,71.43,71.43L91.31,91.31A8,8,0,0,1,85.66,105H32a8,8,0,0,1-8-8V42.34a8,8,0,0,1,13.66-5.65L57.78,56.8A96,96,0,0,1,224,128Z"/></svg>
+            <svg viewBox="0 0 256 256"><path d="M222,128a94,94,0,0,1-92.74,94H128a93.43,93.43,0,0,1-64.5-25.65,6,6,0,1,1,8.24-8.72A82,82,0,1,0,70,70l-.19.19L39.44,98H72a6,6,0,0,1,0,12H24a6,6,0,0,1-6-6V56a6,6,0,0,1,12,0V90.34L61.63,61.4A94,94,0,0,1,222,128Z"/></svg>
           </button>
           <button id="linearPlayBtn" class="btn-play-pause-main" onclick="sendRemoteAction('toggle')" title="Play / Pause">
-            <svg class="play-svg" viewBox="0 0 256 256" style="display: none;"><path d="M240,128a15.74,15.74,0,0,1-7.6,13.51L88.32,229.65a16,16,0,0,1-16.2.3A15.86,15.86,0,0,1,64,216.13V39.87A15.86,15.86,0,0,1,72.12,26a16,16,0,0,1,16.2.3L232.4,114.49A15.74,15.74,0,0,1,240,128Z"/></svg>
-            <svg class="pause-svg" viewBox="0 0 256 256"><path d="M216,48V208a16,16,0,0,1-16,16H160a16,16,0,0,1-16-16V48a16,16,0,0,1,16-16h40A16,16,0,0,1,216,48ZM96,32H56A16,16,0,0,0,40,48V208a16,16,0,0,0,16,16H96a16,16,0,0,0,16-16V48A16,16,0,0,0,96,32Z"/></svg>
+            <svg class="play-svg" viewBox="0 0 256 256" style="display: none;"><path d="M231.36,116.19,87.28,28.06a14,14,0,0,0-14.18-.27A13.69,13.69,0,0,0,66,39.87V216.13a13.69,13.69,0,0,0,7.1,12.08,14,14,0,0,0,14.18-.27l144.08-88.13a13.82,13.82,0,0,0,0-23.62Zm-6.26,13.38L81,217.7a2,2,0,0,1-2.06,0,1.78,1.78,0,0,1-1-1.61V39.87a1.78,1.78,0,0,1,1-1.61A2.06,2.06,0,0,1,80,38a2,2,0,0,1,1,.31L225.1,126.43a1.82,1.82,0,0,1,0,3.14Z"/></svg>
+            <svg class="pause-svg" viewBox="0 0 256 256"><path d="M200,34H160a14,14,0,0,0-14,14V208a14,14,0,0,0,14,14h40a14,14,0,0,0,14-14V48A14,14,0,0,0,200,34Zm2,174a2,2,0,0,1-2,2H160a2,2,0,0,1-2-2V48a2,2,0,0,1,2-2h40a2,2,0,0,1,2,2ZM96,34H56A14,14,0,0,0,42,48V208a14,14,0,0,0,14,14H96a14,14,0,0,0,14-14V48A14,14,0,0,0,96,34Zm2,174a2,2,0,0,1-2,2H56a2,2,0,0,1-2-2V48a2,2,0,0,1,2-2H96a2,2,0,0,1,2,2Z"/></svg>
           </button>
           <button class="btn-ctrl-circle" title="Settings">
-            <svg viewBox="0 0 256 256"><path d="M128,80a48,48,0,1,0,48,48A48.05,48.05,0,0,0,128,80Zm0,80a32,32,0,1,1,32-32A32,32,0,0,1,128,160Z"/></svg>
+            <svg viewBox="0 0 256 256"><path d="M40,86H74.6a30,30,0,0,0,58.8,0H216a6,6,0,0,0,0-12H133.4a30,30,0,0,0-58.8,0H40a6,6,0,0,0,0,12Zm64-24A18,18,0,1,1,86,80,18,18,0,0,1,104,62ZM216,170H197.4a30,30,0,0,0-58.8,0H40a6,6,0,0,0,0,12h98.6a30,30,0,0,0,58.8,0H216a6,6,0,0,0,0-12Zm-48,24a18,18,0,1,1,18-18A18,18,0,0,1,168,194Z"/></svg>
           </button>
         </div>
       </div>
@@ -923,27 +955,30 @@
   </div>
 
   <!-- =======================================================================
-       SCREEN 3: MINDFUL EATING (Landscape Parity)
+       SCREEN 3: MINDFUL EATING (MindfulEatingLandscapeContent 1:1 Parity)
        ======================================================================= -->
   <div id="viewEating" class="view-container">
     <div class="landscape-session-container">
-      <!-- Left Column: Dual Ring Visualizer + Inner Chewing Arc + Dining Bowl -->
+      <!-- Left Column: Meal Progress Ring + Inner Bite Chewing Arc + Phosphor Bowl -->
       <div class="landscape-visualizer-col">
         <div class="eating-visualizer-container">
           <div class="eating-candle-aura"></div>
-          <svg class="eating-ring-svg" viewBox="0 0 440 440">
-            <circle class="eating-meal-track" cx="220" cy="220" r="200" />
-            <circle id="eatingMealFill" class="eating-meal-fill" cx="220" cy="220" r="200" />
+          <svg class="eating-ring-svg" viewBox="0 0 420 420">
+            <circle class="eating-meal-track" cx="210" cy="210" r="190" />
+            <circle id="eatingMealFill" class="eating-meal-fill" cx="210" cy="210" r="190" />
+            <circle id="eatingMealHead" class="progress-head-dot" cx="400" cy="210" r="8" />
           </svg>
           <div class="eating-center-stage">
+            <!-- Acoustic Chime Wave triggered on interval bell -->
+            <div id="eatingAcousticRipple" class="eating-acoustic-ripple"></div>
             <div class="eating-bite-box">
               <svg class="bite-arc-svg" viewBox="0 0 140 140">
-                <circle class="bite-arc-track" cx="70" cy="70" r="65" />
-                <circle id="eatingBiteArc" class="bite-arc-fill" cx="70" cy="70" r="65" />
+                <circle class="bite-arc-track" cx="70" cy="70" r="54" />
+                <circle id="eatingBiteArc" class="bite-arc-fill" cx="70" cy="70" r="54" />
               </svg>
-              <!-- Phosphor Bowl Icon -->
+              <!-- Authentic Phosphor Food Bowl Icon (ic_ph_bowl.xml) -->
               <svg class="eating-bowl-icon" viewBox="0 0 256 256">
-                <path d="M208,80H48A16,16,0,0,0,32,96v16a96.11,96.11,0,0,0,88,95.66V224H104a8,8,0,0,0,0,16h48a8,8,0,0,0,0-16H136V207.66A96.11,96.11,0,0,0,224,112V96A16,16,0,0,0,208,80Zm0,32a80.09,80.09,0,0,1-80,80,80.09,80.09,0,0,1-80-80V96H208Z"/>
+                <path d="M224,106H213.77a86,86,0,0,0-171.54,0H32a6,6,0,0,0-6,6,102.35,102.35,0,0,0,56,91.06V208a14,14,0,0,0,14,14h64a14,14,0,0,0,14-14v-4.94A102.35,102.35,0,0,0,230,112,6,6,0,0,0,224,106ZM174.24,54.29a74.15,74.15,0,0,1,8.15,7.6A85.89,85.89,0,0,0,130.84,106H97.34A74.24,74.24,0,0,1,168,54C170.08,54,172.17,54.11,174.24,54.29ZM190.3,72.14A73.49,73.49,0,0,1,201.74,106H144.48A73.89,73.89,0,0,1,190.3,72.14ZM128,38a73.68,73.68,0,0,1,26.8,5,86.32,86.32,0,0,0-69.94,63H54.26A74.09,74.09,0,0,1,128,38Zm37.5,155.84a6,6,0,0,0-3.5,5.46V208a2,2,0,0,1-2,2H96a2,2,0,0,1-2-2v-8.7a6,6,0,0,0-3.5-5.46A90.35,90.35,0,0,1,38.2,118H217.8A90.35,90.35,0,0,1,165.5,193.84Z"/>
               </svg>
             </div>
           </div>
@@ -955,7 +990,7 @@
         <!-- Top Bar -->
         <div class="landscape-top-bar">
           <button class="action-circle-btn" onclick="sendRemoteAction('toggle')" title="Exit / Pause">
-            <svg viewBox="0 0 256 256"><path d="M224,128a8,8,0,0,1-8,8H59.31l58.35,58.34a8,8,0,0,1-11.32,11.32l-72-72a8,8,0,0,1,0-11.32l72-72a8,8,0,0,1,11.32,11.32L59.31,120H216A8,8,0,0,1,224,128Z"/></svg>
+            <svg viewBox="0 0 256 256"><path d="M164.24,203.76a6,6,0,1,1-8.48,8.48l-80-80a6,6,0,0,1,0-8.48l80-80a6,6,0,0,1,8.48,8.48L88.49,128Z"/></svg>
           </button>
           <div class="landscape-profile-title">Mindful Eating</div>
           <div class="landscape-top-actions-right">
@@ -963,8 +998,11 @@
               <div class="pulse-dot"></div>
               <span>TV CAST</span>
             </div>
-            <div class="action-circle-btn" title="Tibetan Bowl">
-              <svg viewBox="0 0 256 256"><path d="M208,80H48A16,16,0,0,0,32,96v16a96.11,96.11,0,0,0,88,95.66V224H104a8,8,0,0,0,0,16h48a8,8,0,0,0,0-16H136V207.66A96.11,96.11,0,0,0,224,112V96A16,16,0,0,0,208,80Zm0,32a80.09,80.09,0,0,1-80,80,80.09,80.09,0,0,1-80-80V96H208Z"/></svg>
+            <div class="action-circle-btn" title="Theme Toggle">
+              <svg viewBox="0 0 256 256"><path d="M122,40V16a6,6,0,0,1,12,0V40a6,6,0,0,1-12,0Zm68,88a62,62,0,1,1-62-62A62.07,62.07,0,0,1,190,128Zm-12,0a50,50,0,1,0-50,50A50.06,50.06,0,0,0,178,128ZM59.76,68.24a6,6,0,1,0,8.48-8.48l-16-16a6,6,0,0,0-8.48,8.48Zm0,119.52-16,16a6,6,0,1,0,8.48,8.48l16-16a6,6,0,1,0-8.48-8.48ZM192,70a6,6,0,0,0,4.24-1.76l16-16a6,6,0,0,0-8.48-8.48l-16,16A6,6,0,0,0,192,70Zm4.24,117.76a6,6,0,0,0-8.48,8.48l16,16a6,6,0,0,0,8.48-8.48ZM46,128a6,6,0,0,0-6-6H16a6,6,0,0,0,0,12H40A6,6,0,0,0,46,128Zm82,82a6,6,0,0,0-6,6v24a6,6,0,0,0,12,0V216A6,6,0,0,0,128,210Zm112-88H216a6,6,0,0,0,0,12h24a6,6,0,0,0,0-12Z"/></svg>
+            </div>
+            <div class="action-circle-btn" title="Settings">
+              <svg viewBox="0 0 256 256"><path d="M40,86H74.6a30,30,0,0,0,58.8,0H216a6,6,0,0,0,0-12H133.4a30,30,0,0,0-58.8,0H40a6,6,0,0,0,0,12Zm64-24A18,18,0,1,1,86,80,18,18,0,0,1,104,62ZM216,170H197.4a30,30,0,0,0-58.8,0H40a6,6,0,0,0,0,12h98.6a30,30,0,0,0,58.8,0H216a6,6,0,0,0,0-12Zm-48,24a18,18,0,1,1,18-18A18,18,0,0,1,168,194Z"/></svg>
             </div>
           </div>
         </div>
@@ -973,9 +1011,13 @@
         <div class="landscape-middle-hud">
           <div id="eatingRemainingDigits" class="eating-remaining-digits">45:00</div>
           <div class="eating-bite-capsule">
-            <svg viewBox="0 0 256 256"><path d="M221.8,175.94C216.25,166.38,208,139.33,208,104a80,80,0,1,0-160,0c0,35.34-8.26,62.38-13.81,71.94A16,16,0,0,0,48,200H88.81a40,40,0,0,0,78.38,0H208a16,16,0,0,0,13.8-24.06ZM128,216a24,24,0,0,1-22.62-16h45.24A24,24,0,0,1,128,216Z"/></svg>
+            <!-- Authentic Phosphor Bell Icon (ic_ph_bell.xml) -->
+            <svg viewBox="0 0 256 256">
+              <path d="M166,224a6,6,0,0,1-6,6H96a6,6,0,0,1,0-12h64A6,6,0,0,1,166,224Zm54.11-33a13.83,13.83,0,0,1-12.1,7H48a14,14,0,0,1-12.06-21.06C41.59,167.2,50,139.74,50,104a78,78,0,1,1,156,0c0,35.73,8.42,63.2,14.08,72.94A13.9,13.9,0,0,1,220.11,191Zm-10.41-8C202.13,170,194,139.68,194,104a66,66,0,1,0-132,0c0,35.69-8.14,66-15.71,79a2,2,0,0,0,0,2,1.9,1.9,0,0,0,1.7,1H208a1.9,1.9,0,0,0,1.7-1A2,2,0,0,0,209.7,183Z"/>
+            </svg>
             <span id="eatingBiteText">Bite in 00:45 • CHEW & SAVOR</span>
           </div>
+          <div id="eatingStatusLabel" class="status-capsule-label" style="margin-bottom: 12px;">● Mindful Chewing Rhythm</div>
           <div id="eatingGuidelineCard" class="eating-guideline-card">
             "Chew each bite 30–40 times before swallowing to cultivate satiety and digestive ease."
           </div>
@@ -984,14 +1026,14 @@
         <!-- Bottom Transport Controls -->
         <div class="landscape-bottom-controls">
           <button class="btn-ctrl-circle" onclick="sendRemoteAction('reset')" title="Reset Session">
-            <svg viewBox="0 0 256 256"><path d="M224,128A96,96,0,0,1,60.8,195.92a8,8,0,0,1,11.32-11.31A80,80,0,1,0,71.43,71.43L91.31,91.31A8,8,0,0,1,85.66,105H32a8,8,0,0,1-8-8V42.34a8,8,0,0,1,13.66-5.65L57.78,56.8A96,96,0,0,1,224,128Z"/></svg>
+            <svg viewBox="0 0 256 256"><path d="M222,128a94,94,0,0,1-92.74,94H128a93.43,93.43,0,0,1-64.5-25.65,6,6,0,1,1,8.24-8.72A82,82,0,1,0,70,70l-.19.19L39.44,98H72a6,6,0,0,1,0,12H24a6,6,0,0,1-6-6V56a6,6,0,0,1,12,0V90.34L61.63,61.4A94,94,0,0,1,222,128Z"/></svg>
           </button>
           <button id="eatingPlayBtn" class="btn-play-pause-main" onclick="sendRemoteAction('toggle')" title="Play / Pause">
-            <svg class="play-svg" viewBox="0 0 256 256" style="display: none;"><path d="M240,128a15.74,15.74,0,0,1-7.6,13.51L88.32,229.65a16,16,0,0,1-16.2.3A15.86,15.86,0,0,1,64,216.13V39.87A15.86,15.86,0,0,1,72.12,26a16,16,0,0,1,16.2.3L232.4,114.49A15.74,15.74,0,0,1,240,128Z"/></svg>
-            <svg class="pause-svg" viewBox="0 0 256 256"><path d="M216,48V208a16,16,0,0,1-16,16H160a16,16,0,0,1-16-16V48a16,16,0,0,1,16-16h40A16,16,0,0,1,216,48ZM96,32H56A16,16,0,0,0,40,48V208a16,16,0,0,0,16,16H96a16,16,0,0,0,16-16V48A16,16,0,0,0,96,32Z"/></svg>
+            <svg class="play-svg" viewBox="0 0 256 256" style="display: none;"><path d="M231.36,116.19,87.28,28.06a14,14,0,0,0-14.18-.27A13.69,13.69,0,0,0,66,39.87V216.13a13.69,13.69,0,0,0,7.1,12.08,14,14,0,0,0,14.18-.27l144.08-88.13a13.82,13.82,0,0,0,0-23.62Zm-6.26,13.38L81,217.7a2,2,0,0,1-2.06,0,1.78,1.78,0,0,1-1-1.61V39.87a1.78,1.78,0,0,1,1-1.61A2.06,2.06,0,0,1,80,38a2,2,0,0,1,1,.31L225.1,126.43a1.82,1.82,0,0,1,0,3.14Z"/></svg>
+            <svg class="pause-svg" viewBox="0 0 256 256"><path d="M200,34H160a14,14,0,0,0-14,14V208a14,14,0,0,0,14,14h40a14,14,0,0,0,14-14V48A14,14,0,0,0,200,34Zm2,174a2,2,0,0,1-2,2H160a2,2,0,0,1-2-2V48a2,2,0,0,1,2-2h40a2,2,0,0,1,2,2ZM96,34H56A14,14,0,0,0,42,48V208a14,14,0,0,0,14,14H96a14,14,0,0,0,14-14V48A14,14,0,0,0,96,34Zm2,174a2,2,0,0,1-2,2H56a2,2,0,0,1-2-2V48a2,2,0,0,1,2-2H96a2,2,0,0,1,2,2Z"/></svg>
           </button>
           <button class="btn-ctrl-circle" title="Settings">
-            <svg viewBox="0 0 256 256"><path d="M128,80a48,48,0,1,0,48,48A48.05,48.05,0,0,0,128,80Zm0,80a32,32,0,1,1,32-32A32,32,0,0,1,128,160Z"/></svg>
+            <svg viewBox="0 0 256 256"><path d="M40,86H74.6a30,30,0,0,0,58.8,0H216a6,6,0,0,0,0-12H133.4a30,30,0,0,0-58.8,0H40a6,6,0,0,0,0,12Zm64-24A18,18,0,1,1,86,80,18,18,0,0,1,104,62ZM216,170H197.4a30,30,0,0,0-58.8,0H40a6,6,0,0,0,0,12h98.6a30,30,0,0,0,58.8,0H216a6,6,0,0,0,0-12Zm-48,24a18,18,0,1,1,18-18A18,18,0,0,1,168,194Z"/></svg>
           </button>
         </div>
       </div>
@@ -1015,7 +1057,7 @@
         <!-- Top Bar -->
         <div class="landscape-top-bar">
           <button class="action-circle-btn" onclick="sendRemoteAction('toggle')" title="Exit / Pause">
-            <svg viewBox="0 0 256 256"><path d="M224,128a8,8,0,0,1-8,8H59.31l58.35,58.34a8,8,0,0,1-11.32,11.32l-72-72a8,8,0,0,1,0-11.32l72-72a8,8,0,0,1,11.32,11.32L59.31,120H216A8,8,0,0,1,224,128Z"/></svg>
+            <svg viewBox="0 0 256 256"><path d="M164.24,203.76a6,6,0,1,1-8.48,8.48l-80-80a6,6,0,0,1,0-8.48l80-80a6,6,0,0,1,8.48,8.48L88.49,128Z"/></svg>
           </button>
           <div id="pranayamaProfileTitle" class="landscape-profile-title">Pranayama</div>
           <div class="landscape-top-actions-right">
@@ -1023,8 +1065,11 @@
               <div class="pulse-dot"></div>
               <span>TV CAST</span>
             </div>
-            <div class="action-circle-btn" title="Tibetan Bowl">
-              <svg viewBox="0 0 256 256"><path d="M208,80H48A16,16,0,0,0,32,96v16a96.11,96.11,0,0,0,88,95.66V224H104a8,8,0,0,0,0,16h48a8,8,0,0,0,0-16H136V207.66A96.11,96.11,0,0,0,224,112V96A16,16,0,0,0,208,80Zm0,32a80.09,80.09,0,0,1-80,80,80.09,80.09,0,0,1-80-80V96H208Z"/></svg>
+            <div class="action-circle-btn" title="Theme Toggle">
+              <svg viewBox="0 0 256 256"><path d="M122,40V16a6,6,0,0,1,12,0V40a6,6,0,0,1-12,0Zm68,88a62,62,0,1,1-62-62A62.07,62.07,0,0,1,190,128Zm-12,0a50,50,0,1,0-50,50A50.06,50.06,0,0,0,178,128ZM59.76,68.24a6,6,0,1,0,8.48-8.48l-16-16a6,6,0,0,0-8.48,8.48Zm0,119.52-16,16a6,6,0,1,0,8.48,8.48l16-16a6,6,0,1,0-8.48-8.48ZM192,70a6,6,0,0,0,4.24-1.76l16-16a6,6,0,0,0-8.48-8.48l-16,16A6,6,0,0,0,192,70Zm4.24,117.76a6,6,0,0,0-8.48,8.48l16,16a6,6,0,0,0,8.48-8.48ZM46,128a6,6,0,0,0-6-6H16a6,6,0,0,0,0,12H40A6,6,0,0,0,46,128Zm82,82a6,6,0,0,0-6,6v24a6,6,0,0,0,12,0V216A6,6,0,0,0,128,210Zm112-88H216a6,6,0,0,0,0,12h24a6,6,0,0,0,0-12Z"/></svg>
+            </div>
+            <div class="action-circle-btn" title="Settings">
+              <svg viewBox="0 0 256 256"><path d="M40,86H74.6a30,30,0,0,0,58.8,0H216a6,6,0,0,0,0-12H133.4a30,30,0,0,0-58.8,0H40a6,6,0,0,0,0,12Zm64-24A18,18,0,1,1,86,80,18,18,0,0,1,104,62ZM216,170H197.4a30,30,0,0,0-58.8,0H40a6,6,0,0,0,0,12h98.6a30,30,0,0,0,58.8,0H216a6,6,0,0,0,0-12Zm-48,24a18,18,0,1,1,18-18A18,18,0,0,1,168,194Z"/></svg>
             </div>
           </div>
         </div>
@@ -1049,14 +1094,14 @@
         <!-- Bottom Transport Controls -->
         <div class="landscape-bottom-controls">
           <button class="btn-ctrl-circle" onclick="sendRemoteAction('reset')" title="Reset Session">
-            <svg viewBox="0 0 256 256"><path d="M224,128A96,96,0,0,1,60.8,195.92a8,8,0,0,1,11.32-11.31A80,80,0,1,0,71.43,71.43L91.31,91.31A8,8,0,0,1,85.66,105H32a8,8,0,0,1-8-8V42.34a8,8,0,0,1,13.66-5.65L57.78,56.8A96,96,0,0,1,224,128Z"/></svg>
+            <svg viewBox="0 0 256 256"><path d="M222,128a94,94,0,0,1-92.74,94H128a93.43,93.43,0,0,1-64.5-25.65,6,6,0,1,1,8.24-8.72A82,82,0,1,0,70,70l-.19.19L39.44,98H72a6,6,0,0,1,0,12H24a6,6,0,0,1-6-6V56a6,6,0,0,1,12,0V90.34L61.63,61.4A94,94,0,0,1,222,128Z"/></svg>
           </button>
           <button id="pranayamaPlayBtn" class="btn-play-pause-main" onclick="sendRemoteAction('toggle')" title="Play / Pause">
-            <svg class="play-svg" viewBox="0 0 256 256" style="display: none;"><path d="M240,128a15.74,15.74,0,0,1-7.6,13.51L88.32,229.65a16,16,0,0,1-16.2.3A15.86,15.86,0,0,1,64,216.13V39.87A15.86,15.86,0,0,1,72.12,26a16,16,0,0,1,16.2.3L232.4,114.49A15.74,15.74,0,0,1,240,128Z"/></svg>
-            <svg class="pause-svg" viewBox="0 0 256 256"><path d="M216,48V208a16,16,0,0,1-16,16H160a16,16,0,0,1-16-16V48a16,16,0,0,1,16-16h40A16,16,0,0,1,216,48ZM96,32H56A16,16,0,0,0,40,48V208a16,16,0,0,0,16,16H96a16,16,0,0,0,16-16V48A16,16,0,0,0,96,32Z"/></svg>
+            <svg class="play-svg" viewBox="0 0 256 256" style="display: none;"><path d="M231.36,116.19,87.28,28.06a14,14,0,0,0-14.18-.27A13.69,13.69,0,0,0,66,39.87V216.13a13.69,13.69,0,0,0,7.1,12.08,14,14,0,0,0,14.18-.27l144.08-88.13a13.82,13.82,0,0,0,0-23.62Zm-6.26,13.38L81,217.7a2,2,0,0,1-2.06,0,1.78,1.78,0,0,1-1-1.61V39.87a1.78,1.78,0,0,1,1-1.61A2.06,2.06,0,0,1,80,38a2,2,0,0,1,1,.31L225.1,126.43a1.82,1.82,0,0,1,0,3.14Z"/></svg>
+            <svg class="pause-svg" viewBox="0 0 256 256"><path d="M200,34H160a14,14,0,0,0-14,14V208a14,14,0,0,0,14,14h40a14,14,0,0,0,14-14V48A14,14,0,0,0,200,34Zm2,174a2,2,0,0,1-2,2H160a2,2,0,0,1-2-2V48a2,2,0,0,1,2-2h40a2,2,0,0,1,2,2ZM96,34H56A14,14,0,0,0,42,48V208a14,14,0,0,0,14,14H96a14,14,0,0,0,14-14V48A14,14,0,0,0,96,34Zm2,174a2,2,0,0,1-2,2H56a2,2,0,0,1-2-2V48a2,2,0,0,1,2-2H96a2,2,0,0,1,2,2Z"/></svg>
           </button>
           <button class="btn-ctrl-circle" title="Settings">
-            <svg viewBox="0 0 256 256"><path d="M128,80a48,48,0,1,0,48,48A48.05,48.05,0,0,0,128,80Zm0,80a32,32,0,1,1,32-32A32,32,0,0,1,128,160Z"/></svg>
+            <svg viewBox="0 0 256 256"><path d="M40,86H74.6a30,30,0,0,0,58.8,0H216a6,6,0,0,0,0-12H133.4a30,30,0,0,0-58.8,0H40a6,6,0,0,0,0,12Zm64-24A18,18,0,1,1,86,80,18,18,0,0,1,104,62ZM216,170H197.4a30,30,0,0,0-58.8,0H40a6,6,0,0,0,0,12h98.6a30,30,0,0,0,58.8,0H216a6,6,0,0,0,0-12Zm-48,24a18,18,0,1,1,18-18A18,18,0,0,1,168,194Z"/></svg>
           </button>
         </div>
       </div>
@@ -1093,7 +1138,7 @@
         <!-- Top Bar -->
         <div class="landscape-top-bar">
           <button class="action-circle-btn" onclick="sendRemoteAction('toggle')" title="Exit / Pause">
-            <svg viewBox="0 0 256 256"><path d="M224,128a8,8,0,0,1-8,8H59.31l58.35,58.34a8,8,0,0,1-11.32,11.32l-72-72a8,8,0,0,1,0-11.32l72-72a8,8,0,0,1,11.32,11.32L59.31,120H216A8,8,0,0,1,224,128Z"/></svg>
+            <svg viewBox="0 0 256 256"><path d="M164.24,203.76a6,6,0,1,1-8.48,8.48l-80-80a6,6,0,0,1,0-8.48l80-80a6,6,0,0,1,8.48,8.48L88.49,128Z"/></svg>
           </button>
           <div class="landscape-profile-title">Surya Namaskar</div>
           <div class="landscape-top-actions-right">
@@ -1101,8 +1146,11 @@
               <div class="pulse-dot"></div>
               <span>TV CAST</span>
             </div>
-            <div class="action-circle-btn" title="Tibetan Bowl">
-              <svg viewBox="0 0 256 256"><path d="M208,80H48A16,16,0,0,0,32,96v16a96.11,96.11,0,0,0,88,95.66V224H104a8,8,0,0,0,0,16h48a8,8,0,0,0,0-16H136V207.66A96.11,96.11,0,0,0,224,112V96A16,16,0,0,0,208,80Zm0,32a80.09,80.09,0,0,1-80,80,80.09,80.09,0,0,1-80-80V96H208Z"/></svg>
+            <div class="action-circle-btn" title="Theme Toggle">
+              <svg viewBox="0 0 256 256"><path d="M122,40V16a6,6,0,0,1,12,0V40a6,6,0,0,1-12,0Zm68,88a62,62,0,1,1-62-62A62.07,62.07,0,0,1,190,128Zm-12,0a50,50,0,1,0-50,50A50.06,50.06,0,0,0,178,128ZM59.76,68.24a6,6,0,1,0,8.48-8.48l-16-16a6,6,0,0,0-8.48,8.48Zm0,119.52-16,16a6,6,0,1,0,8.48,8.48l16-16a6,6,0,1,0-8.48-8.48ZM192,70a6,6,0,0,0,4.24-1.76l16-16a6,6,0,0,0-8.48-8.48l-16,16A6,6,0,0,0,192,70Zm4.24,117.76a6,6,0,0,0-8.48,8.48l16,16a6,6,0,0,0,8.48-8.48ZM46,128a6,6,0,0,0-6-6H16a6,6,0,0,0,0,12H40A6,6,0,0,0,46,128Zm82,82a6,6,0,0,0-6,6v24a6,6,0,0,0,12,0V216A6,6,0,0,0,128,210Zm112-88H216a6,6,0,0,0,0,12h24a6,6,0,0,0,0-12Z"/></svg>
+            </div>
+            <div class="action-circle-btn" title="Settings">
+              <svg viewBox="0 0 256 256"><path d="M40,86H74.6a30,30,0,0,0,58.8,0H216a6,6,0,0,0,0-12H133.4a30,30,0,0,0-58.8,0H40a6,6,0,0,0,0,12Zm64-24A18,18,0,1,1,86,80,18,18,0,0,1,104,62ZM216,170H197.4a30,30,0,0,0-58.8,0H40a6,6,0,0,0,0,12h98.6a30,30,0,0,0,58.8,0H216a6,6,0,0,0,0-12Zm-48,24a18,18,0,1,1,18-18A18,18,0,0,1,168,194Z"/></svg>
             </div>
           </div>
         </div>
@@ -1120,14 +1168,14 @@
         <!-- Bottom Transport Controls -->
         <div class="landscape-bottom-controls">
           <button class="btn-ctrl-circle" onclick="sendRemoteAction('reset')" title="Reset Session">
-            <svg viewBox="0 0 256 256"><path d="M224,128A96,96,0,0,1,60.8,195.92a8,8,0,0,1,11.32-11.31A80,80,0,1,0,71.43,71.43L91.31,91.31A8,8,0,0,1,85.66,105H32a8,8,0,0,1-8-8V42.34a8,8,0,0,1,13.66-5.65L57.78,56.8A96,96,0,0,1,224,128Z"/></svg>
+            <svg viewBox="0 0 256 256"><path d="M222,128a94,94,0,0,1-92.74,94H128a93.43,93.43,0,0,1-64.5-25.65,6,6,0,1,1,8.24-8.72A82,82,0,1,0,70,70l-.19.19L39.44,98H72a6,6,0,0,1,0,12H24a6,6,0,0,1-6-6V56a6,6,0,0,1,12,0V90.34L61.63,61.4A94,94,0,0,1,222,128Z"/></svg>
           </button>
           <button id="suryaPlayBtn" class="btn-play-pause-main" onclick="sendRemoteAction('toggle')" title="Play / Pause">
-            <svg class="play-svg" viewBox="0 0 256 256" style="display: none;"><path d="M240,128a15.74,15.74,0,0,1-7.6,13.51L88.32,229.65a16,16,0,0,1-16.2.3A15.86,15.86,0,0,1,64,216.13V39.87A15.86,15.86,0,0,1,72.12,26a16,16,0,0,1,16.2.3L232.4,114.49A15.74,15.74,0,0,1,240,128Z"/></svg>
-            <svg class="pause-svg" viewBox="0 0 256 256"><path d="M216,48V208a16,16,0,0,1-16,16H160a16,16,0,0,1-16-16V48a16,16,0,0,1,16-16h40A16,16,0,0,1,216,48ZM96,32H56A16,16,0,0,0,40,48V208a16,16,0,0,0,16,16H96a16,16,0,0,0,16-16V48A16,16,0,0,0,96,32Z"/></svg>
+            <svg class="play-svg" viewBox="0 0 256 256" style="display: none;"><path d="M231.36,116.19,87.28,28.06a14,14,0,0,0-14.18-.27A13.69,13.69,0,0,0,66,39.87V216.13a13.69,13.69,0,0,0,7.1,12.08,14,14,0,0,0,14.18-.27l144.08-88.13a13.82,13.82,0,0,0,0-23.62Zm-6.26,13.38L81,217.7a2,2,0,0,1-2.06,0,1.78,1.78,0,0,1-1-1.61V39.87a1.78,1.78,0,0,1,1-1.61A2.06,2.06,0,0,1,80,38a2,2,0,0,1,1,.31L225.1,126.43a1.82,1.82,0,0,1,0,3.14Z"/></svg>
+            <svg class="pause-svg" viewBox="0 0 256 256"><path d="M200,34H160a14,14,0,0,0-14,14V208a14,14,0,0,0,14,14h40a14,14,0,0,0,14-14V48A14,14,0,0,0,200,34Zm2,174a2,2,0,0,1-2,2H160a2,2,0,0,1-2-2V48a2,2,0,0,1,2-2h40a2,2,0,0,1,2,2ZM96,34H56A14,14,0,0,0,42,48V208a14,14,0,0,0,14,14H96a14,14,0,0,0,14-14V48A14,14,0,0,0,96,34Zm2,174a2,2,0,0,1-2,2H56a2,2,0,0,1-2-2V48a2,2,0,0,1,2-2H96a2,2,0,0,1,2,2Z"/></svg>
           </button>
           <button class="btn-ctrl-circle" title="Settings">
-            <svg viewBox="0 0 256 256"><path d="M128,80a48,48,0,1,0,48,48A48.05,48.05,0,0,0,128,80Zm0,80a32,32,0,1,1,32-32A32,32,0,0,1,128,160Z"/></svg>
+            <svg viewBox="0 0 256 256"><path d="M40,86H74.6a30,30,0,0,0,58.8,0H216a6,6,0,0,0,0-12H133.4a30,30,0,0,0-58.8,0H40a6,6,0,0,0,0,12Zm64-24A18,18,0,1,1,86,80,18,18,0,0,1,104,62ZM216,170H197.4a30,30,0,0,0-58.8,0H40a6,6,0,0,0,0,12h98.6a30,30,0,0,0,58.8,0H216a6,6,0,0,0,0-12Zm-48,24a18,18,0,1,1,18-18A18,18,0,0,1,168,194Z"/></svg>
           </button>
         </div>
       </div>
@@ -1144,21 +1192,13 @@
     // YOGA SILHOUETTE VECTOR ASSET MAP (Exact match with Android XML drawables)
     // -------------------------------------------------------------------------
     const YOGA_SILHOUETTES = {
-      // 1 & 12: Pranamasana
       pranamasana: `<svg viewBox="0 0 100 100"><circle cx="50" cy="18" r="7"/><path d="M46 29 L54 29 L58 46 L53 47 L51 38 L51 58 L55 88 L49 88 L47 62 L45 88 L39 88 L43 58 L43 38 L41 47 L36 46 Z"/><path d="M48 33 L52 33 L52 42 L48 42 Z"/></svg>`,
-      // 2 & 11: Hastauttanasana
       hastauttanasana: `<svg viewBox="0 0 100 100"><circle cx="43" cy="22" r="7"/><path d="M41 33 C44 48 45 62 45 88 L51 88 C51 62 50 48 47 33 Z"/><path d="M44 33 L32 10 L37 8 L47 30 Z"/><path d="M46 33 L36 9 L41 7 L49 30 Z"/></svg>`,
-      // 3 & 10: Padahastasana
       padahastasana: `<svg viewBox="0 0 100 100"><circle cx="38" cy="58" r="7"/><path d="M52 35 C52 55 52 70 54 88 L60 88 C58 70 58 55 58 35 Z"/><path d="M58 35 C50 35 44 42 40 54 L46 56 C49 46 53 41 58 41 Z"/><path d="M41 50 L34 78 L39 79 L46 52 Z"/></svg>`,
-      // 4 & 9: Ashwa Sanchalanasana
       ashwa: `<svg viewBox="0 0 100 100"><circle cx="40" cy="30" r="7"/><path d="M42 40 L44 58 L62 64 L82 82 L77 84 L58 68 L42 63 Z"/><path d="M42 58 L24 60 L24 84 L18 84 L18 56 L38 54 Z"/><path d="M40 40 L35 68 L30 68 L34 40 Z"/></svg>`,
-      // 5: Dandasana (Plank)
       dandasana: `<svg viewBox="0 0 100 100"><circle cx="25" cy="40" r="7"/><path d="M28 48 L76 66 L74 72 L26 54 Z"/><path d="M30 49 L32 78 L26 78 L24 49 Z"/><path d="M74 66 L84 76 L80 78 L72 68 Z"/></svg>`,
-      // 6: Ashtanga Namaskara
       ashtanga: `<svg viewBox="0 0 100 100"><circle cx="20" cy="56" r="6"/><path d="M24 62 L38 64 L48 50 L64 56 L72 74 L66 76 L58 60 L46 56 L38 68 L24 68 Z"/><path d="M26 62 L26 74 L20 74 L20 62 Z"/><path d="M72 74 L84 76 L84 80 L70 78 Z"/></svg>`,
-      // 7: Bhujangasana (Cobra)
       bhujangasana: `<svg viewBox="0 0 100 100"><circle cx="32" cy="32" r="7"/><path d="M30 42 C34 56 46 68 84 76 L82 82 C42 74 28 60 24 42 Z"/><path d="M32 44 L38 78 L32 78 L26 44 Z"/></svg>`,
-      // 8: Parvatasana (Mountain)
       parvatasana: `<svg viewBox="0 0 100 100"><circle cx="34" cy="58" r="6.5"/><path d="M52 28 L80 82 L74 84 L50 36 L30 76 L24 73 L46 28 Z"/></svg>`
     };
 
@@ -1259,29 +1299,32 @@
       }
     }
 
+    // Trigger visual acoustic ripple wave from bowl on bite bell chime
+    function triggerEatingChimeRipple() {
+      const ripple = document.getElementById('eatingAcousticRipple');
+      if (ripple) {
+        ripple.classList.remove('animate');
+        void ripple.offsetWidth; // trigger reflow
+        ripple.classList.add('animate');
+      }
+    }
+
     // -------------------------------------------------------------------------
     // BreathIndicator.kt 1:1 PROCEDURAL LOTUS CANVAS ENGINE
     // -------------------------------------------------------------------------
     const PETAL_SPECS = [
-      // Tier 0: Outermost horizontal wings
       { id: "wing_L", angleBud: -6, angleBloom: -84, lengthRatioBud: 0.89, lengthRatioBloom: 0.555, widthRatio: 0.44, alpha: 0.22, layer: 0 },
       { id: "wing_R", angleBud: 6, angleBloom: 84, lengthRatioBud: 0.89, lengthRatioBloom: 0.555, widthRatio: 0.44, alpha: 0.22, layer: 0 },
-      // Tier 1: Outer lateral wings
       { id: "out_L2", angleBud: -5, angleBloom: -70, lengthRatioBud: 0.916, lengthRatioBloom: 0.666, widthRatio: 0.43, alpha: 0.26, layer: 1 },
       { id: "out_R2", angleBud: 5, angleBloom: 70, lengthRatioBud: 0.916, lengthRatioBloom: 0.666, widthRatio: 0.43, alpha: 0.26, layer: 1 },
-      // Tier 2: Mid lateral petals
       { id: "out_L1", angleBud: -4, angleBloom: -56, lengthRatioBud: 0.944, lengthRatioBloom: 0.777, widthRatio: 0.42, alpha: 0.30, layer: 2 },
       { id: "out_R1", angleBud: 4, angleBloom: 56, lengthRatioBud: 0.944, lengthRatioBloom: 0.777, widthRatio: 0.42, alpha: 0.30, layer: 2 },
-      // Tier 3: Core fanning petals
       { id: "mid_L", angleBud: -3, angleBloom: -42, lengthRatioBud: 0.958, lengthRatioBloom: 0.861, widthRatio: 0.41, alpha: 0.34, layer: 3 },
       { id: "mid_R", angleBud: 3, angleBloom: 42, lengthRatioBud: 0.958, lengthRatioBloom: 0.861, widthRatio: 0.41, alpha: 0.34, layer: 3 },
-      // Tier 4: Inner-mid chalice
       { id: "in_L", angleBud: -2, angleBloom: -28, lengthRatioBud: 0.972, lengthRatioBloom: 0.93, widthRatio: 0.40, alpha: 0.38, layer: 4 },
       { id: "in_R", angleBud: 2, angleBloom: 28, lengthRatioBud: 0.972, lengthRatioBloom: 0.93, widthRatio: 0.40, alpha: 0.38, layer: 4 },
-      // Tier 5: Inner core
       { id: "core_L", angleBud: -1, angleBloom: -14, lengthRatioBud: 0.986, lengthRatioBloom: 0.972, widthRatio: 0.39, alpha: 0.42, layer: 5 },
       { id: "core_R", angleBud: 1, angleBloom: 14, lengthRatioBud: 0.986, lengthRatioBloom: 0.972, widthRatio: 0.39, alpha: 0.42, layer: 5 },
-      // Tier 6: Central erect spine
       { id: "center", angleBud: 0, angleBloom: 0, lengthRatioBud: 1.0, lengthRatioBloom: 1.0, widthRatio: 0.38, alpha: 0.46, layer: 6 }
     ];
 
@@ -1289,9 +1332,7 @@
       return a + (b - a) * t;
     }
 
-    // Cubic Bezier Easing matching Compose CubicBezierEasing(0.645f, 0.045f, 0.355f, 1.0f)
     function cubicBezierEase(t) {
-      // Approximation of FastOutSlowIn cubic bezier
       return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
     }
 
@@ -1329,7 +1370,6 @@
 
       lotusCtx.clearRect(0, 0, canvasW, canvasH);
 
-      // Compute continuous bloom progress
       const p = currentPranayamaData;
       const dur = Math.max(p.phaseDuration, 1);
       const elapsed = Math.max(0, dur - p.phaseRemaining);
@@ -1347,7 +1387,6 @@
         targetBloom = 0.0; // HOLD_OUT
       }
 
-      // Smooth C2-continuous floating wave (2600ms cycle)
       const floatWave = (timestamp / 2600) % 1.0;
       const waveOffset = Math.sin(floatWave * 2 * Math.PI);
 
@@ -1370,7 +1409,7 @@
 
       const cy = baseWaterY + floatOffsetPx;
 
-      // 1. Luminous Breathing Prana Radial Aura behind flower
+      // 1. Luminous Breathing Prana Radial Aura
       const auraRadius = (maxPetalLen * 0.85) + (targetBloom * maxPetalLen * 0.45);
       const auraY = baseWaterY - maxPetalLen * 0.35;
       const auraGrad = lotusCtx.createRadialGradient(cx, auraY, 0, cx, auraY, auraRadius);
@@ -1383,7 +1422,7 @@
       lotusCtx.fillStyle = auraGrad;
       lotusCtx.fill();
 
-      // 2. Calm Resting Waterline Ripples (continuous 10s ripple timer)
+      // 2. Calm Resting Waterline Ripples
       const rippleAnimTime = (timestamp / 1000) % 10.0;
       const r1 = (rippleAnimTime * 0.45) % 2.5;
       const r2 = (rippleAnimTime * 0.45 + 1.25) % 2.5;
@@ -1404,7 +1443,6 @@
       lotusCtx.translate(cx, cy);
       lotusCtx.rotate((swayAngleDeg * Math.PI) / 180);
 
-      // Draw 13 Curved Lotus Petals sorted by layer
       const sortedSpecs = [...PETAL_SPECS].sort((a, b) => a.layer - b.layer);
       sortedSpecs.forEach(spec => {
         const curAngle = lerp(spec.angleBud, spec.angleBloom, targetBloom);
@@ -1414,7 +1452,6 @@
         lotusCtx.save();
         lotusCtx.rotate((curAngle * Math.PI) / 180);
 
-        // drawCurvedLotusPetal
         const halfW = curLength * spec.widthRatio * 0.55;
         const tipY = -curLength;
 
@@ -1437,8 +1474,7 @@
         lotusCtx.restore();
       });
 
-      // 4. Draw Geometric Calyx (3 leaves "patte" + vertical stem + receptacle dot)
-      // Stem
+      // 4. Draw Geometric Calyx
       lotusCtx.beginPath();
       lotusCtx.moveTo(0, 0);
       lotusCtx.lineTo(0, stemLen);
@@ -1447,7 +1483,6 @@
       lotusCtx.strokeStyle = 'rgba(132, 204, 22, 0.90)';
       lotusCtx.stroke();
 
-      // 3 Calyx Leaves ("Patte") pointing downwards into water
       const calyxSpread = lerp(22, 58, targetBloom);
       const calyxLen = lerp(stemLen * 0.48, stemLen * 0.68, targetBloom);
       const calyxW = calyxLen * 0.42;
@@ -1472,7 +1507,7 @@
       drawCalyxLeaf(180 + calyxSpread);
       drawCalyxLeaf(180);
 
-      // Central receptacle seed dot
+      // Receptacle seed dot
       lotusCtx.beginPath();
       lotusCtx.arc(0, 0, 7, 0, 2 * Math.PI);
       lotusCtx.fillStyle = '#84CC16';
@@ -1564,7 +1599,6 @@
         switchView('viewLinear');
         document.getElementById('linearProfileTitle').textContent = data.profileTitle || 'General Timer';
         
-        // Timer digits vs Steps
         const timerDigits = document.getElementById('linearTimerDigits');
         const stepDigits = document.getElementById('linearStepCount');
         const stepUnit = document.getElementById('linearStepUnit');
@@ -1608,7 +1642,6 @@
           head.setAttribute('cy', hy);
         }
 
-        // Status & Step/Bell cues
         const statusLabel = document.getElementById('linearStatusLabel');
         if (statusLabel) {
           statusLabel.textContent = isRunning ? '● Active Mindful Session' : (status === 'PAUSED' ? 'Paused' : 'Ready');
@@ -1630,7 +1663,7 @@
         }
       }
 
-      // 3. UPDATE MINDFUL EATING VIEW
+      // 3. UPDATE MINDFUL EATING VIEW (MindfulEatingLandscapeContent 1:1 Parity)
       else if (mode === 'EATING') {
         switchView('viewEating');
         startTipRotation();
@@ -1638,20 +1671,28 @@
         const digits = document.getElementById('eatingRemainingDigits');
         if (digits) digits.textContent = data.formattedTime || '45:00';
 
-        // Outer Meal Ring Fill
+        // Outer Meal Progress Ring Fill & Progress Head Dot
         const mealProgress = Math.min(Math.max(data.progress || 0, 0), 1);
-        const mealCircumference = 2 * Math.PI * 200; // 1256.6
+        const mealCircumference = 2 * Math.PI * 190; // 1193.8
         const mealFill = document.getElementById('eatingMealFill');
+        const mealHead = document.getElementById('eatingMealHead');
         if (mealFill) {
           mealFill.style.strokeDasharray = mealCircumference;
           mealFill.style.strokeDashoffset = mealCircumference * (1 - mealProgress);
         }
+        if (mealHead) {
+          const angle = mealProgress * 2 * Math.PI - Math.PI / 2;
+          const hx = 210 + 190 * Math.cos(angle);
+          const hy = 210 + 190 * Math.sin(angle);
+          mealHead.setAttribute('cx', hx);
+          mealHead.setAttribute('cy', hy);
+        }
 
-        // Inner Bite Arc Progress
+        // Inner Bite-Cycle Arc Progress
         const intervalDur = data.intervalDurationSeconds || 60;
         const nextBell = data.nextBellSeconds !== undefined ? data.nextBellSeconds : intervalDur;
         const biteProgress = intervalDur > 0 ? Math.min(Math.max(1 - (nextBell / intervalDur), 0), 1) : 0;
-        const biteCircumference = 2 * Math.PI * 65; // 408.4
+        const biteCircumference = 2 * Math.PI * 54; // 339.29
         const biteArc = document.getElementById('eatingBiteArc');
         if (biteArc) {
           biteArc.style.strokeDasharray = biteCircumference;
@@ -1661,6 +1702,16 @@
         const biteText = document.getElementById('eatingBiteText');
         if (biteText) {
           biteText.textContent = `Bite in ${data.formattedNextBell || '00:45'} • CHEW & SAVOR`;
+        }
+
+        const statusLabel = document.getElementById('eatingStatusLabel');
+        if (statusLabel) {
+          statusLabel.textContent = isRunning ? '● Mindful Chewing Rhythm' : (status === 'PAUSED' ? 'Paused' : 'Ready');
+        }
+
+        // Trigger visual acoustic ripple wave from bowl on bite bell chime
+        if (data.triggerBell) {
+          triggerEatingChimeRipple();
         }
       }
 
@@ -1706,7 +1757,6 @@
         document.getElementById('suryaPoseTranslation').textContent = data.poseSanskrit || 'Prayer Pose';
         document.getElementById('suryaSolarMantra').textContent = data.poseMantra ? `☀️ ${data.poseMantra}` : '';
 
-        // Dynamic Posture Silhouette
         const silhouetteKey = STEP_SILHOUETTE_MAP[stepIdx] || 'pranamasana';
         const silhouetteView = document.getElementById('suryaSilhouetteView');
         if (silhouetteView) {
