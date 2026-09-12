@@ -77,8 +77,10 @@ The audio architecture guarantees high-fidelity, boundary-free sound reproductio
   - **Temple Gong**: Rich, resonant low-frequency acoustic bell triggered upon session completion.
 - **Automotive Audio Routing**:
   - Configured strictly with `AudioAttributes.USAGE_MEDIA` and `AudioAttributes.CONTENT_TYPE_MUSIC`.
-  - **Architectural Rationale**: Routing as `USAGE_MEDIA` ensures that when connected to Android Auto or Bluetooth A2DP, interval bells and completion gongs play through vehicle stereo speakers rather than being isolated to the smartphone handset speaker.
-  - **Transient Ducking**: Audio focus requests with `AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK` smoothly lower background music and third-party media during bell strikes without interrupting playback.
+  - **Constant Ambient Volume Layering (Requirement E2)**:
+    - Interval bells, countdown strikes, single-strike Pranayama bells, and session completion gongs layer additively over ongoing background ambient music on the shared `USAGE_MEDIA` stream without requesting OS-level transient ducking audio focus.
+    - This eliminates jarring volume dips and abrupt snap-backs, maintaining a constant ambient background volume throughout the entire meditative session as configured by the user.
+    - Spoken vocal guidance continues to utilize the gentle raised-cosine software crossfader (`duckVolume` / `restoreVolume` over 350ms/500ms) to ensure vocal clarity.
 
 #### 2. Ambient Soundscape Subsystem (`BackgroundMusicManager.kt`)
 - **Bundled Ambient Drones**: High-definition continuous Aum chant drone bundled compile-time via `R.raw.aum`.
@@ -870,7 +872,7 @@ The Surya Namaskar subsystem provides comprehensive data persistence, animated v
 1. **CPU WakeLock (`BatteryOptimizer.kt`)**: Acquires `PowerManager.PARTIAL_WAKE_LOCK` (`"HabitBell:TimerWakeLock"`) during active countdowns to prevent the OS from suspending the CPU when the screen turns off.
 2. **Wi-Fi Multicast Lock**: Acquires `WifiManager.MulticastLock` (`"HabitBellTVMulticast"`) when TV Webcast is active to ensure mDNS / Bonjour packets pass through Android's network power-saving filters.
 3. **Proximity Sensor Monitoring**: Monitors device proximity in active sessions to automatically toggle Pocket Mode and the `#000000` AMOLED power curtain.
-4. **Automotive Audio Focus**: Requests transient audio focus ducking (`AUDIOFOCUS_GAIN_TRANSIENT_MAY_DUCK`) with `USAGE_MEDIA` to ensure clean audio routing to car audio systems without disrupting navigation directions.
+4. **Automotive Audio Routing & Ambient Volume Preservation (Requirement E2)**: Routes bell and soundscape streams via `AudioAttributes.USAGE_MEDIA` with `CONTENT_TYPE_MUSIC` to car audio systems while keeping ambient volume constant without intrusive ducking or volume snapping.
 5. **Pedometer & Activity Recognition Management**: Registers hardware step counter sensors with `SENSOR_DELAY_UI` only during active walking timer sessions; unregisters immediately upon pause, stop, or completion to prevent battery drain. Dynamically checks and requests `Manifest.permission.ACTIVITY_RECOGNITION` on Android 10+ (API 29+).
 6. **Multi-Sensor Display Automation**: Powers off OLED pixels using `#000000` blackout curtain across Pocket Mode, Android Auto Car HUD, Smart TV casting, and Wear OS companion states. Employs hardware `TYPE_SIGNIFICANT_MOTION` trigger and Z-axis gravity vector analysis for battery-efficient, zero-latency Lift-to-Wake and 10-second flat inactivity timeout.
 
