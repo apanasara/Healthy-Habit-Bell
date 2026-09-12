@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ # yoga_dandasana.xml
+  ~ Vector silhouette representing Dandasana (Plank Pose / Stick Pose).
+  ~ Step 5 of the classical 12-step Surya Namaskar cycle.
+  ~ Viewport: 512x512, scalable monochrome fill for dynamic Compose theme tinting.
+  -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="512dp"
+    android:height="512dp"
+    android:viewportWidth="512"
+    android:viewportHeight="512">
+    <group android:name="figure">
+        <path
+            android:name="silhouette"
+            android:fillColor="#FF000000"
+            android:pathData="
+                M 65,450
+                C 65,440 75,430 90,420
+                L 190,360
+                L 280,310
+                L 360,265
+                C 370,260 380,265 385,275
+                L 395,460
+                L 365,460
+                L 355,320
+                L 270,360
+                L 180,410
+                L 95,455
+                C 85,460 70,460 65,450
+                Z
+                M 390,240
+                C 402,232 418,235 425,248
+                C 432,260 428,275 415,282
+                C 402,290 388,285 380,272
+                C 375,260 380,245 390,240
+                Z" />
+    </group>
+</vector>

@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ # yoga_parvatasana.xml
+  ~ Vector silhouette representing Parvatasana / Adho Mukha Svanasana (Downward-Facing Dog / Mountain Pose).
+  ~ Step 8 of the classical 12-step Surya Namaskar cycle.
+  ~ Viewport: 512x512, scalable monochrome fill for dynamic Compose theme tinting.
+  -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="512dp"
+    android:height="512dp"
+    android:viewportWidth="512"
+    android:viewportHeight="512">
+    <group android:name="figure">
+        <path
+            android:name="silhouette"
+            android:fillColor="#FF000000"
+            android:pathData="
+                M 110,460
+                L 155,460
+                L 240,240
+                C 248,220 256,200 265,200
+                C 274,200 282,220 290,240
+                L 375,460
+                L 420,460
+                L 320,220
+                C 300,175 280,165 256,165
+                C 232,165 212,175 192,220
+                L 110,460
+                Z
+                M 300,285
+                C 312,285 322,275 322,262
+                C 322,250 312,240 300,240
+                C 288,240 278,250 278,262
+                C 278,275 288,285 300,285
+                Z" />
+    </group>
+</vector>

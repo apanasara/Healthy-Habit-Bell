@@ -688,14 +688,17 @@ The Surya Namaskar subsystem provides comprehensive data persistence, animated v
 - **Payload Contract (`/surya_sync`)**: Packs step models, presets, and settings into a unified JSON descriptor via `JsonUtil` (Google Gson) transferred as an urgent `PutDataMapRequest`.
 - **Zero-Latency Push**: Executed asynchronously on `Dispatchers.IO` when the user taps "Sync Watch" on the phone interface.
 
-#### 4. Audio Guidance & Offline TTS Voice Engine (`SuryaVoicePlayer.kt`)
-- **Offline Android TextToSpeech Synthesis**: Built-in Android `TextToSpeech` engine tuned to high-frequency meditative swara (`+52Hz` pitch shift) and calm yogic cadence (`rate: 0.70x`), ensuring 100% offline functionality without network dependencies.
+#### 4. Audio Guidance & Studio Voice Engine (`SuryaVoicePlayer.kt` & `SuryaPoseAssets.kt`)
+- **Studio-Mastered SwaraNeural Audio Profile**: Plays high-definition, studio-mastered audio files (`res/raw/surya_*.mp3`) synthesized with Microsoft Natural Neural voice `hi-IN-SwaraNeural` (+52Hz pitch, unhurried -30% yogic cadence, Lata Mangeshkar meditative timbre).
 - **Dynamic Mode Cues**:
-  - `VoiceCueMode.STEP_NAME`: Articulates classical Sanskrit Asana name (e.g. "Pranamasana", "Hastauttanasana").
-  - `VoiceCueMode.SLOKA`: Chants the respective classical Solar Mantra (e.g. "ॐ मित्राय नमः", "ॐ रवये नमः", "ॐ सूर्याय नमः").
-  - `VoiceCueMode.PRANIC`: Guides yogic breath flow (e.g. "Inhale & Exhale gently", "Inhale, stretch arms up").
+  - `VoiceCueMode.STEP_NAME`: Articulates classical Sanskrit Asana name with breathing guidance (e.g., "प्रणामासन, Inhale and Exhale", "हस्तउत्तानासन, Inhale").
+  - `VoiceCueMode.SLOKA`: Chants the respective classical Solar Mantra followed by the Asana (e.g. "ॐ मित्राय नमः, प्रणामासन", "ॐ रवये नमः, हस्तउत्तानासन").
+  - `VoiceCueMode.PRANIC`: Guides yogic breath flow and posture transitions with high-fidelity studio clips.
   - `VoiceCueMode.NONE`: Silent / Bell mode emitting no spoken cues, preserving meditative silence.
-- **Anti-Startle Lead Delay & Smooth Ducking**: Inserts a 120ms lead delay after smooth background music ducking (`duckVolume(duckedRatio = 0.20f, durationMs = 350L)`) before speech starts, and gently restores background audio over 500ms upon completion.
+- **Anti-Startle Lead Delay & Raised-Cosine Ducking**: Inserts an anti-startle 120ms lead delay after smooth background music ducking (`duckVolume(duckedRatio = 0.20f, durationMs = 350L)`) before speech playback starts, and gently restores background audio over 500ms upon completion.
+- **Anti-Clipping Step Duration Guard**: In accordance with the project's Step Timing vs. Voice Timing Law, if an allocated step duration is short (< 4 seconds, such as in the Fast 3s preset), bilingual cues automatically fall back to the concise Sanskrit solar mantra so the spoken audio is never clipped mid-sentence by the next transition.
+- **Offline Android TextToSpeech Fallback**: Native Android `TextToSpeech` engine configured with sweet high-pitch (`1.28f`) and unhurried cadence (`0.75f`) acts strictly as a resilient offline fallback if a raw audio resource is unavailable.
+- **Posture Vector Asset Catalog (`SuryaPoseAssets.kt`)**: Maps the 12 cyclical postures to their dedicated monochrome vector silhouettes (`yoga_pranamasana`, `yoga_hastauttanasana`, `yoga_padahastasana`, `yoga_ashwa_sanchalanasana`, `yoga_dandasana`, `yoga_ashtanga_namaskara`, `yoga_bhujangasana`, `yoga_parvatasana`) for accurate rendering in `SuryaTimerScreen` and `CompoundPoseCard`.
 
 #### 5. Live Timer Reflection & Bidirectional Persistence Pipeline
 - **Problem Solved**: Historically, adjusting Surya Namaskar settings in `SuryaSettingsSheet` or `SuryaTimerScreen` only mutated Room SQLite tables, while `CentralSessionHandler` and `TimerEngine` executed against immutable `TimerProfile` models stored in `TimerRepository`. As a result, modified pose timings and round counts failed to reflect into active countdowns.

@@ -1,20 +1,23 @@
 /**
  * # SuryaVoicePlayer
  *
- * Handles audio playback and speech synthesis of voice cues for the Surya Namaskar timer.
+ * Coordinates audio playback and speech synthesis of voice cues for the Surya Namaskar sequencer.
  *
  * ## Architectural Role & Component Relationships
- * Audio subsystem component interfacing with Android [TextToSpeech], [MediaPlayer], and the process-level
+ * Audio subsystem component interfacing with Android [MediaPlayer], [TextToSpeech], and the process-level
  * [BackgroundMusicManager]. Ducking is applied before speech starts, and volume is smoothly restored
  * upon cue completion.
  * - Bound to [com.habitbell.app.engine.CentralSessionHandler] and [com.habitbell.app.engine.TimerEngine].
  * - Supports 4 distinct voice guidance modes: [VoiceCueMode.NONE], [VoiceCueMode.PRANIC],
  *   [VoiceCueMode.STEP_NAME], and [VoiceCueMode.SLOKA].
+ * - Prioritizes high-definition studio-mastered audio clips (Edge-TTS `hi-IN-SwaraNeural`, Lata Mangeshkar tone)
+ *   from `res/raw`, gracefully falling back to native Android [TextToSpeech] if an asset is unavailable.
  *
- * ## Acoustic Profile
- * - Voice Profile: hi-IN-SwaraNeural (+52Hz pitch shift, Lata Mangeshkar meditative tone)
- * - Lead Delay: 120ms anti-startle grace period after background music ducking begins
- * - Audio Ducking: 0.20f target volume factor over 350ms, restored over 500ms
+ * ## Acoustic Profile & Studio Standard
+ * - Voice Profile: hi-IN-SwaraNeural (+52Hz pitch shift, unhurried -30% yogic cadence, Lata Mangeshkar meditative timbre)
+ * - Lead Delay: 120ms anti-startle grace period after background music ducking begins before playback starts
+ * - Audio Ducking: 0.20f target volume factor over 350ms, smoothly restored over 500ms
+ * - Playback Gain: Subdued whisper-soft volume (0.52f default)
  *
  * ## Concurrency & Thread Safety
  * Initialization occurs safely with application context. Speech dispatch and MediaPlayer actions
@@ -32,6 +35,7 @@ import android.util.Log
 import androidx.annotation.RawRes
 import com.habitbell.app.data.model.CompoundPose
 import com.habitbell.app.engine.BackgroundMusicManager
+import com.habitbell.app.ui.SuryaPoseAssets
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -51,7 +55,7 @@ enum class VoiceCueMode(val mode: Int) {
     SLOKA(3);
 
     /**
-     * User-facing localized display name for UI chips and badges.
+     * User-facing localized display name for UI chips, dialogs, and badges.
      */
     val displayName: String
         get() = when (this) {
@@ -63,7 +67,7 @@ enum class VoiceCueMode(val mode: Int) {
 }
 
 /**
- * Voice cue player coordinating audio ducking, TextToSpeech articulation, and MediaPlayer playback.
+ * Voice cue player coordinating audio ducking, studio MediaPlayer playback, and TextToSpeech fallback.
  *
  * @param context Android context used to access system speech engines and audio resources.
  * @param backgroundMusicManager Manager controlling ambient background music ducking.
@@ -76,7 +80,10 @@ class SuryaVoicePlayer(
     private val scope = CoroutineScope(Dispatchers.Main)
     private var currentJob: Job? = null
 
-    /** Native Android TextToSpeech engine handle for offline cue synthesis. */
+    /** Active media player instance for studio-mastered audio cues. */
+    private var activeMediaPlayer: MediaPlayer? = null
+
+    /** Native Android TextToSpeech engine handle for offline cue synthesis fallback. */
     private var tts: TextToSpeech? = null
 
     /** Guard flag indicating whether TTS engine finished initialization successfully. */
@@ -145,51 +152,127 @@ class SuryaVoicePlayer(
 
             override fun onError(utteranceId: String?, errorCode: Int) {
                 backgroundMusicManager.restoreVolume(durationMs = 500L)
+                Log.w(TAG, "SuryaVoicePlayer TTS utterance error: $errorCode for id: $utteranceId")
             }
         })
     }
 
     /**
-     * Dispatches voice guidance for an engaged Surya Namaskar posture based on active [mode].
+     * Dispatches voice guidance for an engaged Surya Namaskar posture.
      *
-     * @param pose The active [CompoundPose] containing names, breath cues, and solar mantra.
+     * Prioritizes high-definition studio-mastered audio clips (Edge-TTS SwaraNeural) with
+     * raised-cosine ducking and 120ms lead delay. Automatically falls back to native TTS
+     * if the audio asset is missing.
+     *
+     * @param pose The active [CompoundPose] containing index, names, breath cues, and solar mantra.
      * @param mode The selected [VoiceCueMode] governing what information is spoken.
+     * @param volume Whisper-soft gain factor (0.15f..1.0f, default 0.52f).
      */
-    fun playPoseCue(pose: CompoundPose, mode: VoiceCueMode) {
+    fun playPoseCue(
+        pose: CompoundPose,
+        mode: VoiceCueMode,
+        volume: Float = 0.52f
+    ) {
         if (mode == VoiceCueMode.NONE) return
 
-        val textToSpeak = when (mode) {
-            VoiceCueMode.STEP_NAME -> pose.name
-            VoiceCueMode.SLOKA -> if (pose.mantra.isNotBlank()) pose.mantra else pose.name
-            VoiceCueMode.PRANIC -> pose.breathCue
-            VoiceCueMode.NONE -> return
-        }
+        val safeVol = volume.coerceIn(0.15f, 1.0f)
+        val rawRes = SuryaPoseAssets.getAudioResource(
+            stepIndex = pose.index,
+            mode = mode,
+            stepDurationSeconds = pose.durationSeconds
+        )
 
-        speakWithDucking(textToSpeak)
+        if (rawRes != null) {
+            playMasteredAudio(rawRes, safeVol)
+        } else {
+            val textToSpeak = when (mode) {
+                VoiceCueMode.STEP_NAME -> pose.name
+                VoiceCueMode.SLOKA -> if (pose.mantra.isNotBlank()) "${pose.mantra}, ${pose.name}" else pose.name
+                VoiceCueMode.PRANIC -> "${pose.name}, ${pose.breathCue}"
+                VoiceCueMode.NONE -> return
+            }
+            speakWithDucking(textToSpeak, safeVol)
+        }
     }
 
     /**
-     * Smoothly ducks background music, honors anti-startle delay, and synthesizes speech.
+     * Auditions a sample posture voice cue for immediate in-app UI settings preview.
      *
-     * @param text Text string to articulate via [TextToSpeech].
+     * @param pose The sample [CompoundPose] to audition.
+     * @param mode Selected [VoiceCueMode] to preview.
+     * @param volume Preview volume gain (default 0.52f).
      */
-    fun speakWithDucking(text: String) {
+    fun auditionPoseCue(
+        pose: CompoundPose,
+        mode: VoiceCueMode,
+        volume: Float = 0.52f
+    ) {
+        playPoseCue(pose, mode, volume)
+    }
+
+    /**
+     * Plays a high-definition studio-mastered audio asset via [MediaPlayer] with smooth
+     * background music ducking and anti-startle lead delay.
+     *
+     * @param resId Raw resource ID from [com.habitbell.app.R.raw].
+     * @param volume Floating-point volume gain (0.15f..1.0f).
+     */
+    private fun playMasteredAudio(@RawRes resId: Int, volume: Float) {
         currentJob?.cancel()
         currentJob = scope.launch {
-            // Duck ambient music smoothly
+            stopMediaPlayer()
+            // 1. Duck ambient music smoothly
             backgroundMusicManager.duckVolume(duckedRatio = 0.20f, durationMs = 350L)
-            // Anti-startle lead delay
+
+            // 2. Anti-startle lead delay allowing ambient drone to soften before voice entry
+            delay(120L)
+
+            try {
+                activeMediaPlayer = MediaPlayer.create(context, resId)?.apply {
+                    setAudioAttributes(
+                        AudioAttributes.Builder()
+                            .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                            .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
+                            .build()
+                    )
+                    setVolume(volume, volume)
+                    setOnCompletionListener { mp ->
+                        backgroundMusicManager.restoreVolume(durationMs = 500L)
+                        mp.release()
+                        if (activeMediaPlayer == mp) {
+                            activeMediaPlayer = null
+                        }
+                    }
+                    start()
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error playing mastered Surya Namaskar audio asset", e)
+                backgroundMusicManager.restoreVolume(durationMs = 500L)
+            }
+        }
+    }
+
+    /**
+     * Synthesizes speech through native Android TTS engine with ducking when raw assets are unavailable.
+     *
+     * @param text Text string to articulate via [TextToSpeech].
+     * @param volume Subdued volume gain factor.
+     */
+    fun speakWithDucking(text: String, volume: Float = 0.65f) {
+        currentJob?.cancel()
+        currentJob = scope.launch {
+            stopMediaPlayer()
+            backgroundMusicManager.duckVolume(duckedRatio = 0.20f, durationMs = 350L)
             delay(120L)
 
             val engine = tts
             if (isTtsReady && engine != null) {
                 val utteranceId = "surya_cue_${System.currentTimeMillis()}"
                 val params = Bundle().apply {
-                    putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, 0.65f)
+                    putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, volume)
                 }
                 engine.speak(text, TextToSpeech.QUEUE_FLUSH, params, utteranceId)
             } else {
-                // If TTS is not yet initialized, restore volume after brief pause
                 delay(1200L)
                 backgroundMusicManager.restoreVolume(durationMs = 500L)
             }
@@ -197,48 +280,38 @@ class SuryaVoicePlayer(
     }
 
     /**
-     * Plays the voice cue for a given step with ducking and lead delay using a raw resource ID.
+     * Plays the voice cue for a given step with ducking and lead delay using a raw resource ID directly.
      *
      * @param resId Raw resource ID of the voice cue audio asset.
      * @param mode Selected [VoiceCueMode].
      */
     fun playCue(@RawRes resId: Int, mode: VoiceCueMode) {
-        currentJob?.cancel()
         if (mode == VoiceCueMode.NONE) return
-
-        currentJob = scope.launch {
-            // Duck ambient music smoothly
-            backgroundMusicManager.duckVolume(duckedRatio = 0.20f, durationMs = 350L)
-            // Anti-startle lead delay
-            delay(120L)
-
-            val player = MediaPlayer.create(context, resId)?.apply {
-                setAudioAttributes(
-                    AudioAttributes.Builder()
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                        .setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
-                        .build()
-                )
-                setVolume(0.52f, 0.52f)
-            } ?: return@launch
-
-            player.start()
-            while (player.isPlaying) {
-                delay(50L)
-            }
-            player.release()
-
-            // Restore ambient music volume smoothly
-            backgroundMusicManager.restoreVolume(durationMs = 500L)
-        }
+        playMasteredAudio(resId, volume = 0.52f)
     }
 
     /**
-     * Stops any currently playing cue and cancels pending jobs, restoring background music.
+     * Safely stops and releases active [MediaPlayer] instances.
+     */
+    private fun stopMediaPlayer() {
+        try {
+            activeMediaPlayer?.let {
+                if (it.isPlaying) {
+                    it.stop()
+                }
+                it.release()
+            }
+        } catch (_: Exception) {}
+        activeMediaPlayer = null
+    }
+
+    /**
+     * Halts ongoing speech synthesis or audio playback immediately and restores ambient volume.
      */
     fun stop() {
         currentJob?.cancel()
         currentJob = null
+        stopMediaPlayer()
         try {
             tts?.stop()
         } catch (_: Exception) {}
@@ -246,7 +319,7 @@ class SuryaVoicePlayer(
     }
 
     /**
-     * Releases speech resources when application process terminates.
+     * Releases speech and media player resources when the application session or process terminates.
      */
     fun release() {
         stop()

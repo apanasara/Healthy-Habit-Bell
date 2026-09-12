@@ -258,4 +258,17 @@ class SuryaTimerViewModel(application: Application) : AndroidViewModel(applicati
     fun syncWithWatch() {
         syncManager.pushSyncToWatch()
     }
+
+    /**
+     * Auditions a sample posture voice cue matching the studio Lata-style SwaraNeural audio profile.
+     *
+     * @param stepIndex 1-based index (1..12) of the posture to audition.
+     * @param mode Optional override of [VoiceCueMode]. Defaults to current active mode.
+     */
+    fun auditionVoiceCue(stepIndex: Int = 1, mode: VoiceCueMode? = null) {
+        val targetMode = mode ?: currentVoiceCueMode.value
+        val defaultPose = DefaultProfiles.SURYA_NAMASKAR.compoundConfig?.poses?.getOrNull(stepIndex - 1)
+            ?: CompoundPose(1, "Pranamasana", "Prayer Pose", 5, "Inhale & Exhale gently", "ॐ मित्राय नमः")
+        sessionHandler.suryaVoicePlayer.auditionPoseCue(defaultPose, targetMode)
+    }
 }

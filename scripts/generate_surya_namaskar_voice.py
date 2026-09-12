@@ -25,91 +25,91 @@ VOICE_ENGINE = "hi-IN-SwaraNeural"
 PITCH = "+52Hz"
 RATE = "-30%"
 
-# 12 Classical Surya Namaskar Steps (Asana + Solar Mantra)
+# 12 Classical Surya Namaskar Steps (Asana + Solar Mantra + Breath Direction)
 SURYA_NAMASKAR_STEPS = [
     {
         "step": 1,
         "raw_name": "surya_01_pranamasana",
         "asana": "प्रणामासन",
         "mantra": "ॐ मित्राय नमः",
-        "english": "Pranamasana, Inhale and Exhale"
+        "breath": "Inhale and Exhale"
     },
     {
         "step": 2,
         "raw_name": "surya_02_hastauttanasana",
         "asana": "हस्तउत्तानासन",
         "mantra": "ॐ रवये नमः",
-        "english": "Hastauttanasana, Inhale"
+        "breath": "Inhale"
     },
     {
         "step": 3,
         "raw_name": "surya_03_padahastasana",
         "asana": "पादहस्तासन",
         "mantra": "ॐ सूर्याय नमः",
-        "english": "Padahastasana, Exhale"
+        "breath": "Exhale"
     },
     {
         "step": 4,
         "raw_name": "surya_04_ashwasanchalanasana",
         "asana": "अश्वसञ्चालनासन",
         "mantra": "ॐ भानवे नमः",
-        "english": "Ashwa Sanchalanasana, Inhale"
+        "breath": "Inhale"
     },
     {
         "step": 5,
         "raw_name": "surya_05_dandasana",
         "asana": "दण्डासन",
         "mantra": "ॐ खगाय नमः",
-        "english": "Dandasana, Retain"
+        "breath": "Retain"
     },
     {
         "step": 6,
         "raw_name": "surya_06_ashtanganamaskara",
         "asana": "अष्टाङ्ग नमस्कार",
         "mantra": "ॐ पूष्णे नमः",
-        "english": "Ashtanga Namaskara, Exhale"
+        "breath": "Exhale"
     },
     {
         "step": 7,
         "raw_name": "surya_07_bhujangasana",
         "asana": "भुजङ्गासन",
         "mantra": "ॐ हिरण्यगर्भाय नमः",
-        "english": "Bhujangasana, Inhale"
+        "breath": "Inhale"
     },
     {
         "step": 8,
         "raw_name": "surya_08_parvatasana",
         "asana": "पर्वतासन",
         "mantra": "ॐ मरीचये नमः",
-        "english": "Parvatasana, Exhale"
+        "breath": "Exhale"
     },
     {
         "step": 9,
         "raw_name": "surya_09_ashwasanchalanasana",
         "asana": "अश्वसञ्चालनासन",
         "mantra": "ॐ आदित्याय नमः",
-        "english": "Ashwa Sanchalanasana, Inhale"
+        "breath": "Inhale"
     },
     {
         "step": 10,
         "raw_name": "surya_10_padahastasana",
         "asana": "पादहस्तासन",
         "mantra": "ॐ सवित्रे नमः",
-        "english": "Padahastasana, Exhale"
+        "breath": "Exhale"
     },
     {
         "step": 11,
         "raw_name": "surya_11_hastauttanasana",
         "asana": "हस्तउत्तानासन",
         "mantra": "ॐ अर्काय नमः",
-        "english": "Hastauttanasana, Inhale"
+        "breath": "Inhale"
     },
     {
         "step": 12,
         "raw_name": "surya_12_pranamasana",
         "asana": "प्रणामासन",
         "mantra": "ॐ भास्कराय नमः",
-        "english": "Pranamasana, Exhale"
+        "breath": "Exhale"
     }
 ]
 
@@ -127,7 +127,7 @@ async def generate_clips(output_dir: str = "app/src/main/res/raw"):
         print(f"✓ Generated [{item['step']:02d}/12] Sanskrit: {sanskrit_out} ({sanskrit_text})")
 
         # 2. Asana + English Direction Cue (Option 2: Bilingual)
-        bilingual_text = f"{item['asana']} {item['english']}"
+        bilingual_text = f"{item['asana']}, {item['breath']}"
         bilingual_out = os.path.join(output_dir, f"{item['raw_name']}_bilingual.mp3")
         comm_bilingual = edge_tts.Communicate(bilingual_text, VOICE_ENGINE, rate=RATE, pitch=PITCH)
         await comm_bilingual.save(bilingual_out)

@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ # yoga_ashtanga_namaskara.xml
+  ~ Vector silhouette representing Ashtanga Namaskara (Salute with Eight Limbs).
+  ~ Step 6 of the classical 12-step Surya Namaskar cycle.
+  ~ Viewport: 512x512, scalable monochrome fill for dynamic Compose theme tinting.
+  -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="512dp"
+    android:height="512dp"
+    android:viewportWidth="512"
+    android:viewportHeight="512">
+    <group android:name="figure">
+        <path
+            android:name="silhouette"
+            android:fillColor="#FF000000"
+            android:pathData="
+                M 60,460
+                L 100,430
+                C 120,430 145,445 165,460
+                L 190,460
+                C 195,440 210,400 235,385
+                C 260,370 285,390 310,420
+                L 340,460
+                L 420,460
+                C 425,450 435,440 440,425
+                C 445,410 435,395 420,395
+                C 405,395 395,405 385,415
+                C 370,390 345,380 320,385
+                C 300,390 290,410 280,430
+                C 260,380 235,360 205,380
+                C 180,400 160,440 145,460
+                L 60,460
+                Z
+                M 415,380
+                C 428,380 438,370 438,358
+                C 438,345 428,335 415,335
+                C 402,335 392,345 392,358
+                C 392,370 402,380 415,380
+                Z" />
+    </group>
+</vector>

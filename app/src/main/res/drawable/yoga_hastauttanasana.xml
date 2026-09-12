@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ # yoga_hastauttanasana.xml
+  ~ Vector silhouette representing Hastauttanasana (Raised Arms Pose / Backbend).
+  ~ Step 2 and Step 11 of the classical 12-step Surya Namaskar cycle.
+  ~ Viewport: 512x512, scalable monochrome fill for dynamic Compose theme tinting.
+  -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="512dp"
+    android:height="512dp"
+    android:viewportWidth="512"
+    android:viewportHeight="512">
+    <group android:name="figure">
+        <path
+            android:name="silhouette"
+            android:fillColor="#FF000000"
+            android:pathData="
+                M 215,35
+                C 225,28 240,32 245,45
+                C 248,55 244,70 238,90
+                C 246,82 258,80 268,88
+                C 278,96 280,110 274,122
+                C 268,132 255,138 242,134
+                C 245,150 252,175 262,205
+                C 272,235 278,260 275,280
+                C 272,305 268,340 264,380
+                C 260,415 258,445 258,460
+                L 290,460
+                C 290,455 288,430 286,395
+                C 285,360 286,325 289,295
+                C 292,265 290,235 280,205
+                C 270,175 262,150 258,130
+                C 268,110 272,80 258,55
+                C 252,42 240,35 228,38
+                C 220,40 205,52 195,75
+                C 185,100 178,135 174,170
+                L 160,165
+                C 165,130 174,90 186,65
+                C 194,48 205,38 215,35
+                Z
+                M 235,280
+                C 238,300 240,335 240,375
+                C 240,415 238,445 236,460
+                L 268,460
+                C 268,445 270,415 270,375
+                C 270,335 268,300 265,280
+                Z" />
+    </group>
+</vector>

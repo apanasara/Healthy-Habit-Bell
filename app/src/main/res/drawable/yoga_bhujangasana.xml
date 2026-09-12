@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ~ # yoga_bhujangasana.xml
+  ~ Vector silhouette representing Bhujangasana (Cobra Pose).
+  ~ Step 7 of the classical 12-step Surya Namaskar cycle.
+  ~ Viewport: 512x512, scalable monochrome fill for dynamic Compose theme tinting.
+  -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="512dp"
+    android:height="512dp"
+    android:viewportWidth="512"
+    android:viewportHeight="512">
+    <group android:name="figure">
+        <path
+            android:name="silhouette"
+            android:fillColor="#FF000000"
+            android:pathData="
+                M 60,460
+                L 240,460
+                C 260,440 280,390 290,340
+                C 295,310 305,275 315,250
+                C 320,240 330,245 335,255
+                C 340,270 330,310 320,350
+                C 310,390 300,430 305,460
+                L 345,460
+                C 345,420 355,370 360,330
+                C 365,290 355,250 335,225
+                C 315,200 290,220 280,260
+                C 270,300 255,350 240,390
+                C 220,435 180,455 120,458
+                L 60,460
+                Z
+                M 335,205
+                C 348,205 358,195 358,182
+                C 358,170 348,160 335,160
+                C 322,160 312,170 312,182
+                C 312,195 322,205 335,205
+                Z" />
+    </group>
+</vector>

@@ -2,12 +2,13 @@
  * # SuryaTimerScreen
  *
  * Jetpack Compose screen providing fine-grained configuration, speed preset selection,
- * animated posture previews, and Wear OS companion synchronization for Surya Namaskar sequences.
+ * animated posture previews, auditioning voice cues, and Wear OS companion synchronization
+ * for Surya Namaskar sequences.
  *
  * ## Architectural Role & Component Relationships
  * Presentation layer component in `com.habitbell.app.ui`:
  * - Connects to [com.habitbell.app.viewmodel.SuryaTimerViewModel] for Room database mutations and reactive StateFlow collection.
- * - Embeds [com.habitbell.app.ui.AnimatedPoseView] for smooth AnimatedVectorDrawable rendering of classical poses.
+ * - Embeds [com.habitbell.app.ui.AnimatedPoseView] and [com.habitbell.app.ui.SuryaPoseAssets] for accurate monochrome vector rendering.
  * - Dispatches watch synchronization requests via [SuryaTimerViewModel.syncWithWatch].
  *
  * ## Concurrency & Thread Safety
@@ -29,10 +30,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.ButtonDefaults
@@ -275,7 +277,7 @@ fun SuryaTimerScreen(
             }
 
             // -------------------------------------------------------------
-            // 2. Voice Guidance for All Steps (Global selection, not editable per-step)
+            // 2. Voice Guidance for All Steps (with Audition Preview)
             // -------------------------------------------------------------
             item {
                 Card(
@@ -286,18 +288,42 @@ fun SuryaTimerScreen(
                         .padding(bottom = 12.dp)
                 ) {
                     Column(modifier = Modifier.padding(14.dp)) {
-                        Text(
-                            text = "Voice Guidance (All Steps)",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = "Voice cue mode is applied uniformly across all 12 postures:",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Voice Guidance (All Steps)",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "Applied uniformly across all 12 postures:",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+
+                            if (currentVoiceCueMode != VoiceCueMode.NONE) {
+                                OutlinedButton(
+                                    onClick = { viewModel.auditionVoiceCue(1) },
+                                    contentPadding = ButtonDefaults.ContentPadding
+                                ) {
+                                    Icon(
+                                        painter = painterResource(id = R.drawable.ic_ph_play),
+                                        contentDescription = "Audition Voice Cue",
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("Audition", style = MaterialTheme.typography.labelSmall)
+                                }
+                            }
+                        }
+
                         Spacer(modifier = Modifier.height(10.dp))
 
                         Row(
@@ -339,11 +365,13 @@ fun SuryaTimerScreen(
             // -------------------------------------------------------------
             // 3. Ordered Classical Postures Sequence Cards
             // -------------------------------------------------------------
-            items(steps, key = { it.id }) { step ->
+            itemsIndexed(steps, key = { _, it -> it.id }) { index, step ->
                 StepRow(
+                    stepIndex = index + 1,
                     step = step,
                     isCustomMode = isCustomMode,
-                    onStepUpdate = viewModel::updateStep
+                    onStepUpdate = viewModel::updateStep,
+                    onAudition = { viewModel.auditionVoiceCue(index + 1) }
                 )
                 Spacer(modifier = Modifier.height(10.dp))
             }
@@ -356,19 +384,22 @@ fun SuryaTimerScreen(
 }
 
 /**
- * Individual posture configuration card displaying duration, animated silhouette preview,
- * and unified voice guidance indicator. Voice cue is globally selected for all steps.
- * Timing is editable when Custom speed preset is selected.
+ * Individual posture configuration card displaying duration, distinct posture silhouette,
+ * and unified voice guidance indicator.
  *
+ * @param stepIndex 1-based index (1 to 12) of the posture in the cycle.
  * @param step Immutable UI representation of the Surya Namaskar posture.
  * @param isCustomMode Whether Custom speed preset is active allowing timing modification.
  * @param onStepUpdate Callback invoked when the user adjusts timing or enabled state.
+ * @param onAudition Callback invoked to audition this posture's voice cue.
  */
 @Composable
 private fun StepRow(
+    stepIndex: Int,
     step: StepUiModel,
     isCustomMode: Boolean,
-    onStepUpdate: (StepUiModel) -> Unit
+    onStepUpdate: (StepUiModel) -> Unit,
+    onAudition: () -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -390,6 +421,23 @@ private fun StepRow(
                     checked = step.isEnabled,
                     onCheckedChange = { onStepUpdate(step.copy(isEnabled = it)) }
                 )
+                Spacer(modifier = Modifier.width(4.dp))
+
+                // Step number badge
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    modifier = Modifier.size(24.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(
+                            text = "$stepIndex",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+                }
                 Spacer(modifier = Modifier.width(8.dp))
 
                 // Posture Name & Sanskrit subtitle
@@ -402,11 +450,26 @@ private fun StepRow(
                     )
                 }
 
-                // Animated Posture Vector Illustration
+                // Play / Audition Button
+                if (step.voiceCueMode != VoiceCueMode.NONE) {
+                    IconButton(
+                        onClick = onAudition,
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_ph_play),
+                            contentDescription = "Play Pose Voice Cue",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+
+                // Dedicated Animated Posture Vector Illustration
                 AnimatedPoseView(
-                    drawableResId = R.drawable.avd_yoga_pranamasana,
-                    modifier = Modifier.padding(start = 8.dp),
-                    size = 42.dp,
+                    drawableResId = SuryaPoseAssets.getDrawableForStep(stepIndex),
+                    modifier = Modifier.padding(start = 4.dp),
+                    size = 46.dp,
                     contentDescription = step.name
                 )
             }
