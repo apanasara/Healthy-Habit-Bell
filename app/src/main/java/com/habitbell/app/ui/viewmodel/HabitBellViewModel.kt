@@ -238,6 +238,24 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
         session.status == SessionStatus.RUNNING && autoDimEnabled && !inPocket && session.isDimmed
     }.stateIn(viewModelScope, SharingStarted.Eagerly, false)
 
+    /** Backing state flow tracking whether MainActivity is actively running in the foreground. */
+    private val _isAppForeground = MutableStateFlow(true)
+
+    /** Public immutable stream indicating whether the app UI is currently foregrounded. */
+    val isAppForeground: StateFlow<Boolean> = _isAppForeground.asStateFlow()
+
+    /**
+     * Reactive stream indicating whether volume settings UI is actively visible in the foreground.
+     * Combines sheet/drawer visibility with foreground status to ensure hardware observer is active
+     * exclusively while the user is actively viewing/adjusting volume controls.
+     */
+    val isVolumeUiActive: Flow<Boolean> = combine(
+        _uiState.map { it.isVolumeSheetOpen || it.isSettingsDrawerOpen }.distinctUntilChanged(),
+        _isAppForeground
+    ) { isVolumeUiOpen, isForeground ->
+        isVolumeUiOpen && isForeground
+    }.distinctUntilChanged()
+
     init {
         // Enforce project rule: Haptic vibration ONLY triggers when device is in pocket mode
         engine.isPocketModeActive = { _uiState.value.isPocketModeManual || isPocketBlankingActive.value }
@@ -270,18 +288,34 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
         }
 
         // Synchronize ambient volume directly with hardware/system volume (Requirement E7)
+        // Lifecycle-optimized: Only registers ContentObserver and collects volume while Volume Settings UI is actively visible in foreground
         viewModelScope.launch {
-            castManager.isCasting.collectLatest { isCasting ->
-                if (isCasting) {
-                    // Chromecast Mode: In-app slider observes and mirrors TV hardware volume
-                    castManager.castVolume.collect { tvVol ->
-                        _uiState.update { it.copy(bgMusicVolume = tvVol) }
+            combine(
+                isVolumeUiActive,
+                castManager.isCasting
+            ) { isUiActive, isCasting ->
+                Pair(isUiActive, isCasting)
+            }.collectLatest { (isUiActive, isCasting) ->
+                if (isUiActive) {
+                    if (isCasting) {
+                        // Cast mode: unregister phone observer and mirror TV volume
+                        systemVolumeObserver.unregister()
+                        _uiState.update { it.copy(bgMusicVolume = castManager.castVolume.value) }
+                        castManager.castVolume.collect { tvVol ->
+                            _uiState.update { it.copy(bgMusicVolume = tvVol) }
+                        }
+                    } else {
+                        // Mobile mode: register phone observer and mirror Android STREAM_MUSIC
+                        systemVolumeObserver.register()
+                        val currentVol = systemVolumeObserver.readCurrentNormalizedVolume()
+                        _uiState.update { it.copy(bgMusicVolume = currentVol) }
+                        systemVolumeObserver.volume.collect { phoneVol ->
+                            _uiState.update { it.copy(bgMusicVolume = phoneVol) }
+                        }
                     }
                 } else {
-                    // Mobile App Mode: In-app slider observes and mirrors Android STREAM_MUSIC volume
-                    systemVolumeObserver.volume.collect { phoneVol ->
-                        _uiState.update { it.copy(bgMusicVolume = phoneVol) }
-                    }
+                    // Volume UI closed or app backgrounded: unregister observer to eliminate battery/CPU drain
+                    systemVolumeObserver.unregister()
                 }
             }
         }
@@ -656,6 +690,19 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
      */
     fun openCastSheet(open: Boolean) {
         _uiState.update { it.copy(isCastSheetOpen = open) }
+    }
+
+    /**
+     * Updates the application foreground lifecycle state.
+     *
+     * When the application is foregrounded ([inForeground] = true), volume observation can resume if
+     * a volume sheet or drawer is open. When backgrounded ([inForeground] = false), hardware
+     * observation is immediately suspended to conserve battery.
+     *
+     * @param inForeground True when MainActivity is started/resumed; false when stopped.
+     */
+    fun setAppForegroundState(inForeground: Boolean) {
+        _isAppForeground.value = inForeground
     }
 
     /**

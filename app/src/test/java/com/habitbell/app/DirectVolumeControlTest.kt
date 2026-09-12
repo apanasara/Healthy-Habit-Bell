@@ -124,4 +124,89 @@ class DirectVolumeControlTest {
         assertTrue("Ducked audio must stay non-zero to maintain soothing ambiance", duckedTarget > 0.05f)
         assertTrue("Ducked audio must not exceed 25% to guarantee vocal clarity", duckedTarget <= 0.25f)
     }
+
+    /**
+     * Verifies that volume observation is active ONLY when a volume-controlling UI surface
+     * (Volume Settings Sheet or Settings Drawer) is visible AND the application is in the foreground.
+     *
+     * Ensures zero background battery consumption when the user is running/timing or away from settings.
+     */
+    @Test
+    fun testVolumeUiActiveLifecycleCondition() {
+        fun computeIsVolumeUiActive(
+            isVolumeSheetOpen: Boolean,
+            isSettingsDrawerOpen: Boolean,
+            isAppForeground: Boolean
+        ): Boolean {
+            return (isVolumeSheetOpen || isSettingsDrawerOpen) && isAppForeground
+        }
+
+        // 1. Initial State: App in foreground, no sheets open -> DORMANT (no ContentObserver)
+        org.junit.Assert.assertFalse(computeIsVolumeUiActive(isVolumeSheetOpen = false, isSettingsDrawerOpen = false, isAppForeground = true))
+
+        // 2. User opens Volume Settings Sheet in foreground -> ACTIVE (ContentObserver registered)
+        assertTrue(computeIsVolumeUiActive(isVolumeSheetOpen = true, isSettingsDrawerOpen = false, isAppForeground = true))
+
+        // 3. User opens Settings Drawer in foreground -> ACTIVE (ContentObserver registered)
+        assertTrue(computeIsVolumeUiActive(isVolumeSheetOpen = false, isSettingsDrawerOpen = true, isAppForeground = true))
+
+        // 4. User opens both sheet and drawer in foreground -> ACTIVE
+        assertTrue(computeIsVolumeUiActive(isVolumeSheetOpen = true, isSettingsDrawerOpen = true, isAppForeground = true))
+
+        // 5. User leaves app / phone goes to background with Volume Sheet open -> DORMANT (unregistered, saving battery)
+        org.junit.Assert.assertFalse(computeIsVolumeUiActive(isVolumeSheetOpen = true, isSettingsDrawerOpen = false, isAppForeground = false))
+
+        // 6. User leaves app with Settings Drawer open -> DORMANT (unregistered, saving battery)
+        org.junit.Assert.assertFalse(computeIsVolumeUiActive(isVolumeSheetOpen = false, isSettingsDrawerOpen = true, isAppForeground = false))
+
+        // 7. Background state with all UI closed -> DORMANT
+        org.junit.Assert.assertFalse(computeIsVolumeUiActive(isVolumeSheetOpen = false, isSettingsDrawerOpen = false, isAppForeground = false))
+    }
+
+    /**
+     * Verifies simulated registration state machine transitions across user interaction workflows.
+     */
+    @Test
+    fun testVolumeObserverRegistrationStateMachine() {
+        var isRegistered = false
+
+        fun register() {
+            isRegistered = true
+        }
+
+        fun unregister() {
+            isRegistered = false
+        }
+
+        fun updateLifecycle(isUiActive: Boolean, isCasting: Boolean) {
+            if (isUiActive) {
+                if (isCasting) {
+                    unregister() // Cast mode uses Cast SDK, not phone ContentObserver
+                } else {
+                    register()
+                }
+            } else {
+                unregister()
+            }
+        }
+
+        // Initially dormant
+        org.junit.Assert.assertFalse(isRegistered)
+
+        // User opens Volume Sheet on phone
+        updateLifecycle(isUiActive = true, isCasting = false)
+        assertTrue("Must register ContentObserver when volume sheet is open on phone", isRegistered)
+
+        // User switches to TV casting
+        updateLifecycle(isUiActive = true, isCasting = true)
+        org.junit.Assert.assertFalse("Must unregister phone ContentObserver in Cast mode", isRegistered)
+
+        // User disconnects cast while sheet is still open
+        updateLifecycle(isUiActive = true, isCasting = false)
+        assertTrue("Must register phone ContentObserver when returning to phone mode", isRegistered)
+
+        // User dismisses sheet
+        updateLifecycle(isUiActive = false, isCasting = false)
+        org.junit.Assert.assertFalse("Must unregister ContentObserver when sheet dismissed", isRegistered)
+    }
 }

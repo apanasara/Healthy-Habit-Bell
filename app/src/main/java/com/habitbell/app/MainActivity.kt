@@ -627,20 +627,31 @@ class MainActivity : FragmentActivity() {
     }
 
     /**
+     * Propagates foreground lifecycle state to ViewModel and enables reactive UI observers.
+     */
+    override fun onStart() {
+        super.onStart()
+        viewModel.setAppForegroundState(true)
+    }
+
+    /**
      * Synchronizes status bar visibility and active session navigation whenever the activity returns to the foreground.
      */
     override fun onResume() {
         super.onResume()
+        viewModel.setAppForegroundState(true)
         viewModel.checkAndRestoreOngoingSession()
         val isTimerScreen = viewModel.uiState.value.currentScreen == AppScreen.SESSION
         setStatusBarHidden(isTimerScreen)
     }
 
     /**
-     * Restores system screen brightness and unhides system status bars when the activity is backgrounded.
+     * Suspends foreground observers (including hardware volume ContentObserver), restores
+     * system screen brightness, and unhides system status bars when the activity is backgrounded.
      */
     override fun onStop() {
         super.onStop()
+        viewModel.setAppForegroundState(false)
         viewModel.batteryOptimizer.setScreenBrightness(this, false)
         setStatusBarHidden(false)
     }
