@@ -234,11 +234,12 @@ The heartbeat of the mindfulness runtime is a deterministic finite state machine
   1. **Two-Column Horizontal Split Architecture**:
      - **Left Column (Visualizer Area, weight 1.15)**: Dedicated to the hero visualizer centerpiece across all topologies.
        - *Linear*: SVG circular progress ring (radius 190, circumference 1194px) with animated glowing progress head dot, large timer numerals (`88px`), step count, elapsed/total subtext (`00:00 elapsed • 15:00 total`).
-       - *Mindful Eating (`MindfulEatingLandscapeContent` Parity)*:
-         - Concentric dual rings: Outer meal countdown ring (radius 190, circumference 1194px) with animated glowing head dot + inner bite-pacing arc (radius 54, circumference 339px) with rounded caps sweeping clockwise from 12 o'clock.
-         - Authentic Phosphor food bowl icon (`ic_ph_bowl.xml`) centered inside the bite arc with chopsticks, food basin, and steam curls.
-         - Candlelit radial breathing aura behind the bowl and dynamic acoustic chime wave expanding radially on every interval bell chime.
-         - Right column HUD featuring large meal countdown numerals (`78px`), bite bell countdown capsule (`ic_ph_bell.xml` + `🔔 Bite in MM:SS • CHEW & SAVOR`), `"● Mindful Chewing Rhythm"` status badge, and rotating 12-second mindful eating guidelines carousel.
+       - *Mindful Eating (`MindfulEatingLandscapeContent` 1:1 Bit-Identical Parity)*:
+          - Concentric dual rings: Outer meal countdown ring (radius 190, circumference 1193.8px) with animated glowing progress head dot (`progress-head-dot`) + inner bite-pacing arc (radius 54, circumference 339.29px) with rounded caps sweeping clockwise from 12 o'clock (-90°).
+          - Authentic Phosphor Food Bowl icon directly extracted from Android `ic_ph_bowl.xml` (`M224,106H213.77a86,86,0,0,0-171.54,0H32...`), featuring the complete food basin and rising steam curls with drop-shadow prana glow.
+          - Authentic Phosphor Bell icon from Android `ic_ph_bell.xml` (`M166,224a6,6,0,0,1-6,6H96...`) embedded in the bite-pacing rhythm capsule (`#eatingBiteText`: `Bite in MM:SS • CHEW & SAVOR`).
+          - Candlelit radial breathing aura (`eating-candle-aura`) behind the bowl and hardware-accelerated acoustic chime wave (`#eatingAcousticRipple`) animated on interval bell chimes.
+          - Right column HUD featuring large meal countdown numerals (`78px`, ExtraLight 200, letter-spacing -2px), `"● Mindful Chewing Rhythm"` status label, and rotating 12-second curated mindful eating guidelines carousel.
        - *Pranayama (`BreathIndicator.kt` 1:1 Procedural Canvas Engine)*: High-performance HTML5 canvas rendering:
          - **13 Curved Petals Across 7 Depth Layers**: Implements dynamic dual morphing where each petal interpolates both angle (`angleBud` $\to$ `angleBloom`, $-84^\circ \dots +84^\circ$) and length (`lengthRatioBud` $\to$ `lengthRatioBloom`, $0.555\times \dots 1.0\times$) so resting bud petals remain tall and slender, while blooming petals form an organic cupped water lily.
          - **Dynamic 3-Leaf Calyx ("Patte") & Receptacle**: Three downward-pointing leaves spreading organically from $22^\circ$ to $58^\circ$ with bloom, a vertical stem with rounded caps, and a lime seed receptacle (`#84CC16`).
@@ -247,14 +248,17 @@ The heartbeat of the mindfulness runtime is a deterministic finite state machine
          - **Breathing Prana Radial Aura**: Dynamic radial gradient expanding behind the flower apex.
        - *Surya Namaskar (`CompoundPoseCard` Parity)*: Dedicated card featuring the active pose name, Sanskrit translation, Devanagari solar invocation (`☀️ ॐ मित्राय नमः`), 12-step cyclical flow progress bar with active elongated pill, 150px vector posture silhouette, synchronized breath cue badge, and pose countdown pill.
      - **Right Column (Info & Transport Controls, weight 1.05)**:
-       - **Top Action Bar**: Circular frosted Back button (`ic_ph_back`), session profile title, Cast indicator badge (`ic_ph_tv` with emerald beacon), and Tibetan bowl sound pill (`ic_ph_bowl`).
+       - **Top Action Bar (1:1 Mobile App Parity)**:
+         - Circular Back button with authentic Phosphor chevron from `ic_ph_back.xml` (`M164.24,203.76a6,6,0,1,1-8.48...`).
+         - Session profile title (`style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold`).
+         - Right actions: Live `TV CAST` pill badge with pulsing emerald beacon, Theme toggle button (`ic_ph_sun.xml`), and Settings button (`ic_ph_tune.xml`).
        - **Middle Status & HUD**:
          - *Pranayama*: Sanskrit phase title (`PŪRAKA`), Devanagari script banner (`पूरक`), giant seconds countdown numeral (`96px`), round milestone capsule (`Round 1 of 12 • 12:00 left`), and interval bell cadence counter (`🔔 Interval Bell in 5 rounds`).
-         - *Mindful Eating*: Large meal countdown numerals (`78px`), bite bell countdown capsule (`🔔 Bite in 00:45 • CHEW & SAVOR`), and rotating 12-second mindful eating guidelines carousel.
+         - *Mindful Eating*: Large meal countdown numerals (`78px`), bite bell countdown capsule (`ic_ph_bell.xml` + `Bite in MM:SS • CHEW & SAVOR`), `"● Mindful Chewing Rhythm"` status label, and rotating 12-second mindful eating guidelines carousel.
          - *Linear*: Session status indicator (`● Active Mindful Session`), walking step/cadence telemetry badge, and next Tibetan bell cue.
          - *Surya Namaskar*: Sequence status label, master round indicator (`Round 1 of 6`), and total sequence countdown.
-       - **Bottom Transport Controls**:
-         - Frosted floating pill container spaced evenly with Reset button (`ic_ph_reset`), master Play/Pause button with golden prana glow (`ic_ph_play`/`ic_ph_pause`), and Settings icon (`ic_ph_tune`).
+       - **Bottom Transport Controls (Authentic Phosphor Line Vector Suite)**:
+         - Frosted floating pill container with Reset button (`ic_ph_reset.xml`: `M222,128a94,94,0,0,1-92.74,94H128...`), master Play/Pause button with golden prana glow (`ic_ph_play.xml`: `M231.36,116.19...` / `ic_ph_pause.xml`: `M200,34H160...`), and Settings icon (`ic_ph_tune.xml`: `M40,86H74.6...`).
 - **Bidirectional Custom Message Bus (`urn:x-cast:com.habitbell.cast`) & Handshake Protocol**:
   - **Receiver Readiness Handshake**: Receiver emits `{ type: 'ready' }` upon startup (`EventType.READY`) and upon sender connection (`EventType.SENDER_CONNECTED`). Android `HabitBellCastManager` triggers `onReceiverReady`, causing `CentralSessionHandler` to immediately dispatch the current session snapshot (even if `IDLE`).
   - **Immediate Telemetry Synchronization**: Binds telemetry push to `castManager.isCasting.collect` regardless of session running status, instantly updating the TV from standby to active profile preview when the user taps Cast from the mobile home screen.
