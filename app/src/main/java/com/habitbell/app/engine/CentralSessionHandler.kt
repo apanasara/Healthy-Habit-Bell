@@ -85,6 +85,9 @@ class CentralSessionHandler(private val application: Application) {
     /** Native Google Cast manager enabling pure app casting to TV hardware without mirroring. */
     val castManager: com.habitbell.app.cast.HabitBellCastManager = com.habitbell.app.cast.HabitBellCastManager.getInstance(application)
 
+    /** Screen mirroring and TV display orientation manager. */
+    val screenMirroringManager: com.habitbell.app.cast.ScreenMirroringManager = com.habitbell.app.cast.ScreenMirroringManager.getInstance(application)
+
     /** Tracks active cast session routine ID to avoid duplicate loadSession() calls on pause/resume. */
     private var lastCastProfileId: String? = null
 
@@ -710,5 +713,6 @@ class CentralSessionHandler(private val application: Application) {
         bluetoothDisconnectionManager.destroy()
         mediaSession.release()
         castManager.destroy()
+        screenMirroringManager.destroy()
     }
 }
