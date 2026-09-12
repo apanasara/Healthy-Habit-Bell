@@ -57,6 +57,8 @@ import com.habitbell.app.ui.components.CompoundPoseCard
  * @param onExit Callback to exit session and return to the Home dashboard.
  * @param onToggleTheme Callback to centrally cycle or toggle the application visual theme.
  * @param onUserInteraction Callback triggered when the user interacts with the display to wake from dimming.
+ * @param isScreenMirroringActive Whether Screen Mirroring is currently engaged.
+ * @param onToggleOrientation Screen rotation callback.
  * @param modifier Composable layout modifier.
  */
 @Composable
@@ -68,6 +70,8 @@ fun SessionScreen(
     onExit: () -> Unit,
     onToggleTheme: () -> Unit,
     onUserInteraction: () -> Unit = {},
+    isScreenMirroringActive: Boolean = false,
+    onToggleOrientation: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val configuration = LocalConfiguration.current
@@ -101,7 +105,9 @@ fun SessionScreen(
                 onReset = onReset,
                 onOpenSettings = onOpenSettings,
                 onExit = onExit,
-                onToggleTheme = onToggleTheme
+                onToggleTheme = onToggleTheme,
+                isScreenMirroringActive = isScreenMirroringActive,
+                onToggleOrientation = onToggleOrientation
             )
         } else {
             PortraitSessionLayout(
@@ -110,7 +116,9 @@ fun SessionScreen(
                 onReset = onReset,
                 onOpenSettings = onOpenSettings,
                 onExit = onExit,
-                onToggleTheme = onToggleTheme
+                onToggleTheme = onToggleTheme,
+                isScreenMirroringActive = isScreenMirroringActive,
+                onToggleOrientation = onToggleOrientation
             )
         }
     }
@@ -126,6 +134,8 @@ fun SessionScreen(
  * @param onOpenSettings Open settings callback.
  * @param onExit Exit to home callback.
  * @param onToggleTheme Central theme switcher callback.
+ * @param isScreenMirroringActive Whether Screen Mirroring is active.
+ * @param onToggleOrientation Screen rotation callback.
  */
 @Composable
 private fun LandscapeSessionLayout(
@@ -134,7 +144,9 @@ private fun LandscapeSessionLayout(
     onReset: () -> Unit,
     onOpenSettings: () -> Unit,
     onExit: () -> Unit,
-    onToggleTheme: () -> Unit
+    onToggleTheme: () -> Unit,
+    isScreenMirroringActive: Boolean = false,
+    onToggleOrientation: () -> Unit = {}
 ) {
     val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val buttonPillBg = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (isDark) 0.35f else 0.75f)
@@ -290,6 +302,22 @@ private fun LandscapeSessionLayout(
                             contentAlignment = Alignment.Center
                         ) {
                             CastButton(modifier = Modifier.size(20.dp))
+                        }
+                    }
+                    if (isScreenMirroringActive) {
+                        IconButton(
+                            onClick = onToggleOrientation,
+                            modifier = Modifier
+                                .size(38.dp)
+                                .background(buttonPillBg, CircleShape)
+                                .border(buttonBorder, CircleShape)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.StayCurrentPortrait,
+                                contentDescription = "Rotate to Vertical (Portrait) for TV",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp)
+                            )
                         }
                     }
                     IconButton(
@@ -498,6 +526,8 @@ private fun LandscapeSessionLayout(
  * @param onOpenSettings Open settings callback.
  * @param onExit Exit to home callback.
  * @param onToggleTheme Central theme switcher callback.
+ * @param isScreenMirroringActive Whether Screen Mirroring is active.
+ * @param onToggleOrientation Screen rotation callback.
  */
 @Composable
 private fun PortraitSessionLayout(
@@ -506,7 +536,9 @@ private fun PortraitSessionLayout(
     onReset: () -> Unit,
     onOpenSettings: () -> Unit,
     onExit: () -> Unit,
-    onToggleTheme: () -> Unit
+    onToggleTheme: () -> Unit,
+    isScreenMirroringActive: Boolean = false,
+    onToggleOrientation: () -> Unit = {}
 ) {
     Column(
         modifier = Modifier
@@ -571,6 +603,22 @@ private fun PortraitSessionLayout(
                             contentAlignment = Alignment.Center
                         ) {
                             CastButton(modifier = Modifier.size(24.dp))
+                        }
+                    }
+                    if (isScreenMirroringActive) {
+                        IconButton(
+                            onClick = onToggleOrientation,
+                            modifier = Modifier
+                                .size(42.dp)
+                                .background(buttonPillBg, CircleShape)
+                                .border(buttonBorder, CircleShape)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.StayCurrentLandscape,
+                                contentDescription = "Rotate to Horizontal (Landscape) for TV",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
                         }
                     }
                     val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f

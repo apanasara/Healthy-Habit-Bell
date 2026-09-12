@@ -138,6 +138,18 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
     /** Embedded local HTTP daemon and NSD service for auxiliary Smart TV web browsers (Samsung/LG). */
     val castServer = com.habitbell.app.cast.LocalCastWebServer(application)
 
+    /** Subsystem managing Screen Mirroring, external display detection, and TV orientation rotation. */
+    val screenMirroringManager: com.habitbell.app.cast.ScreenMirroringManager = sessionHandler.screenMirroringManager
+
+    /** Reactive stream emitting whether screen mirroring is active (hardware external display or manual mode). */
+    val isScreenMirroringActive: StateFlow<Boolean> = screenMirroringManager.isScreenMirroringActive
+
+    /** Reactive stream emitting target screen orientation (PORTRAIT, LANDSCAPE, AUTO). */
+    val screenOrientation: StateFlow<com.habitbell.app.cast.ScreenOrientation> = screenMirroringManager.targetOrientation
+
+    /** Reactive stream emitting whether display is currently rendered in horizontal landscape. */
+    val isLandscape: StateFlow<Boolean> = screenMirroringManager.isLandscape
+
     /** Mutable state flow holding the reactive application UI state. */
     private val _uiState = MutableStateFlow(
         run {
@@ -1014,6 +1026,33 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
             .putBoolean("is_auto_dim", state.isAutoDim)
             .putBoolean("is_pause_on_bluetooth_disconnect", state.isPauseOnBluetoothDisconnect)
             .apply()
+    }
+
+    /**
+     * Toggles screen orientation between Horizontal (Landscape) and Vertical (Portrait) for TV screen mirroring.
+     *
+     * @return The newly assigned [com.habitbell.app.cast.ScreenOrientation].
+     */
+    fun toggleScreenOrientation(): com.habitbell.app.cast.ScreenOrientation {
+        return screenMirroringManager.toggleOrientation()
+    }
+
+    /**
+     * Sets an explicit screen orientation target for display alignment.
+     *
+     * @param orientation Desired [com.habitbell.app.cast.ScreenOrientation].
+     */
+    fun setScreenOrientation(orientation: com.habitbell.app.cast.ScreenOrientation) {
+        screenMirroringManager.setOrientation(orientation)
+    }
+
+    /**
+     * Toggles manual Screen Mirroring mode on or off.
+     *
+     * @param enabled True to engage screen mirroring controls; false to rely on automatic hardware detection.
+     */
+    fun setScreenMirroringMode(enabled: Boolean) {
+        screenMirroringManager.setScreenMirroringManual(enabled)
     }
 
     /**

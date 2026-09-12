@@ -80,6 +80,11 @@ class MainActivity : FragmentActivity() {
             val isCasting by viewModel.castManager.isCasting.collectAsStateWithLifecycle()
             val castDeviceName by viewModel.castManager.castDeviceName.collectAsStateWithLifecycle()
             val selectedHealthProvider by viewModel.selectedHealthProvider.collectAsStateWithLifecycle()
+            val isScreenMirroringActive by viewModel.isScreenMirroringActive.collectAsStateWithLifecycle()
+            val targetOrientation by viewModel.screenOrientation.collectAsStateWithLifecycle()
+            val isLandscape by viewModel.isLandscape.collectAsStateWithLifecycle()
+            val isScreenMirroringManual by viewModel.screenMirroringManager.isScreenMirroringManual.collectAsStateWithLifecycle()
+            val externalDisplayName by viewModel.screenMirroringManager.externalDisplayName.collectAsStateWithLifecycle()
             var hasActivityPermission by remember { mutableStateOf(viewModel.healthStepManager.hasActivityRecognitionPermission()) }
 
             // Activity recognition permission request launcher for step counting
@@ -121,11 +126,21 @@ class MainActivity : FragmentActivity() {
                 }
             }
 
-            // Keep screen awake dynamically while session is running to prevent Android OS display sleep
-            // from terminating the real-time Screen Mirroring capture encoder or dropping Chromecast streams
-            LaunchedEffect(sessionState.status) {
-                val shouldKeepAwake = sessionState.status == SessionStatus.RUNNING
+            // Keep screen awake dynamically while session is running or while Screen Mirroring is active
+            // to prevent Android OS display sleep from terminating the real-time Screen Mirroring capture encoder or dropping Chromecast streams
+            LaunchedEffect(sessionState.status, isScreenMirroringActive) {
+                val shouldKeepAwake = sessionState.status == SessionStatus.RUNNING || isScreenMirroringActive
                 viewModel.batteryOptimizer.applyScreenAwake(this@MainActivity, shouldKeepAwake)
+            }
+
+            // Dynamically modulate Activity window orientation when screen mirroring target orientation changes
+            LaunchedEffect(targetOrientation) {
+                requestedOrientation = when (targetOrientation) {
+                    com.habitbell.app.cast.ScreenOrientation.LANDSCAPE -> android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                    com.habitbell.app.cast.ScreenOrientation.PORTRAIT -> android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
+                    com.habitbell.app.cast.ScreenOrientation.AUTO -> android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                    else -> android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                }
             }
 
             // Dynamically modulate hardware screen brightness based on the Display Mode dimming lifecycle
@@ -200,6 +215,11 @@ class MainActivity : FragmentActivity() {
                                 },
                                 onStopSession = {
                                     viewModel.stopTimer()
+                                },
+                                isScreenMirroringActive = isScreenMirroringActive,
+                                isLandscape = isLandscape,
+                                onToggleOrientation = {
+                                    viewModel.toggleScreenOrientation()
                                 }
                             )
                         }
@@ -222,6 +242,10 @@ class MainActivity : FragmentActivity() {
                                 },
                                 onUserInteraction = {
                                     viewModel.userInteractionWake()
+                                },
+                                isScreenMirroringActive = isScreenMirroringActive,
+                                onToggleOrientation = {
+                                    viewModel.toggleScreenOrientation()
                                 }
                             )
                         }
@@ -308,6 +332,13 @@ class MainActivity : FragmentActivity() {
                             onToggleSunMoonTheme = { viewModel.toggleSunMoonTheme() },
                             isPauseOnBluetoothDisconnect = uiState.isPauseOnBluetoothDisconnect,
                             onPauseOnBluetoothDisconnectToggle = { viewModel.setPauseOnBluetoothDisconnect(it) },
+                            isScreenMirroringActive = isScreenMirroringActive,
+                            isScreenMirroringManual = isScreenMirroringManual,
+                            screenMirroringTargetOrientation = targetOrientation,
+                            externalDisplayName = externalDisplayName,
+                            onToggleScreenMirroringMode = { viewModel.setScreenMirroringMode(it) },
+                            onSetScreenOrientation = { viewModel.setScreenOrientation(it) },
+                            onToggleScreenOrientation = { viewModel.toggleScreenOrientation() },
                             onOpenSuryaEditor = {
                                 viewModel.openSettingsDrawer(false)
                                 viewModel.navigateTo(AppScreen.SURYA_TIMER)
@@ -543,6 +574,14 @@ class MainActivity : FragmentActivity() {
         super.onStop()
         viewModel.batteryOptimizer.setScreenBrightness(this, false)
         setStatusBarHidden(false)
+    }
+
+    /**
+     * Propagates system window orientation changes to [com.habitbell.app.cast.ScreenMirroringManager].
+     */
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        viewModel.screenMirroringManager.notifyConfigurationChanged(newConfig.orientation)
     }
 
     /**

@@ -85,6 +85,9 @@ fun ModernHomeScreenSample(
     sessionState: TimerSessionState? = null,
     onResumeSession: () -> Unit = {},
     onStopSession: () -> Unit = {},
+    isScreenMirroringActive: Boolean = false,
+    isLandscape: Boolean = false,
+    onToggleOrientation: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var selectedCategory by remember { mutableStateOf("All") }
@@ -113,7 +116,10 @@ fun ModernHomeScreenSample(
                 isZenMode = isZenMode,
                 onToggleZenMode = onToggleZenMode,
                 onCycleTheme = onCycleTheme,
-                onOpenSettings = onOpenSettings
+                onOpenSettings = onOpenSettings,
+                isScreenMirroringActive = isScreenMirroringActive,
+                isLandscape = isLandscape,
+                onToggleOrientation = onToggleOrientation
             )
         }
     ) { padding ->
@@ -496,7 +502,10 @@ private fun ModernZenTopBar(
     isZenMode: Boolean,
     onToggleZenMode: () -> Unit,
     onCycleTheme: () -> Unit,
-    onOpenSettings: () -> Unit
+    onOpenSettings: () -> Unit,
+    isScreenMirroringActive: Boolean = false,
+    isLandscape: Boolean = false,
+    onToggleOrientation: () -> Unit = {}
 ) {
     val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val primaryColor = MaterialTheme.colorScheme.primary
@@ -535,6 +544,18 @@ private fun ModernZenTopBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            // TV Screen Mirroring Orientation Rotate Button
+            if (isScreenMirroringActive) {
+                IconButton(onClick = onToggleOrientation, modifier = Modifier.size(36.dp)) {
+                    Icon(
+                        imageVector = if (isLandscape) Icons.Outlined.StayCurrentPortrait else Icons.Outlined.StayCurrentLandscape,
+                        contentDescription = if (isLandscape) "Rotate to Vertical (Portrait) for TV" else "Rotate to Horizontal (Landscape) for TV",
+                        tint = primaryColor,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+
             // Zen Mode Pill Toggle
             Surface(
                 shape = CircleShape,
