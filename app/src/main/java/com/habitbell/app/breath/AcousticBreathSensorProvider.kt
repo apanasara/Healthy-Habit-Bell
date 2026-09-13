@@ -107,10 +107,24 @@ class AcousticBreathSensorProvider(
     private var kapalabhatiState = KapalabhatiState.IDLE_LISTENING
     private var strokeStartTimeMillis: Long = 0L
     private var strokePeakRms: Float = 0f
+    private var kapalabhatiCooldownStartTimeMillis: Long = 0L
 
-    // --- Bhastrika Dual-Phase Detector ---
-    private var bhastrikaInhaleDetected: Boolean = false
-    private var bhastrikaInhaleTimeMillis: Long = 0L
+    // --- Bhastrika 4-Stage Bellows State Machine ---
+    private enum class BhastrikaState {
+        IDLE_WAITING_INHALE,
+        INHALE_BURST,
+        TURNAROUND_VALLEY,
+        EXHALE_BURST,
+        CYCLE_COOLDOWN
+    }
+    private var bhastrikaState = BhastrikaState.IDLE_WAITING_INHALE
+    private var bhastrikaInhaleStartTimeMillis: Long = 0L
+    private var bhastrikaInhalePeakRms: Float = 0f
+    private var bhastrikaInhaleDurationMillis: Long = 0L
+    private var bhastrikaTurnaroundStartTimeMillis: Long = 0L
+    private var bhastrikaExhaleStartTimeMillis: Long = 0L
+    private var bhastrikaExhalePeakRms: Float = 0f
+    private var bhastrikaCooldownStartTimeMillis: Long = 0L
 
     // --- Bhramari Humming Detector ---
     private var humStartTimeMillis: Long = 0L
@@ -194,8 +208,15 @@ class AcousticBreathSensorProvider(
         kapalabhatiState = KapalabhatiState.IDLE_LISTENING
         strokeStartTimeMillis = 0L
         strokePeakRms = 0f
-        bhastrikaInhaleDetected = false
-        bhastrikaInhaleTimeMillis = 0L
+        kapalabhatiCooldownStartTimeMillis = 0L
+        bhastrikaState = BhastrikaState.IDLE_WAITING_INHALE
+        bhastrikaInhaleStartTimeMillis = 0L
+        bhastrikaInhalePeakRms = 0f
+        bhastrikaInhaleDurationMillis = 0L
+        bhastrikaTurnaroundStartTimeMillis = 0L
+        bhastrikaExhaleStartTimeMillis = 0L
+        bhastrikaExhalePeakRms = 0f
+        bhastrikaCooldownStartTimeMillis = 0L
         bandpassFilter.reset()
         _inputFlow.value = BreathInputEvent()
     }
@@ -422,16 +443,16 @@ class AcousticBreathSensorProvider(
                     // Abort to cooldown to prevent false runaway count
                     Log.w(TAG, "⚠️ SUSTAINED SOUND ABORT: burstDuration=${burstDuration}ms > 220ms -> COOLDOWN")
                     kapalabhatiState = KapalabhatiState.COOLDOWN_VALLEY
-                    lastStrokeTimeMillis = now
+                    kapalabhatiCooldownStartTimeMillis = now
                 } else if (bandpassRms < strokePeakRms * 0.75f) {
                     // Confirmed peak decay!
                     val isValidBurstDuration = burstDuration in 20..220
                     val isSufficientPeak = strokePeakRms >= dynamicThreshold
 
                     if (isValidBurstDuration && isSufficientPeak) {
-                        lastStrokeTimeMillis = now
                         strokeEmitted = true
                         kapalabhatiState = KapalabhatiState.COOLDOWN_VALLEY
+                        kapalabhatiCooldownStartTimeMillis = now
                         Log.i(TAG, "🎯 STROKE CONFIRMED! burstDuration=${burstDuration}ms, peakRms=%.4f, thresh=%.4f".format(
                             strokePeakRms, dynamicThreshold
                         ))
@@ -445,7 +466,7 @@ class AcousticBreathSensorProvider(
             }
 
             KapalabhatiState.COOLDOWN_VALLEY -> {
-                val elapsedSinceStroke = now - lastStrokeTimeMillis
+                val elapsedSinceStroke = now - kapalabhatiCooldownStartTimeMillis
                 val isMinRefractoryPassed = elapsedSinceStroke >= 140L
                 val isInValley = bandpassRms < (dynamicThreshold * 0.88f)
                 val isCooldownExpired = elapsedSinceStroke >= 220L
@@ -459,6 +480,7 @@ class AcousticBreathSensorProvider(
 
         if (strokeEmitted) {
             val cadenceBpm = calculateCadenceBpm(now)
+            lastStrokeTimeMillis = now
             _inputFlow.value = BreathInputEvent(
                 strokeDelta = 1,
                 instantaneousCadenceBpm = cadenceBpm,
@@ -479,8 +501,26 @@ class AcousticBreathSensorProvider(
     }
 
     /**
-     * Evaluates audio chunks for Bhastrika dual-phase bellows breathing.
-     * Requires both forceful inhalation and sharp exhalation within a 1200ms window.
+     * Evaluates audio chunks for Bhastrika dual-phase bellows breathing using a 4-Stage State Machine.
+     *
+     * In Bhastrika (Bellows Breath), both inhalation and exhalation are active, forceful, and rhythmic.
+     * A complete cycle requires:
+     * 1. Forceful Inhalation Burst: Nasal airflow in 1.0 kHz – 3.5 kHz lasting 60ms – 850ms.
+     * 2. Acoustic Turnaround Valley: Direction reversal pause lasting 30ms – 700ms as airflow reverses.
+     * 3. Forceful Exhalation Burst: Nasal airflow in 1.0 kHz – 3.5 kHz lasting 60ms – 850ms.
+     *
+     * State Transitions:
+     * - [BhastrikaState.IDLE_WAITING_INHALE]: Tracks ambient noise floor. Awaiting sharp inhalation onset.
+     * - [BhastrikaState.INHALE_BURST]: Accumulates inhale peak energy, verifying physiological duration and decay.
+     * - [BhastrikaState.TURNAROUND_VALLEY]: Mandates respiratory direction reversal drop-off before exhalation.
+     * - [BhastrikaState.EXHALE_BURST]: Accumulates exhale peak energy, verifying physiological duration and decay.
+     * - [BhastrikaState.CYCLE_COOLDOWN]: Post-cycle refractory window (140ms) preventing acoustic echo.
+     *
+     * @param pcm 16-bit PCM audio samples.
+     * @param length Number of valid samples in [pcm].
+     * @param rawRms Full-band RMS amplitude (0.0f..1.0f).
+     * @param bandpassRms Bandpass-filtered RMS amplitude (1.0 kHz - 3.5 kHz).
+     * @param now Monotonic epoch timestamp in milliseconds.
      */
     private fun evaluateBhastrikaCycle(
         pcm: ShortArray,
@@ -490,44 +530,160 @@ class AcousticBreathSensorProvider(
         now: Long
     ) {
         val sensitivity = activeSensitivity.coerceIn(0.5f, 2.5f)
-        val dynamicThreshold = (dynamicNoiseFloorRms * (1.8f / sensitivity) + (0.010f / sensitivity)).coerceIn(0.010f, 0.20f)
-        val normalizedAmplitude = (rawRms * 3.0f).coerceIn(0f, 1f)
-        val normalizedThreshold = (dynamicThreshold * 3.0f).coerceIn(0.05f, 0.95f)
-        val timeSinceLastStroke = now - lastStrokeTimeMillis
+        val thresholdMultiplier = 2.0f / sensitivity
+        val minFloor = 0.0016f / sensitivity
+        val dynamicThreshold = (dynamicNoiseFloorRms * thresholdMultiplier + minFloor).coerceIn(0.0016f, 0.15f)
+        val normalizedAmplitude = (rawRms * 3.5f).coerceIn(0f, 1f)
+        val normalizedThreshold = (dynamicThreshold * 3.5f).coerceIn(0.05f, 0.95f)
 
-        // Bhastrika bellows cycle requires at least 650 ms between full dual-phase cycles
-        if (!bhastrikaInhaleDetected) {
-            if (bandpassRms > dynamicThreshold && timeSinceLastStroke >= 650L) {
-                bhastrikaInhaleDetected = true
-                bhastrikaInhaleTimeMillis = now
+        // Continuous noise floor tracking during idle waiting
+        if (bhastrikaState == BhastrikaState.IDLE_WAITING_INHALE) {
+            if (bandpassRms < dynamicNoiseFloorRms) {
+                dynamicNoiseFloorRms = (dynamicNoiseFloorRms * 0.88f) + (bandpassRms * 0.12f)
+            } else {
+                dynamicNoiseFloorRms = (dynamicNoiseFloorRms * 0.98f) + (bandpassRms * 0.02f)
             }
-        } else {
-            val elapsedSinceInhale = now - bhastrikaInhaleTimeMillis
-            if (elapsedSinceInhale in 180..1200 && bandpassRms > dynamicThreshold) {
-                // Both inhalation and exhalation completed!
-                bhastrikaInhaleDetected = false
-                lastStrokeTimeMillis = now
-                val cadenceBpm = calculateCadenceBpm(now)
+            dynamicNoiseFloorRms = dynamicNoiseFloorRms.coerceIn(0.0005f, 0.05f)
+        }
 
-                _inputFlow.value = BreathInputEvent(
-                    strokeDelta = 1,
-                    instantaneousCadenceBpm = cadenceBpm,
-                    audioAmplitudeRms = normalizedAmplitude,
-                    thresholdRms = normalizedThreshold,
-                    timestampMillis = now
+        val energyRise = bandpassRms - previousBandpassRms
+        var cycleEmitted = false
+
+        // Periodic telemetry logging (~1 second)
+        if (now - lastLogTimeMillis >= 1000L) {
+            lastLogTimeMillis = now
+            Log.d(
+                TAG,
+                "📊 BHASTRIKA STATS: state=$bhastrikaState, rawRms=%.4f, bandpassRms=%.4f, noiseFloor=%.4f, thresh=%.4f, sens=%.1f".format(
+                    rawRms, bandpassRms, dynamicNoiseFloorRms, dynamicThreshold, sensitivity
                 )
-                return
-            } else if (elapsedSinceInhale > 1200) {
-                bhastrikaInhaleDetected = false
+            )
+        }
+
+        when (bhastrikaState) {
+            BhastrikaState.IDLE_WAITING_INHALE -> {
+                val timeSinceLastStroke = now - lastStrokeTimeMillis
+                val isAttack = bandpassRms > dynamicThreshold &&
+                        (energyRise > dynamicThreshold * 0.10f || bandpassRms > dynamicThreshold * 1.25f)
+
+                if (isAttack && timeSinceLastStroke >= 250L) {
+                    bhastrikaState = BhastrikaState.INHALE_BURST
+                    bhastrikaInhaleStartTimeMillis = now
+                    bhastrikaInhalePeakRms = bandpassRms
+                    Log.d(TAG, "⚡ BHASTRIKA INHALE ONSET: bandpassRms=%.4f > thresh=%.4f (rise=%.4f)".format(
+                        bandpassRms, dynamicThreshold, energyRise
+                    ))
+                }
+            }
+
+            BhastrikaState.INHALE_BURST -> {
+                bhastrikaInhalePeakRms = max(bhastrikaInhalePeakRms, bandpassRms)
+                val burstDuration = now - bhastrikaInhaleStartTimeMillis
+
+                if (burstDuration > 850L) {
+                    // Continuous droning or talking: reset to idle
+                    Log.w(TAG, "⚠️ BHASTRIKA INHALE TIMEOUT: burstDuration=${burstDuration}ms > 850ms -> IDLE")
+                    bhastrikaState = BhastrikaState.IDLE_WAITING_INHALE
+                } else if (bandpassRms < bhastrikaInhalePeakRms * 0.72f || bandpassRms < dynamicThreshold * 1.10f) {
+                    val isValidBurstDuration = burstDuration in 60..850
+                    val isSufficientPeak = bhastrikaInhalePeakRms >= dynamicThreshold
+
+                    if (isValidBurstDuration && isSufficientPeak) {
+                        bhastrikaInhaleDurationMillis = burstDuration
+                        bhastrikaTurnaroundStartTimeMillis = now
+                        bhastrikaState = BhastrikaState.TURNAROUND_VALLEY
+                        Log.d(TAG, "🌬️ BHASTRIKA INHALE CONFIRMED: duration=${burstDuration}ms, peak=%.4f -> TURNAROUND_VALLEY".format(
+                            bhastrikaInhalePeakRms
+                        ))
+                    } else if (burstDuration < 60L) {
+                        // Dismiss transient blip
+                        bhastrikaState = BhastrikaState.IDLE_WAITING_INHALE
+                    }
+                }
+            }
+
+            BhastrikaState.TURNAROUND_VALLEY -> {
+                val valleyDuration = now - bhastrikaTurnaroundStartTimeMillis
+
+                if (valleyDuration > 700L) {
+                    // Exhale did not arrive within 700ms: cycle timed out
+                    Log.d(TAG, "⏱️ BHASTRIKA TURNAROUND TIMEOUT: ${valleyDuration}ms -> IDLE_WAITING_INHALE")
+                    bhastrikaState = BhastrikaState.IDLE_WAITING_INHALE
+                } else if (valleyDuration >= 30L) {
+                    // Turnaround registered; check for exhalation attack
+                    val isExhaleAttack = bandpassRms > dynamicThreshold &&
+                            (energyRise > dynamicThreshold * 0.10f || bandpassRms > dynamicThreshold * 1.20f)
+
+                    if (isExhaleAttack) {
+                        bhastrikaState = BhastrikaState.EXHALE_BURST
+                        bhastrikaExhaleStartTimeMillis = now
+                        bhastrikaExhalePeakRms = bandpassRms
+                        Log.d(TAG, "⚡ BHASTRIKA EXHALE ONSET: valley=${valleyDuration}ms, bandpassRms=%.4f > thresh=%.4f".format(
+                            bandpassRms, dynamicThreshold
+                        ))
+                    }
+                }
+            }
+
+            BhastrikaState.EXHALE_BURST -> {
+                bhastrikaExhalePeakRms = max(bhastrikaExhalePeakRms, bandpassRms)
+                val exhaleDuration = now - bhastrikaExhaleStartTimeMillis
+
+                if (exhaleDuration > 850L) {
+                    Log.w(TAG, "⚠️ BHASTRIKA EXHALE TIMEOUT: duration=${exhaleDuration}ms > 850ms -> COOLDOWN")
+                    bhastrikaState = BhastrikaState.CYCLE_COOLDOWN
+                    bhastrikaCooldownStartTimeMillis = now
+                } else if (bandpassRms < bhastrikaExhalePeakRms * 0.72f || bandpassRms < dynamicThreshold * 1.10f) {
+                    val isValidExhaleDuration = exhaleDuration in 60..850
+                    val isSufficientExhalePeak = bhastrikaExhalePeakRms >= dynamicThreshold
+
+                    if (isValidExhaleDuration && isSufficientExhalePeak) {
+                        val totalCycleMs = now - bhastrikaInhaleStartTimeMillis
+                        cycleEmitted = true
+                        bhastrikaState = BhastrikaState.CYCLE_COOLDOWN
+                        bhastrikaCooldownStartTimeMillis = now
+                        Log.i(TAG, "🎯 BHASTRIKA CYCLE CONFIRMED! Inhale=${bhastrikaInhaleDurationMillis}ms, Exhale=${exhaleDuration}ms, Total=${totalCycleMs}ms, peakRms=%.4f, thresh=%.4f".format(
+                            bhastrikaExhalePeakRms, dynamicThreshold
+                        ))
+                    } else if (exhaleDuration < 60L) {
+                        bhastrikaState = BhastrikaState.IDLE_WAITING_INHALE
+                    }
+                }
+            }
+
+            BhastrikaState.CYCLE_COOLDOWN -> {
+                val elapsedSinceCycle = now - bhastrikaCooldownStartTimeMillis
+                val isRefractoryPassed = elapsedSinceCycle >= 140L
+                val isInValley = bandpassRms < (dynamicThreshold * 0.90f)
+                val isCooldownExpired = elapsedSinceCycle >= 220L
+
+                if (isRefractoryPassed && (isInValley || isCooldownExpired)) {
+                    bhastrikaState = BhastrikaState.IDLE_WAITING_INHALE
+                    Log.d(TAG, "🔄 BHASTRIKA COOLDOWN COMPLETE -> IDLE_WAITING_INHALE (elapsed=${elapsedSinceCycle}ms, bandpassRms=%.4f)".format(bandpassRms))
+                }
             }
         }
 
-        _inputFlow.value = _inputFlow.value.copy(
-            strokeDelta = 0,
-            audioAmplitudeRms = normalizedAmplitude,
-            thresholdRms = normalizedThreshold,
-            timestampMillis = now
-        )
+        if (cycleEmitted) {
+            val cadenceBpm = calculateCadenceBpm(now)
+            lastStrokeTimeMillis = now
+            _inputFlow.value = BreathInputEvent(
+                strokeDelta = 1,
+                instantaneousCadenceBpm = cadenceBpm,
+                audioAmplitudeRms = normalizedAmplitude,
+                thresholdRms = normalizedThreshold,
+                isHummingActive = false,
+                activeHumDurationSeconds = 0f,
+                timestampMillis = now
+            )
+        } else {
+            _inputFlow.value = _inputFlow.value.copy(
+                strokeDelta = 0,
+                audioAmplitudeRms = normalizedAmplitude,
+                thresholdRms = normalizedThreshold,
+                timestampMillis = now
+            )
+        }
     }
 
     /**
@@ -540,7 +696,8 @@ class AcousticBreathSensorProvider(
         now: Long
     ) {
         val normalizedAmplitude = (rawRms * 3.5f).coerceIn(0f, 1f)
-        val humThreshold = (dynamicNoiseFloorRms * 2.0f).coerceAtLeast(0.035f)
+        val sensitivity = activeSensitivity.coerceIn(0.5f, 2.5f)
+        val humThreshold = (dynamicNoiseFloorRms * (2.2f / sensitivity) + (0.0035f / sensitivity)).coerceIn(0.0035f, 0.08f)
         val normalizedThreshold = (humThreshold * 3.5f).coerceIn(0.05f, 0.95f)
 
         // Autocorrelation test at pitch lags corresponding to 80Hz - 250Hz (lag: 64 to 200 samples)
@@ -607,22 +764,22 @@ class AcousticBreathSensorProvider(
     }
 
     /**
-     * Estimates cadence in strokes per minute (BPM) from recent inter-stroke intervals.
+     * Estimates cadence in strokes or cycles per minute (BPM) from recent inter-stroke intervals.
      *
      * @param now Monotonic timestamp in milliseconds.
-     * @return Rolling cadence in BPM (bounded 15..180 BPM).
+     * @return Rolling cadence in BPM (bounded 15..300 BPM).
      */
     private fun calculateCadenceBpm(now: Long): Int {
         if (lastStrokeTimeMillis > 0L) {
             val intervalMs = now - lastStrokeTimeMillis
-            if (intervalMs in 250..3000) {
+            if (intervalMs in 180..3500) {
                 if (strokeIntervals.size >= 6) {
                     strokeIntervals.removeFirst()
                 }
                 strokeIntervals.addLast(intervalMs)
                 val avgInterval = strokeIntervals.average()
                 if (avgInterval > 0) {
-                    return (60_000.0 / avgInterval).toInt().coerceIn(15, 180)
+                    return (60_000.0 / avgInterval).toInt().coerceIn(15, 300)
                 }
             }
         }
