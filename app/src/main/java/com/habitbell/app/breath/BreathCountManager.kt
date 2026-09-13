@@ -1,6 +1,7 @@
 package com.habitbell.app.breath
 
 import android.content.Context
+import android.util.Log
 import com.habitbell.app.data.model.BreathCounterConfig
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
@@ -169,6 +170,7 @@ class BreathCountManager(private val context: Context) {
                 )
             }
 
+            Log.i("BreathCountManager", "🔔 STROKE REGISTERED: $newRoundStrokes / $targetForRound (Total: $newTotalStrokes, Cadence: ${event.instantaneousCadenceBpm} BPM)")
             onStrokeRegistered?.invoke(newRoundStrokes, event.instantaneousCadenceBpm)
 
             // Check if active round target reached

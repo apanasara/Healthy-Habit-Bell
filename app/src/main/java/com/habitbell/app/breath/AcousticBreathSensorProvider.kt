@@ -116,8 +116,11 @@ class AcousticBreathSensorProvider(
     private var humStartTimeMillis: Long = 0L
     private var isCurrentlyHumming: Boolean = false
 
-    /** 2nd-order Biquad Bandpass filter isolating nasal breath friction around 2.4 kHz. */
-    private val bandpassFilter = BiquadBandpassFilter(SAMPLE_RATE_HZ.toFloat(), 2400f, 1.0f)
+    /** Timestamp of last telemetry stats log for rate-limiting logcat output. */
+    private var lastLogTimeMillis: Long = 0L
+
+    /** 2nd-order Biquad Bandpass filter isolating nasal breath friction around 2.0 kHz (Q=0.8). */
+    private val bandpassFilter = BiquadBandpassFilter(SAMPLE_RATE_HZ.toFloat(), 2000f, 0.8f)
 
     /**
      * Updates detection sensitivity dynamically.
@@ -221,10 +224,10 @@ class AcousticBreathSensorProvider(
             AudioFormat.ENCODING_PCM_16BIT
         ).coerceAtLeast(CHUNK_SIZE * 2)
 
-        // Prefer VOICE_RECOGNITION to disable aggressive OEM breath noise cancellation
+        // Prefer standard MIC for direct unclipped acoustic breath capture without OEM speech gates
         val audioSources = listOf(
-            MediaRecorder.AudioSource.VOICE_RECOGNITION,
-            MediaRecorder.AudioSource.MIC
+            MediaRecorder.AudioSource.MIC,
+            MediaRecorder.AudioSource.VOICE_RECOGNITION
         )
 
         var initialized = false
@@ -362,21 +365,22 @@ class AcousticBreathSensorProvider(
     ) {
         val sensitivity = activeSensitivity.coerceIn(0.5f, 2.5f)
 
-        // Dynamic threshold based on continuous noise floor and sensitivity scaling
-        val thresholdMultiplier = 2.4f / sensitivity
-        val minFloor = 0.022f / sensitivity
-        val dynamicThreshold = (dynamicNoiseFloorRms * thresholdMultiplier + minFloor).coerceIn(0.022f, 0.25f)
+        // Dynamic threshold calibrated for natural breath acoustics:
+        // Scaled inversely by sensitivity (0.7 = Low, 1.0 = Med, 1.5 = High)
+        val thresholdMultiplier = 1.8f / sensitivity
+        val minFloor = 0.007f / sensitivity
+        val dynamicThreshold = (dynamicNoiseFloorRms * thresholdMultiplier + minFloor).coerceIn(0.007f, 0.20f)
 
         // Continuous ambient noise floor tracking (only update when in calm idle state)
         if (kapalabhatiState == KapalabhatiState.IDLE_LISTENING) {
             if (bandpassRms < dynamicNoiseFloorRms) {
-                // Quick downward adaptation to silence
+                // Fast downward adaptation to quiet
                 dynamicNoiseFloorRms = (dynamicNoiseFloorRms * 0.88f) + (bandpassRms * 0.12f)
-            } else if (bandpassRms < dynamicThreshold * 0.60f) {
+            } else if (bandpassRms < dynamicThreshold * 0.65f) {
                 // Gentle upward adaptation to quiet room ambience
                 dynamicNoiseFloorRms = (dynamicNoiseFloorRms * 0.98f) + (bandpassRms * 0.02f)
             }
-            dynamicNoiseFloorRms = dynamicNoiseFloorRms.coerceIn(0.005f, 0.08f)
+            dynamicNoiseFloorRms = dynamicNoiseFloorRms.coerceIn(0.002f, 0.06f)
         }
 
         val normalizedAmplitude = (rawRms * 3.5f).coerceIn(0f, 1f)
@@ -385,16 +389,24 @@ class AcousticBreathSensorProvider(
         var strokeEmitted = false
         val timeSinceLastStroke = now - lastStrokeTimeMillis
 
+        // Periodic telemetry logging (every ~1s)
+        if (now - lastLogTimeMillis >= 1000L) {
+            lastLogTimeMillis = now
+            Log.d(TAG, "📊 STATS: state=$kapalabhatiState, rawRms=%.4f, bandpassRms=%.4f, noiseFloor=%.4f, thresh=%.4f, sens=%.1f".format(
+                rawRms, bandpassRms, dynamicNoiseFloorRms, dynamicThreshold, sensitivity
+            ))
+        }
+
         when (kapalabhatiState) {
             KapalabhatiState.IDLE_LISTENING -> {
-                val energyRise = bandpassRms - previousBandpassRms
-                val isSharpOnset = energyRise > (dynamicThreshold * 0.20f) || bandpassRms > (dynamicThreshold * 1.15f)
-
-                // Minimum 420 ms refractory lockout between distinct strokes (max 142 BPM)
-                if (bandpassRms > dynamicThreshold && isSharpOnset && timeSinceLastStroke >= 420L) {
+                // Enforce minimum refractory interval (280ms = max ~214 BPM)
+                if (bandpassRms > dynamicThreshold && timeSinceLastStroke >= 280L) {
                     kapalabhatiState = KapalabhatiState.ATTACK_DETECTED
                     strokeStartTimeMillis = now
                     strokePeakRms = bandpassRms
+                    Log.d(TAG, "⚡ ATTACK ONSET: bandpassRms=%.4f > thresh=%.4f (rise=%.4f)".format(
+                        bandpassRms, dynamicThreshold, bandpassRms - previousBandpassRms
+                    ))
                 }
             }
 
@@ -402,37 +414,47 @@ class AcousticBreathSensorProvider(
                 strokePeakRms = max(strokePeakRms, bandpassRms)
                 val burstDuration = now - strokeStartTimeMillis
 
-                // Check for peak decay (energy falling below 72% of stroke peak)
-                if (bandpassRms < strokePeakRms * 0.72f) {
-                    // Validate physiological nasal burst properties
-                    val isValidBurstDuration = burstDuration in 35..300
-                    val isSufficientPeak = strokePeakRms >= (dynamicThreshold * 1.15f)
+                if (burstDuration > 220L) {
+                    // Sustained non-stroke sound (e.g. continuous talking, singing, drone)
+                    // Abort to cooldown to prevent false runaway count
+                    Log.w(TAG, "⚠️ SUSTAINED SOUND ABORT: burstDuration=${burstDuration}ms > 220ms -> COOLDOWN")
+                    kapalabhatiState = KapalabhatiState.COOLDOWN_VALLEY
+                    lastStrokeTimeMillis = now
+                } else if (bandpassRms < strokePeakRms * 0.75f) {
+                    // Confirmed peak decay!
+                    val isValidBurstDuration = burstDuration in 20..220
+                    val isSufficientPeak = strokePeakRms >= dynamicThreshold
 
                     if (isValidBurstDuration && isSufficientPeak) {
-                        // CONFIRMED STROKE!
                         lastStrokeTimeMillis = now
                         strokeEmitted = true
                         kapalabhatiState = KapalabhatiState.COOLDOWN_VALLEY
+                        Log.i(TAG, "🎯 STROKE CONFIRMED! burstDuration=${burstDuration}ms, peakRms=%.4f, thresh=%.4f".format(
+                            strokePeakRms, dynamicThreshold
+                        ))
                     } else {
-                        // Spurious blip or non-stroke noise -> abort to idle
+                        Log.d(TAG, "❌ BLIP DISMISSED: burstDuration=${burstDuration}ms, peakRms=%.4f".format(
+                            strokePeakRms
+                        ))
                         kapalabhatiState = KapalabhatiState.IDLE_LISTENING
                     }
-                } else if (burstDuration > 320L) {
-                    // Sound lasted too long without falling edge (continuous talking, fans, sighing) -> reject
-                    kapalabhatiState = KapalabhatiState.IDLE_LISTENING
                 }
             }
 
             KapalabhatiState.COOLDOWN_VALLEY -> {
-                // Must return to quiet baseline (inhalation valley) before re-arming
-                val isInValley = bandpassRms < (dynamicThreshold * 0.70f)
-                val isMinQuietElapsed = (now - lastStrokeTimeMillis) >= 180L
+                val elapsedSinceStroke = now - lastStrokeTimeMillis
+                // If ambient noise is still louder than threshold, stay in cooldown to avoid runaway loop
+                if (bandpassRms > dynamicThreshold) {
+                    lastStrokeTimeMillis = now
+                } else {
+                    val isInValley = bandpassRms < (dynamicThreshold * 0.85f)
+                    val isMinRefractoryPassed = elapsedSinceStroke >= 200L
+                    val isCooldownExpired = elapsedSinceStroke >= 280L
 
-                if (isInValley && isMinQuietElapsed) {
-                    kapalabhatiState = KapalabhatiState.IDLE_LISTENING
-                } else if ((now - lastStrokeTimeMillis) > 850L) {
-                    // Safety timeout if room ambience shifted
-                    kapalabhatiState = KapalabhatiState.IDLE_LISTENING
+                    if ((isInValley && isMinRefractoryPassed) || isCooldownExpired) {
+                        kapalabhatiState = KapalabhatiState.IDLE_LISTENING
+                        Log.d(TAG, "🔄 COOLDOWN COMPLETE -> IDLE_LISTENING (elapsed=${elapsedSinceStroke}ms, bandpassRms=%.4f)".format(bandpassRms))
+                    }
                 }
             }
         }
@@ -470,7 +492,7 @@ class AcousticBreathSensorProvider(
         now: Long
     ) {
         val sensitivity = activeSensitivity.coerceIn(0.5f, 2.5f)
-        val dynamicThreshold = (dynamicNoiseFloorRms * (2.6f / sensitivity) + (0.030f / sensitivity)).coerceIn(0.030f, 0.25f)
+        val dynamicThreshold = (dynamicNoiseFloorRms * (1.8f / sensitivity) + (0.010f / sensitivity)).coerceIn(0.010f, 0.20f)
         val normalizedAmplitude = (rawRms * 3.0f).coerceIn(0f, 1f)
         val normalizedThreshold = (dynamicThreshold * 3.0f).coerceIn(0.05f, 0.95f)
         val timeSinceLastStroke = now - lastStrokeTimeMillis
