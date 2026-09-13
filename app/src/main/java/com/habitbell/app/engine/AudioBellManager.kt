@@ -230,6 +230,20 @@ class AudioBellManager(private val context: Context) {
     }
 
     /**
+     * Plays an ultra-short, gentle acoustic strike for breath stroke feedback (e.g. Kapalabhati / Bhastrika).
+     *
+     * @param volume Attenuated gain (defaults to 0.35f for non-intrusive mindfulness feedback).
+     */
+    fun playStrokeFeedback(volume: Float = 0.35f) {
+        if (!isLoaded || soundPool == null) return
+        val vol = volume.coerceIn(0f, 1f)
+        if (strike1SoundId != 0) {
+            // High-pitch 1.6x playback speed turns the tingsha strike into a crisp, light, unobtrusive tap
+            soundPool?.play(strike1SoundId, vol, vol, 1, 0, 1.6f)
+        }
+    }
+
+    /**
      * Triggers the session completion bell: Deep Resonant Temple Gong.
      *
      * Emits a rich 324 Hz harmonic temple gong with long acoustic decay

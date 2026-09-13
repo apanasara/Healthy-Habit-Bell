@@ -100,6 +100,43 @@ class CentralSessionHandler(private val application: Application) {
     /** Health and step tracking orchestrator connecting Google Fit, Health Connect, Apple bridge & sensors. */
     val healthStepManager: com.habitbell.app.health.HealthStepManager = com.habitbell.app.health.HealthStepManager(application)
 
+    /** Breath stroke tracking orchestrator for Kapalabhati, Bhastrika, and Bhramari counting sessions. */
+    val breathCountManager: com.habitbell.app.breath.BreathCountManager = com.habitbell.app.breath.BreathCountManager(application).apply {
+        onStrokeRegistered = { _, _ ->
+            val profile = engine.state.value.profile
+            val config = profile.breathCounterConfig
+            if (config?.isSoundFeedbackEnabled == true) {
+                audioManager.playStrokeFeedback()
+            }
+            if (config?.isHapticFeedbackEnabled == true) {
+                hapticManager.triggerStrokeHaptic()
+            }
+        }
+        onPhaseChanged = { phase ->
+            when (phase) {
+                com.habitbell.app.breath.BreathCounterPhase.RETENTION_HOLD -> {
+                    audioManager.playPranayamaIntervalBell()
+                    voiceGuide.speakPhaseCue(
+                        phase = com.habitbell.app.data.model.PranayamaPhase.HOLD_IN,
+                        isTriBandhaVoiceEnabled = true
+                    )
+                }
+                com.habitbell.app.breath.BreathCounterPhase.REST -> {
+                    voiceGuide.speakPhaseCue(
+                        phase = com.habitbell.app.data.model.PranayamaPhase.EXHALE
+                    )
+                }
+                com.habitbell.app.breath.BreathCounterPhase.STROKES -> {
+                    audioManager.playPranayamaIntervalBell()
+                }
+                com.habitbell.app.breath.BreathCounterPhase.COMPLETED -> {
+                    audioManager.playCompletionBell()
+                }
+                else -> {}
+            }
+        }
+    }
+
     /** Gentle lady voice guidance coordinator for Pranayama breathwork. */
     val voiceGuide: PranayamaVoiceGuide = PranayamaVoiceGuide(application, bgMusicManager)
 
@@ -164,6 +201,7 @@ class CentralSessionHandler(private val application: Application) {
         observeEngineState()
         setupCastListener()
         setupHealthStepListener()
+        setupBreathCountListener()
 
         // Initialize engine with default profile
         val initialProfile = repository.getProfileById("eating-mindful-20")
@@ -182,6 +220,19 @@ class CentralSessionHandler(private val application: Application) {
             healthStepManager.activeStepUpdate.collect { stepUpdate ->
                 if (engine.state.value.status == SessionStatus.RUNNING) {
                     engine.onStepCountUpdated(stepUpdate.sessionSteps, stepUpdate.cadenceStepsPerMinute)
+                }
+            }
+        }
+    }
+
+    /**
+     * Ingests live breath stroke updates and pipes them to the active [TimerEngine] session.
+     */
+    private fun setupBreathCountListener() {
+        scope.launch {
+            breathCountManager.strokeFlow.collect { strokeUpdate ->
+                if (engine.state.value.status == SessionStatus.RUNNING) {
+                    engine.onBreathStrokeUpdated(strokeUpdate)
                 }
             }
         }
@@ -319,6 +370,12 @@ class CentralSessionHandler(private val application: Application) {
                                 healthStepManager.startSession()
                             }
 
+                            if (state.profile.isBreathCountingEnabled) {
+                                state.profile.breathCounterConfig?.let { bConfig ->
+                                    breathCountManager.startSession(bConfig)
+                                }
+                            }
+
                             if (castManager.isCasting.value) {
                                 if (lastCastProfileId != state.profile.id) {
                                     lastCastProfileId = state.profile.id
@@ -345,6 +402,10 @@ class CentralSessionHandler(private val application: Application) {
                                 healthStepManager.pauseSession()
                             }
 
+                            if (state.profile.isBreathCountingEnabled) {
+                                breathCountManager.pauseSession()
+                            }
+
                             if (castManager.isCasting.value) {
                                 castManager.pause()
                             }
@@ -366,6 +427,10 @@ class CentralSessionHandler(private val application: Application) {
                                 healthStepManager.stopSession()
                             }
 
+                            if (state.profile.isBreathCountingEnabled) {
+                                breathCountManager.stopSession()
+                            }
+
                             if (castManager.isCasting.value) {
                                 castManager.stop()
                             }
@@ -377,6 +442,7 @@ class CentralSessionHandler(private val application: Application) {
                             bluetoothDisconnectionManager.stopMonitoring()
                             bgMusicManager.stop()
                             healthStepManager.resetSession()
+                            breathCountManager.resetSession()
                             lastCastProfileId = null
 
                             if (castManager.isCasting.value) {
@@ -691,6 +757,10 @@ class CentralSessionHandler(private val application: Application) {
     fun updateMetadata(profile: TimerProfile) {
         val durationMs = profile.totalDurationSeconds * 1000L
         val subtitle = when {
+            profile.isBreathCountingEnabled -> {
+                val b = profile.breathCounterConfig
+                "${b?.technique?.displayName ?: "Breath Counter"} • ${b?.targetRounds ?: 3} Rounds"
+            }
             profile.stepGoal != null && profile.stepInterval != null ->
                 "Goal: %,d steps • Bell every %,d steps".format(profile.stepGoal, profile.stepInterval)
             profile.stepGoal != null ->
@@ -732,6 +802,7 @@ class CentralSessionHandler(private val application: Application) {
     fun destroy() {
         engine.destroy()
         healthStepManager.destroy()
+        breathCountManager.destroy()
         hapticManager.cancel()
         bgMusicManager.release()
         audioManager.release()

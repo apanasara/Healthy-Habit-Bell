@@ -106,6 +106,22 @@ class HapticManager(private val context: Context) {
     }
 
     /**
+     * Triggers an ultra-short, crisp tactile tick (25ms) for rapid breath stroke feedback
+     * (e.g. Kapalabhati nasal exhale snap or touch screen tap).
+     */
+    fun triggerStrokeHaptic() {
+        if (vibrator?.hasVibrator() != true) return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            vibrator.vibrate(
+                VibrationEffect.createOneShot(25, 140)
+            )
+        } else {
+            @Suppress("DEPRECATION")
+            vibrator.vibrate(25)
+        }
+    }
+
+    /**
      * Immediately halts any active or queued hardware vibration sequences.
      */
     fun cancel() {

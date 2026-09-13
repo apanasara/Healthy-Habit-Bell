@@ -79,6 +79,9 @@ fun SessionScreen(
     onSkipPreparation: () -> Unit = {},
     onOpenVolumeSettings: () -> Unit = {},
     onOpenCastSettings: () -> Unit = {},
+    selectedBreathInputSource: com.habitbell.app.breath.BreathInputSourceType = com.habitbell.app.breath.BreathInputSourceType.ACOUSTIC_MIC,
+    onSelectBreathInputSource: (com.habitbell.app.breath.BreathInputSourceType) -> Unit = {},
+    onManualBreathStrokeTap: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val configuration = LocalConfiguration.current
@@ -117,7 +120,10 @@ fun SessionScreen(
                 onToggleOrientation = onToggleOrientation,
                 onSkipPreparation = onSkipPreparation,
                 onOpenVolumeSettings = onOpenVolumeSettings,
-                onOpenCastSettings = onOpenCastSettings
+                onOpenCastSettings = onOpenCastSettings,
+                selectedBreathInputSource = selectedBreathInputSource,
+                onSelectBreathInputSource = onSelectBreathInputSource,
+                onManualBreathStrokeTap = onManualBreathStrokeTap
             )
         } else {
             PortraitSessionLayout(
@@ -131,7 +137,10 @@ fun SessionScreen(
                 onToggleOrientation = onToggleOrientation,
                 onSkipPreparation = onSkipPreparation,
                 onOpenVolumeSettings = onOpenVolumeSettings,
-                onOpenCastSettings = onOpenCastSettings
+                onOpenCastSettings = onOpenCastSettings,
+                selectedBreathInputSource = selectedBreathInputSource,
+                onSelectBreathInputSource = onSelectBreathInputSource,
+                onManualBreathStrokeTap = onManualBreathStrokeTap
             )
         }
 
@@ -209,7 +218,10 @@ private fun LandscapeSessionLayout(
     onToggleOrientation: () -> Unit = {},
     onSkipPreparation: () -> Unit = {},
     onOpenVolumeSettings: () -> Unit = {},
-    onOpenCastSettings: () -> Unit = {}
+    onOpenCastSettings: () -> Unit = {},
+    selectedBreathInputSource: com.habitbell.app.breath.BreathInputSourceType = com.habitbell.app.breath.BreathInputSourceType.ACOUSTIC_MIC,
+    onSelectBreathInputSource: (com.habitbell.app.breath.BreathInputSourceType) -> Unit = {},
+    onManualBreathStrokeTap: () -> Unit = {}
 ) {
     val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val buttonPillBg = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (isDark) 0.35f else 0.75f)
@@ -233,7 +245,7 @@ private fun LandscapeSessionLayout(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Left Column: Visualizer Area (Hero Lotus / Eating Bowl / Circular Progress / Pose)
+        // Left Column: Visualizer Area (Hero Lotus / Eating Bowl / Circular Progress / Pose / Breath Counter)
         Box(
             modifier = Modifier
                 .weight(1.15f)
@@ -247,16 +259,26 @@ private fun LandscapeSessionLayout(
                 )
             } else when (sessionState.profile.type) {
                 TimerType.MULTI_INTERVAL -> {
-                    val phase = sessionState.currentPranayamaPhase
-                    if (phase != null) {
-                        BreathIndicator(
-                            phase = phase,
-                            remainingSeconds = sessionState.phaseRemainingSeconds,
-                            phaseDuration = sessionState.phaseDurationSeconds,
-                            size = 260.dp,
-                            showHud = false,
-                            modifier = Modifier.clickable { onOpenSettings() }
+                    if (sessionState.isBreathCountingActive && sessionState.breathUpdate != null) {
+                        com.habitbell.app.ui.components.BreathCounterContent(
+                            sessionState = sessionState,
+                            breathUpdate = sessionState.breathUpdate,
+                            selectedInputSource = selectedBreathInputSource,
+                            onSelectInputSource = onSelectBreathInputSource,
+                            onManualStrokeTap = onManualBreathStrokeTap
                         )
+                    } else {
+                        val phase = sessionState.currentPranayamaPhase
+                        if (phase != null) {
+                            BreathIndicator(
+                                phase = phase,
+                                remainingSeconds = sessionState.phaseRemainingSeconds,
+                                phaseDuration = sessionState.phaseDurationSeconds,
+                                size = 260.dp,
+                                showHud = false,
+                                modifier = Modifier.clickable { onOpenSettings() }
+                            )
+                        }
                     }
                 }
                 TimerType.LINEAR -> {
@@ -638,7 +660,10 @@ private fun PortraitSessionLayout(
     onToggleOrientation: () -> Unit = {},
     onSkipPreparation: () -> Unit = {},
     onOpenVolumeSettings: () -> Unit = {},
-    onOpenCastSettings: () -> Unit = {}
+    onOpenCastSettings: () -> Unit = {},
+    selectedBreathInputSource: com.habitbell.app.breath.BreathInputSourceType = com.habitbell.app.breath.BreathInputSourceType.ACOUSTIC_MIC,
+    onSelectBreathInputSource: (com.habitbell.app.breath.BreathInputSourceType) -> Unit = {},
+    onManualBreathStrokeTap: () -> Unit = {}
 ) {
     Column(
         modifier = Modifier
@@ -937,10 +962,20 @@ private fun PortraitSessionLayout(
                 }
 
                 TimerType.MULTI_INTERVAL -> {
-                    PranayamaPortraitContent(
-                        sessionState = sessionState,
-                        onOpenSettings = onOpenSettings
-                    )
+                    if (sessionState.isBreathCountingActive && sessionState.breathUpdate != null) {
+                        com.habitbell.app.ui.components.BreathCounterContent(
+                            sessionState = sessionState,
+                            breathUpdate = sessionState.breathUpdate,
+                            selectedInputSource = selectedBreathInputSource,
+                            onSelectInputSource = onSelectBreathInputSource,
+                            onManualStrokeTap = onManualBreathStrokeTap
+                        )
+                    } else {
+                        PranayamaPortraitContent(
+                            sessionState = sessionState,
+                            onOpenSettings = onOpenSettings
+                        )
+                    }
                 }
 
                 TimerType.COMPOUND -> {

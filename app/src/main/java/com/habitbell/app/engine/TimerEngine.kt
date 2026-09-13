@@ -85,8 +85,16 @@ data class TimerSessionState(
     val healthProvider: com.habitbell.app.health.HealthProviderType = com.habitbell.app.health.HealthProviderType.HARDWARE_SENSOR,
     // Pre-session preparation countdown tracking
     val preparationSecondsRemaining: Int = 0,
-    val totalPreparationSeconds: Int = 5
+    val totalPreparationSeconds: Int = 5,
+    // Breath Counter Tracking (Kapalabhati, Bhastrika, Bhramari)
+    val breathUpdate: com.habitbell.app.breath.BreathStrokeUpdate? = null
 ) {
+    /**
+     * Whether real-time breath stroke or hum counting is active for this session.
+     */
+    val isBreathCountingActive: Boolean
+        get() = profile.isBreathCountingEnabled
+
     /**
      * Whether the session is currently in the 5-second lead-in preparation countdown.
      */
@@ -243,6 +251,26 @@ class TimerEngine(
         pause()
         visualAlertRemainingTicks = 0
         lastStepBellTriggerCount = 0
+
+        if (profile.isBreathCountingEnabled) {
+            val bConfig = profile.breathCounterConfig ?: return
+            val initialTarget = bConfig.strokesForRound(1)
+            val total = profile.totalDurationSeconds
+            _state.value = TimerSessionState(
+                status = SessionStatus.IDLE,
+                profile = profile,
+                remainingSeconds = total,
+                totalSeconds = total,
+                currentRound = 1,
+                totalRounds = bConfig.targetRounds,
+                breathUpdate = com.habitbell.app.breath.BreathStrokeUpdate(
+                    targetRoundStrokes = initialTarget,
+                    targetRounds = bConfig.targetRounds
+                )
+            )
+            return
+        }
+
         when (profile.type) {
             TimerType.LINEAR -> {
                 // Initialize linear countdown parameters
@@ -527,6 +555,31 @@ class TimerEngine(
     }
 
     /**
+     * Ingests real-time breath stroke and round updates from [com.habitbell.app.breath.BreathCountManager].
+     *
+     * Evaluates round progress, cadence updates, and handles session completion when all
+     * breathwork rounds are concluded.
+     *
+     * @param update Authoritative breath stroke update containing live counts, cadence, and phase.
+     */
+    fun onBreathStrokeUpdated(update: com.habitbell.app.breath.BreathStrokeUpdate) {
+        if (_state.value.status != SessionStatus.RUNNING) return
+        if (!_state.value.profile.isBreathCountingEnabled) return
+
+        _state.update {
+            it.copy(
+                breathUpdate = update,
+                currentRound = update.currentRound,
+                totalRounds = update.targetRounds
+            )
+        }
+
+        if (update.currentPhase == com.habitbell.app.breath.BreathCounterPhase.COMPLETED) {
+            onSessionCompleted()
+        }
+    }
+
+    /**
      * Resets the active timer session back to initial values according to the currently assigned profile.
      */
     fun reset() {
@@ -540,6 +593,15 @@ class TimerEngine(
      */
     internal fun tickOneSecond() {
         val current = _state.value
+
+        // If breath counter profile is active, progression is managed by BreathCountManager
+        if (current.profile.isBreathCountingEnabled) {
+            if (current.totalSeconds > 0 && current.remainingSeconds <= 0) {
+                onSessionCompleted()
+            }
+            return
+        }
+
         // If 1 second or less remains in linear mode, evaluate completion semantics
         if (current.profile.type == TimerType.LINEAR && current.remainingSeconds <= 1) {
             if (current.profile.stepTriggerMode == StepTriggerMode.STEPS_ONLY) {
