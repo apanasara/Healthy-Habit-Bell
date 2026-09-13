@@ -15,6 +15,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.util.ArrayDeque
 import kotlin.coroutines.coroutineContext
+import kotlin.math.cos
+import kotlin.math.max
+import kotlin.math.sin
 import kotlin.math.sqrt
 
 /**
@@ -24,32 +27,43 @@ import kotlin.math.sqrt
  *
  * ## Architectural Role & Relationships
  * - Interfaces directly with the device microphone via low-latency [AudioRecord] PCM streams.
+ * - Uses [MediaRecorder.AudioSource.VOICE_RECOGNITION] to eliminate aggressive OEM noise gating
+ *   and acoustic echo cancellation (AEC) that would otherwise suppress subtle breath exhalations.
  * - Implements real-time Digital Signal Processing (DSP) algorithms:
- *   1. **Dynamic Noise Floor Calibration**: Continuously estimates ambient background sound pressure.
- *   2. **Bandpass Filtering**: Isolates nasal friction bursts (1.5 kHz - 4.5 kHz) for Kapalabhati.
- *   3. **RMS Energy & Peak Detector**: Triggers stroke counts with a 320ms refractory guard window.
- *   4. **Autocorrelation Pitch Tracker**: Validates sustained periodic vocal resonance for Bhramari humming.
+ *   1. **Biquad Bandpass Filter**: 2nd-order IIR bandpass centered at 2400 Hz (Q = 1.0),
+ *      isolating turbulent nasal expulsion hiss (1.2 kHz - 4.0 kHz) while rejecting low-frequency
+ *      desk rumble (-28 dB at 100 Hz) and high-frequency thermal hiss (-26 dB at 7500 Hz).
+ *   2. **Continuous Adaptive Noise Floor**: Continuously adapts to ambient background sound level
+ *      using asymmetric attack/decay smoothing, preventing calibration freeze and drift.
+ *   3. **Stateful Hysteresis Peak-Valley Detector**: Detects rapid energy onset (Attack),
+ *      tracks maximum peak amplitude, enforces physiological burst duration (40ms - 280ms),
+ *      and mandates a valley drop-off (silent passive inhalation) before re-arming.
+ *   4. **Acoustic Self-Feedback Blanking**: Disables stroke evaluation during internal speaker
+ *      playback (e.g. interval bells, vocal prompts) to eliminate runaway acoustic loops.
+ *   5. **Autocorrelation Pitch Tracker**: Validates sustained periodic vocal resonance for
+ *      Bhramari bee humming across 80 Hz - 250 Hz swara band.
  * - Dispatches primitive [BreathInputEvent] metrics into [BreathCountManager].
  *
  * ## Concurrency & Hardware Lifecycle
- * - Audio ingestion runs on a dedicated high-priority coroutine on [Dispatchers.Default].
+ * - Audio capture loop executes on a dedicated coroutine job on [Dispatchers.IO].
  * - Hardware handles ([AudioRecord]) are strictly initialized on [start] and released on [stop].
  *
  * @param context Android application context for permission verification.
+ * @param scope Coroutine scope governing the background audio processing pipeline.
  */
 class AcousticBreathSensorProvider(
     private val context: Context,
-    private val scope: CoroutineScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+    private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 ) : BreathDataSource {
 
     private val TAG = "AcousticBreathSensor"
 
     override val inputSourceType: BreathInputSourceType = BreathInputSourceType.ACOUSTIC_MIC
 
-    /** Sample rate in Hz for acoustic breath monitoring. 16kHz offers optimal DSP accuracy with minimal CPU. */
+    /** Sample rate in Hz for acoustic breath monitoring (16 kHz optimal for voice/breath DSP). */
     private val SAMPLE_RATE_HZ = 16000
 
-    /** Chunk size in 16-bit PCM samples (~32 ms per analysis window). */
+    /** Chunk size in 16-bit PCM samples (512 samples = 32 ms per analysis window). */
     private val CHUNK_SIZE = 512
 
     override val isAvailable: Boolean
@@ -65,23 +79,68 @@ class AcousticBreathSensorProvider(
     private var recordingJob: Job? = null
     private var activeConfig: BreathCounterConfig? = null
 
+    /** User-adjustable sensitivity multiplier (0.5f to 2.5f, default 1.0f). */
+    private var activeSensitivity: Float = 1.0f
+
+    /** Timestamp in milliseconds until which acoustic stroke detection is suppressed. */
+    @Volatile
+    private var blankUntilMillis: Long = 0L
+
     /** Timestamp of the most recently detected stroke in milliseconds. */
     private var lastStrokeTimeMillis: Long = 0L
 
     /** Sliding window ring buffer tracking recent inter-stroke intervals for cadence calculation. */
     private val strokeIntervals = ArrayDeque<Long>(6)
 
-    /** Moving average ambient noise floor estimate. */
-    private var dynamicNoiseFloorRms: Float = 0.02f
+    /** Continuous moving average ambient noise floor estimate. */
+    private var dynamicNoiseFloorRms: Float = 0.015f
 
-    /** Timestamp when active Bhramari humming began. */
+    /** Previous chunk RMS for first-difference onset tracking. */
+    private var previousBandpassRms: Float = 0.015f
+
+    // --- Kapalabhati Stateful Hysteresis Detector ---
+    private enum class KapalabhatiState {
+        IDLE_LISTENING,
+        ATTACK_DETECTED,
+        COOLDOWN_VALLEY
+    }
+    private var kapalabhatiState = KapalabhatiState.IDLE_LISTENING
+    private var strokeStartTimeMillis: Long = 0L
+    private var strokePeakRms: Float = 0f
+
+    // --- Bhastrika Dual-Phase Detector ---
+    private var bhastrikaInhaleDetected: Boolean = false
+    private var bhastrikaInhaleTimeMillis: Long = 0L
+
+    // --- Bhramari Humming Detector ---
     private var humStartTimeMillis: Long = 0L
-
-    /** Whether Bhramari humming is currently underway. */
     private var isCurrentlyHumming: Boolean = false
+
+    /** 2nd-order Biquad Bandpass filter isolating nasal breath friction around 2.4 kHz. */
+    private val bandpassFilter = BiquadBandpassFilter(SAMPLE_RATE_HZ.toFloat(), 2400f, 1.0f)
+
+    /**
+     * Updates detection sensitivity dynamically.
+     *
+     * @param sensitivity Multiplier scaling the detection threshold (0.5f = Low, 1.0f = Med, 1.5f = High).
+     */
+    fun setSensitivity(sensitivity: Float) {
+        activeSensitivity = sensitivity.coerceIn(0.5f, 2.5f)
+    }
+
+    /**
+     * Temporarily blanks/mutes acoustic stroke evaluation to prevent phone speaker audio
+     * (interval bells, voice guidance cues, stroke ticks) from self-triggering false strokes.
+     *
+     * @param durationMs Blanking duration in milliseconds.
+     */
+    fun blankDetection(durationMs: Long) {
+        blankUntilMillis = max(blankUntilMillis, System.currentTimeMillis() + durationMs)
+    }
 
     override fun start(config: BreathCounterConfig) {
         activeConfig = config
+        activeSensitivity = config.micSensitivity
         resume()
     }
 
@@ -123,10 +182,18 @@ class AcousticBreathSensorProvider(
 
     override fun reset() {
         lastStrokeTimeMillis = 0L
+        blankUntilMillis = 0L
         strokeIntervals.clear()
         humStartTimeMillis = 0L
         isCurrentlyHumming = false
-        dynamicNoiseFloorRms = 0.02f
+        dynamicNoiseFloorRms = 0.015f
+        previousBandpassRms = 0.015f
+        kapalabhatiState = KapalabhatiState.IDLE_LISTENING
+        strokeStartTimeMillis = 0L
+        strokePeakRms = 0f
+        bhastrikaInhaleDetected = false
+        bhastrikaInhaleTimeMillis = 0L
+        bandpassFilter.reset()
         _inputFlow.value = BreathInputEvent()
     }
 
@@ -137,12 +204,13 @@ class AcousticBreathSensorProvider(
             strokeDelta = 1,
             instantaneousCadenceBpm = bpm,
             audioAmplitudeRms = 0.9f,
+            thresholdRms = 0.05f,
             timestampMillis = now
         )
     }
 
     /**
-     * Primary audio streaming and DSP evaluation loop running on [Dispatchers.Default].
+     * Primary audio streaming and DSP evaluation loop running on [Dispatchers.IO].
      *
      * @param config Active configuration determining detection thresholds.
      */
@@ -153,23 +221,43 @@ class AcousticBreathSensorProvider(
             AudioFormat.ENCODING_PCM_16BIT
         ).coerceAtLeast(CHUNK_SIZE * 2)
 
-        try {
-            audioRecord = AudioRecord(
-                MediaRecorder.AudioSource.MIC,
-                SAMPLE_RATE_HZ,
-                AudioFormat.CHANNEL_IN_MONO,
-                AudioFormat.ENCODING_PCM_16BIT,
-                minBufferSize
-            )
+        // Prefer VOICE_RECOGNITION to disable aggressive OEM breath noise cancellation
+        val audioSources = listOf(
+            MediaRecorder.AudioSource.VOICE_RECOGNITION,
+            MediaRecorder.AudioSource.MIC
+        )
 
-            if (audioRecord?.state != AudioRecord.STATE_INITIALIZED) {
-                Log.e(TAG, "AudioRecord failed to initialize")
-                return
+        var initialized = false
+        for (source in audioSources) {
+            try {
+                val record = AudioRecord(
+                    source,
+                    SAMPLE_RATE_HZ,
+                    AudioFormat.CHANNEL_IN_MONO,
+                    AudioFormat.ENCODING_PCM_16BIT,
+                    minBufferSize
+                )
+                if (record.state == AudioRecord.STATE_INITIALIZED) {
+                    audioRecord = record
+                    initialized = true
+                    break
+                } else {
+                    record.release()
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to init AudioRecord with source $source: ${e.message}")
             }
+        }
 
+        if (!initialized || audioRecord == null) {
+            Log.e(TAG, "AudioRecord failed to initialize across all available sources")
+            return
+        }
+
+        try {
             audioRecord?.startRecording()
             val pcmBuffer = ShortArray(CHUNK_SIZE)
-            var calibrationFrames = 40 // ~1.2 seconds of initial noise calibration
+            var initialCalibrationFrames = 25 // ~800ms quick bootstrap
 
             while (coroutineContext.isActive) {
                 val samplesRead = audioRecord?.read(pcmBuffer, 0, CHUNK_SIZE) ?: -1
@@ -178,34 +266,60 @@ class AcousticBreathSensorProvider(
                     continue
                 }
 
-                // 1. Calculate normalized Short-Time Root Mean Square (RMS) energy
-                var sumSquares = 0.0
-                for (i in 0 until samplesRead) {
-                    val normalized = pcmBuffer[i] / 32768.0f
-                    sumSquares += (normalized * normalized)
-                }
-                val rawRms = sqrt(sumSquares / samplesRead).toFloat()
+                val now = System.currentTimeMillis()
 
-                // 2. Calibration phase: estimate ambient noise floor
-                if (calibrationFrames > 0) {
-                    dynamicNoiseFloorRms = (dynamicNoiseFloorRms * 0.9f) + (rawRms * 0.1f)
-                    calibrationFrames--
-                    _inputFlow.value = BreathInputEvent(audioAmplitudeRms = (rawRms * 3f).coerceIn(0f, 1f))
+                // 1. Filter chunk through Biquad Bandpass Filter (1.2 kHz - 4.0 kHz)
+                var filteredSumSquares = 0.0
+                var rawSumSquares = 0.0
+                for (i in 0 until samplesRead) {
+                    val normalizedRaw = pcmBuffer[i] / 32768.0f
+                    rawSumSquares += (normalizedRaw * normalizedRaw)
+
+                    val filtered = bandpassFilter.process(normalizedRaw)
+                    filteredSumSquares += (filtered * filtered)
+                }
+                val rawRms = sqrt(rawSumSquares / samplesRead).toFloat()
+                val bandpassRms = sqrt(filteredSumSquares / samplesRead).toFloat()
+
+                // 2. Initial noise floor bootstrapping
+                if (initialCalibrationFrames > 0) {
+                    dynamicNoiseFloorRms = (dynamicNoiseFloorRms * 0.85f) + (bandpassRms * 0.15f)
+                    initialCalibrationFrames--
+                    _inputFlow.value = BreathInputEvent(
+                        audioAmplitudeRms = (rawRms * 3.5f).coerceIn(0f, 1f),
+                        thresholdRms = 0.05f,
+                        timestampMillis = now
+                    )
                     continue
                 }
 
-                // 3. Dispatch technique-specific DSP detection
+                // 3. Evaluate blanking period (self-acoustic speaker feedback suppression)
+                val isBlanked = now < blankUntilMillis
+                if (isBlanked) {
+                    // Forward audio level for visuals but completely suppress stroke detection
+                    _inputFlow.value = _inputFlow.value.copy(
+                        strokeDelta = 0,
+                        audioAmplitudeRms = (rawRms * 3.5f).coerceIn(0f, 1f),
+                        timestampMillis = now
+                    )
+                    previousBandpassRms = bandpassRms
+                    continue
+                }
+
+                // 4. Dispatch technique-specific stateful DSP detection
                 when (config.technique) {
                     BreathTechnique.KAPALABHATI, BreathTechnique.FREE_COUNT -> {
-                        evaluateKapalabhatiStroke(pcmBuffer, samplesRead, rawRms, config)
+                        evaluateKapalabhatiStroke(pcmBuffer, samplesRead, rawRms, bandpassRms, now)
                     }
                     BreathTechnique.BHASTRIKA -> {
-                        evaluateBhastrikaCycle(pcmBuffer, samplesRead, rawRms, config)
+                        evaluateBhastrikaCycle(pcmBuffer, samplesRead, rawRms, bandpassRms, now)
                     }
                     BreathTechnique.BHRAMARI -> {
-                        evaluateBhramariHum(pcmBuffer, samplesRead, rawRms, config)
+                        evaluateBhramariHum(pcmBuffer, samplesRead, rawRms, now)
                     }
                 }
+
+                previousBandpassRms = bandpassRms
             }
         } catch (e: SecurityException) {
             Log.e(TAG, "SecurityException: AudioRecord permission missing", e)
@@ -223,87 +337,177 @@ class AcousticBreathSensorProvider(
     }
 
     /**
-     * Evaluates a short audio chunk for Kapalabhati nasal exhalation bursts.
+     * Evaluates audio chunks for Kapalabhati using a 3-Stage Hysteresis Peak-Valley State Machine.
      *
-     * Features:
-     * - Bandpass difference filter rejecting DC rumble.
-     * - Refractory guard window of 300 ms preventing multi-triggering per single breath.
-     * - Dynamic sensitivity threshold scaling.
+     * State Machine:
+     * - [KapalabhatiState.IDLE_LISTENING]: Continuously tracks ambient noise floor. Monitors for
+     *   sudden explosive attack slope (`rise > threshold * 0.20`).
+     * - [KapalabhatiState.ATTACK_DETECTED]: Tracks local peak energy. Verifies physiological burst
+     *   duration (35ms - 300ms) and minimum SNR. Confirms exactly 1 stroke at peak decay!
+     * - [KapalabhatiState.COOLDOWN_VALLEY]: Mandates quiet passive inhalation valley drop-off
+     *   (`energy < threshold * 0.70`) and minimum refractory lockout before re-arming to IDLE.
+     *
+     * @param pcm Raw PCM buffer.
+     * @param length Number of valid samples in [pcm].
+     * @param rawRms Full-spectrum RMS energy.
+     * @param bandpassRms 1.2 kHz - 4.0 kHz bandpass filtered RMS energy.
+     * @param now Current monotonic timestamp in milliseconds.
      */
     private fun evaluateKapalabhatiStroke(
         pcm: ShortArray,
         length: Int,
         rawRms: Float,
-        config: BreathCounterConfig
+        bandpassRms: Float,
+        now: Long
     ) {
-        val now = System.currentTimeMillis()
-        val normalizedAmplitude = (rawRms * 3.5f).coerceIn(0f, 1f)
+        val sensitivity = activeSensitivity.coerceIn(0.5f, 2.5f)
 
-        // Simple high-pass / friction filter: d[i] = pcm[i] - pcm[i-1]
-        var filteredSumSquares = 0.0
-        for (i in 1 until length) {
-            val diff = (pcm[i] - pcm[i - 1]) / 32768.0f
-            filteredSumSquares += (diff * diff)
+        // Dynamic threshold based on continuous noise floor and sensitivity scaling
+        val thresholdMultiplier = 2.4f / sensitivity
+        val minFloor = 0.022f / sensitivity
+        val dynamicThreshold = (dynamicNoiseFloorRms * thresholdMultiplier + minFloor).coerceIn(0.022f, 0.25f)
+
+        // Continuous ambient noise floor tracking (only update when in calm idle state)
+        if (kapalabhatiState == KapalabhatiState.IDLE_LISTENING) {
+            if (bandpassRms < dynamicNoiseFloorRms) {
+                // Quick downward adaptation to silence
+                dynamicNoiseFloorRms = (dynamicNoiseFloorRms * 0.88f) + (bandpassRms * 0.12f)
+            } else if (bandpassRms < dynamicThreshold * 0.60f) {
+                // Gentle upward adaptation to quiet room ambience
+                dynamicNoiseFloorRms = (dynamicNoiseFloorRms * 0.98f) + (bandpassRms * 0.02f)
+            }
+            dynamicNoiseFloorRms = dynamicNoiseFloorRms.coerceIn(0.005f, 0.08f)
         }
-        val highFreqRms = sqrt(filteredSumSquares / length).toFloat()
 
-        val dynamicThreshold = (dynamicNoiseFloorRms * 2.8f * (1.0f / config.micSensitivity.coerceAtLeast(0.5f))).coerceAtLeast(0.045f)
+        val normalizedAmplitude = (rawRms * 3.5f).coerceIn(0f, 1f)
+        val normalizedThreshold = (dynamicThreshold * 3.5f).coerceIn(0.05f, 0.95f)
+
+        var strokeEmitted = false
         val timeSinceLastStroke = now - lastStrokeTimeMillis
 
-        if (highFreqRms > dynamicThreshold && timeSinceLastStroke >= 300L) {
-            lastStrokeTimeMillis = now
-            val cadenceBpm = calculateCadenceBpm(now)
+        when (kapalabhatiState) {
+            KapalabhatiState.IDLE_LISTENING -> {
+                val energyRise = bandpassRms - previousBandpassRms
+                val isSharpOnset = energyRise > (dynamicThreshold * 0.20f) || bandpassRms > (dynamicThreshold * 1.15f)
 
+                // Minimum 420 ms refractory lockout between distinct strokes (max 142 BPM)
+                if (bandpassRms > dynamicThreshold && isSharpOnset && timeSinceLastStroke >= 420L) {
+                    kapalabhatiState = KapalabhatiState.ATTACK_DETECTED
+                    strokeStartTimeMillis = now
+                    strokePeakRms = bandpassRms
+                }
+            }
+
+            KapalabhatiState.ATTACK_DETECTED -> {
+                strokePeakRms = max(strokePeakRms, bandpassRms)
+                val burstDuration = now - strokeStartTimeMillis
+
+                // Check for peak decay (energy falling below 72% of stroke peak)
+                if (bandpassRms < strokePeakRms * 0.72f) {
+                    // Validate physiological nasal burst properties
+                    val isValidBurstDuration = burstDuration in 35..300
+                    val isSufficientPeak = strokePeakRms >= (dynamicThreshold * 1.15f)
+
+                    if (isValidBurstDuration && isSufficientPeak) {
+                        // CONFIRMED STROKE!
+                        lastStrokeTimeMillis = now
+                        strokeEmitted = true
+                        kapalabhatiState = KapalabhatiState.COOLDOWN_VALLEY
+                    } else {
+                        // Spurious blip or non-stroke noise -> abort to idle
+                        kapalabhatiState = KapalabhatiState.IDLE_LISTENING
+                    }
+                } else if (burstDuration > 320L) {
+                    // Sound lasted too long without falling edge (continuous talking, fans, sighing) -> reject
+                    kapalabhatiState = KapalabhatiState.IDLE_LISTENING
+                }
+            }
+
+            KapalabhatiState.COOLDOWN_VALLEY -> {
+                // Must return to quiet baseline (inhalation valley) before re-arming
+                val isInValley = bandpassRms < (dynamicThreshold * 0.70f)
+                val isMinQuietElapsed = (now - lastStrokeTimeMillis) >= 180L
+
+                if (isInValley && isMinQuietElapsed) {
+                    kapalabhatiState = KapalabhatiState.IDLE_LISTENING
+                } else if ((now - lastStrokeTimeMillis) > 850L) {
+                    // Safety timeout if room ambience shifted
+                    kapalabhatiState = KapalabhatiState.IDLE_LISTENING
+                }
+            }
+        }
+
+        if (strokeEmitted) {
+            val cadenceBpm = calculateCadenceBpm(now)
             _inputFlow.value = BreathInputEvent(
                 strokeDelta = 1,
                 instantaneousCadenceBpm = cadenceBpm,
                 audioAmplitudeRms = normalizedAmplitude,
+                thresholdRms = normalizedThreshold,
                 isHummingActive = false,
                 activeHumDurationSeconds = 0f,
                 timestampMillis = now
             )
         } else {
-            // Emit continuous amplitude update for visual ripples without incrementing strokes
             _inputFlow.value = _inputFlow.value.copy(
                 strokeDelta = 0,
                 audioAmplitudeRms = normalizedAmplitude,
+                thresholdRms = normalizedThreshold,
                 timestampMillis = now
             )
         }
     }
 
     /**
-     * Evaluates a short audio chunk for Bhastrika dual-phase bellows breathing.
+     * Evaluates audio chunks for Bhastrika dual-phase bellows breathing.
+     * Requires both forceful inhalation and sharp exhalation within a 1200ms window.
      */
     private fun evaluateBhastrikaCycle(
         pcm: ShortArray,
         length: Int,
         rawRms: Float,
-        config: BreathCounterConfig
+        bandpassRms: Float,
+        now: Long
     ) {
-        val now = System.currentTimeMillis()
+        val sensitivity = activeSensitivity.coerceIn(0.5f, 2.5f)
+        val dynamicThreshold = (dynamicNoiseFloorRms * (2.6f / sensitivity) + (0.030f / sensitivity)).coerceIn(0.030f, 0.25f)
         val normalizedAmplitude = (rawRms * 3.0f).coerceIn(0f, 1f)
-        val dynamicThreshold = (dynamicNoiseFloorRms * 2.5f * (1.0f / config.micSensitivity.coerceAtLeast(0.5f))).coerceAtLeast(0.05f)
+        val normalizedThreshold = (dynamicThreshold * 3.0f).coerceIn(0.05f, 0.95f)
         val timeSinceLastStroke = now - lastStrokeTimeMillis
 
-        // Bellows breath has a longer refractory period (~650 ms per in/out cycle)
-        if (rawRms > dynamicThreshold && timeSinceLastStroke >= 650L) {
-            lastStrokeTimeMillis = now
-            val cadenceBpm = calculateCadenceBpm(now)
-
-            _inputFlow.value = BreathInputEvent(
-                strokeDelta = 1,
-                instantaneousCadenceBpm = cadenceBpm,
-                audioAmplitudeRms = normalizedAmplitude,
-                timestampMillis = now
-            )
+        // Bhastrika bellows cycle requires at least 650 ms between full dual-phase cycles
+        if (!bhastrikaInhaleDetected) {
+            if (bandpassRms > dynamicThreshold && timeSinceLastStroke >= 650L) {
+                bhastrikaInhaleDetected = true
+                bhastrikaInhaleTimeMillis = now
+            }
         } else {
-            _inputFlow.value = _inputFlow.value.copy(
-                strokeDelta = 0,
-                audioAmplitudeRms = normalizedAmplitude,
-                timestampMillis = now
-            )
+            val elapsedSinceInhale = now - bhastrikaInhaleTimeMillis
+            if (elapsedSinceInhale in 180..1200 && bandpassRms > dynamicThreshold) {
+                // Both inhalation and exhalation completed!
+                bhastrikaInhaleDetected = false
+                lastStrokeTimeMillis = now
+                val cadenceBpm = calculateCadenceBpm(now)
+
+                _inputFlow.value = BreathInputEvent(
+                    strokeDelta = 1,
+                    instantaneousCadenceBpm = cadenceBpm,
+                    audioAmplitudeRms = normalizedAmplitude,
+                    thresholdRms = normalizedThreshold,
+                    timestampMillis = now
+                )
+                return
+            } else if (elapsedSinceInhale > 1200) {
+                bhastrikaInhaleDetected = false
+            }
         }
+
+        _inputFlow.value = _inputFlow.value.copy(
+            strokeDelta = 0,
+            audioAmplitudeRms = normalizedAmplitude,
+            thresholdRms = normalizedThreshold,
+            timestampMillis = now
+        )
     }
 
     /**
@@ -313,11 +517,11 @@ class AcousticBreathSensorProvider(
         pcm: ShortArray,
         length: Int,
         rawRms: Float,
-        config: BreathCounterConfig
+        now: Long
     ) {
-        val now = System.currentTimeMillis()
         val normalizedAmplitude = (rawRms * 3.5f).coerceIn(0f, 1f)
         val humThreshold = (dynamicNoiseFloorRms * 2.0f).coerceAtLeast(0.035f)
+        val normalizedThreshold = (humThreshold * 3.5f).coerceIn(0.05f, 0.95f)
 
         // Autocorrelation test at pitch lags corresponding to 80Hz - 250Hz (lag: 64 to 200 samples)
         var maxAutocorr = 0.0
@@ -333,7 +537,6 @@ class AcousticBreathSensorProvider(
             }
         }
 
-        // Energy ratio indicator for harmonic periodicity
         val isHummingDetected = (rawRms > humThreshold) && (maxAutocorr > 0)
 
         if (isHummingDetected) {
@@ -347,6 +550,7 @@ class AcousticBreathSensorProvider(
                 strokeDelta = 0,
                 instantaneousCadenceBpm = 0,
                 audioAmplitudeRms = normalizedAmplitude,
+                thresholdRms = normalizedThreshold,
                 isHummingActive = true,
                 activeHumDurationSeconds = humDurationSec,
                 timestampMillis = now
@@ -363,6 +567,7 @@ class AcousticBreathSensorProvider(
                         strokeDelta = 1,
                         instantaneousCadenceBpm = 0,
                         audioAmplitudeRms = normalizedAmplitude,
+                        thresholdRms = normalizedThreshold,
                         isHummingActive = false,
                         activeHumDurationSeconds = totalHumSec,
                         timestampMillis = now
@@ -374,6 +579,7 @@ class AcousticBreathSensorProvider(
             _inputFlow.value = _inputFlow.value.copy(
                 strokeDelta = 0,
                 audioAmplitudeRms = normalizedAmplitude,
+                thresholdRms = normalizedThreshold,
                 isHummingActive = false,
                 timestampMillis = now
             )
@@ -382,6 +588,9 @@ class AcousticBreathSensorProvider(
 
     /**
      * Estimates cadence in strokes per minute (BPM) from recent inter-stroke intervals.
+     *
+     * @param now Monotonic timestamp in milliseconds.
+     * @return Rolling cadence in BPM (bounded 15..180 BPM).
      */
     private fun calculateCadenceBpm(now: Long): Int {
         if (lastStrokeTimeMillis > 0L) {
@@ -398,5 +607,62 @@ class AcousticBreathSensorProvider(
             }
         }
         return 0
+    }
+
+    /**
+     * 2nd-order Biquad IIR Bandpass Filter (Audio EQ Cookbook).
+     *
+     * @param sampleRate Sampling rate in Hz (e.g. 16000f).
+     * @param centerFreq Center resonance frequency in Hz (e.g. 2400f).
+     * @param q Quality factor Q (e.g. 1.0f).
+     */
+    class BiquadBandpassFilter(sampleRate: Float, centerFreq: Float, q: Float = 1.0f) {
+        private var b0 = 0f
+        private var b1 = 0f
+        private var b2 = 0f
+        private var a1 = 0f
+        private var a2 = 0f
+        private var x1 = 0f
+        private var x2 = 0f
+        private var y1 = 0f
+        private var y2 = 0f
+
+        init {
+            val omega = (2.0 * Math.PI * centerFreq / sampleRate).toFloat()
+            val alpha = (sin(omega) / (2.0 * q)).toFloat()
+            val cosw = cos(omega).toFloat()
+            val a0 = 1.0f + alpha
+
+            b0 = alpha / a0
+            b1 = 0.0f
+            b2 = -alpha / a0
+            a1 = (-2.0f * cosw) / a0
+            a2 = (1.0f - alpha) / a0
+        }
+
+        /**
+         * Processes an incoming audio sample and returns the bandpass filtered sample.
+         *
+         * @param sample Raw normalized PCM audio sample (-1.0f..1.0f).
+         * @return Filtered output sample.
+         */
+        fun process(sample: Float): Float {
+            val y = b0 * sample + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2
+            x2 = x1
+            x1 = sample
+            y2 = y1
+            y1 = y
+            return y
+        }
+
+        /**
+         * Clears filter internal state delays.
+         */
+        fun reset() {
+            x1 = 0f
+            x2 = 0f
+            y1 = 0f
+            y2 = 0f
+        }
     }
 }

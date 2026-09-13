@@ -81,6 +81,7 @@ fun SessionScreen(
     onOpenCastSettings: () -> Unit = {},
     selectedBreathInputSource: com.habitbell.app.breath.BreathInputSourceType = com.habitbell.app.breath.BreathInputSourceType.ACOUSTIC_MIC,
     onSelectBreathInputSource: (com.habitbell.app.breath.BreathInputSourceType) -> Unit = {},
+    onSelectBreathMicSensitivity: (Float) -> Unit = {},
     onManualBreathStrokeTap: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -123,6 +124,7 @@ fun SessionScreen(
                 onOpenCastSettings = onOpenCastSettings,
                 selectedBreathInputSource = selectedBreathInputSource,
                 onSelectBreathInputSource = onSelectBreathInputSource,
+                onSelectBreathMicSensitivity = onSelectBreathMicSensitivity,
                 onManualBreathStrokeTap = onManualBreathStrokeTap
             )
         } else {
@@ -140,6 +142,7 @@ fun SessionScreen(
                 onOpenCastSettings = onOpenCastSettings,
                 selectedBreathInputSource = selectedBreathInputSource,
                 onSelectBreathInputSource = onSelectBreathInputSource,
+                onSelectBreathMicSensitivity = onSelectBreathMicSensitivity,
                 onManualBreathStrokeTap = onManualBreathStrokeTap
             )
         }
@@ -221,6 +224,7 @@ private fun LandscapeSessionLayout(
     onOpenCastSettings: () -> Unit = {},
     selectedBreathInputSource: com.habitbell.app.breath.BreathInputSourceType = com.habitbell.app.breath.BreathInputSourceType.ACOUSTIC_MIC,
     onSelectBreathInputSource: (com.habitbell.app.breath.BreathInputSourceType) -> Unit = {},
+    onSelectBreathMicSensitivity: (Float) -> Unit = {},
     onManualBreathStrokeTap: () -> Unit = {}
 ) {
     val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
@@ -265,6 +269,7 @@ private fun LandscapeSessionLayout(
                             breathUpdate = sessionState.breathUpdate,
                             selectedInputSource = selectedBreathInputSource,
                             onSelectInputSource = onSelectBreathInputSource,
+                            onSelectSensitivity = onSelectBreathMicSensitivity,
                             onManualStrokeTap = onManualBreathStrokeTap
                         )
                     } else {
@@ -663,6 +668,7 @@ private fun PortraitSessionLayout(
     onOpenCastSettings: () -> Unit = {},
     selectedBreathInputSource: com.habitbell.app.breath.BreathInputSourceType = com.habitbell.app.breath.BreathInputSourceType.ACOUSTIC_MIC,
     onSelectBreathInputSource: (com.habitbell.app.breath.BreathInputSourceType) -> Unit = {},
+    onSelectBreathMicSensitivity: (Float) -> Unit = {},
     onManualBreathStrokeTap: () -> Unit = {}
 ) {
     Column(
@@ -968,6 +974,7 @@ private fun PortraitSessionLayout(
                             breathUpdate = sessionState.breathUpdate,
                             selectedInputSource = selectedBreathInputSource,
                             onSelectInputSource = onSelectBreathInputSource,
+                            onSelectSensitivity = onSelectBreathMicSensitivity,
                             onManualStrokeTap = onManualBreathStrokeTap
                         )
                     } else {

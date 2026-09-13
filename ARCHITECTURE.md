@@ -888,11 +888,19 @@ The Surya Namaskar subsystem provides comprehensive data persistence, animated v
 
 #### 3. Pluggable Data Sources (`BreathDataSource`)
 The subsystem implements a modular, swappable data layer via the `BreathDataSource` interface (`start`, `pause`, `resume`, `stop`, `reset`, `registerManualStroke`):
-1. **`AcousticBreathSensorProvider.kt` (Hands-Free Acoustic DSP)**:
-   - **Audio Record Pipeline**: Captures raw PCM audio via low-latency 16 kHz 16-bit Mono `AudioRecord` buffers on a dedicated background coroutine (`Dispatchers.IO`).
-   - **Dynamic Ambient Noise Floor Calibration**: Continuously tracks background noise floor with exponential smoothing ($\alpha = 0.05$). Thresholds automatically scale relative to ambient environment.
+1. **`AcousticBreathSensorProvider.kt` (Hands-Free Acoustic DSP & Hysteresis Engine)**:
+   - **Audio Record Pipeline**: Captures raw PCM audio via low-latency 16 kHz 16-bit Mono `AudioRecord` buffers on a dedicated background coroutine (`Dispatchers.IO`). Prioritizes `MediaRecorder.AudioSource.VOICE_RECOGNITION` to bypass aggressive OEM noise suppression/gating that clips breath turbulence, falling back to `MIC` if unavailable.
+   - **2nd-Order Biquad IIR Bandpass Filter**: Center frequency $f_c = 2400\text{ Hz}$, $Q = 1.0$, passband 1.2 kHz – 4.0 kHz isolating sharp nasal expulsion turbulence. Rejects low-frequency room rumble (>23 dB attenuation at 100 Hz) and thermal high-frequency microphone hiss (>20 dB attenuation at 7.5 kHz).
+   - **Continuous Dynamic Ambient Noise Floor Tracking**: Continuously adapts background noise floor in real time when in the calm idle state (quick downward tracking $\alpha = 0.12$, gentle upward tracking $\alpha = 0.02$). Dynamic stroke threshold dynamically scales: $\text{Threshold} = (\text{NoiseFloor} \times \frac{2.4}{\text{Sensitivity}} + \frac{0.022}{\text{Sensitivity}})$.
+   - **3-Stage Hysteresis State Machine**:
+     - `IDLE_LISTENING`: Monitors for sharp energy rise onset ($\Delta E > \text{Threshold} \times 0.20$ or $E > \text{Threshold} \times 1.15$). Enforces 420ms minimum refractory lockout (142 BPM ceiling).
+     - `ATTACK_DETECTED`: Tracks peak energy; validates physiological burst duration (35ms – 300ms). Confirms exactly 1 stroke upon peak decay ($E < E_{\text{peak}} \times 0.72$).
+     - `COOLDOWN_VALLEY`: Mandates quiet passive inhalation valley drop ($E < \text{Threshold} \times 0.70$) before re-arming to `IDLE_LISTENING`, eliminating false double-triggering.
+   - **Acoustic Self-Feedback Mitigation & Blanking**:
+     - `blankDetection(durationMs)` allows `CentralSessionHandler` to temporarily mute acoustic detection (320ms on stroke chime, 2000ms on phase transition cues) so speaker audio does not create an uncontrolled counting feedback loop.
+     - Interactive Sensitivity Selector chips (`Low 0.7x`, `Med 1.0x`, `High 1.5x`) and live real-time RMS needle gauge rendered on `BreathCounterContent.kt`.
    - **Technique-Specific Digital Signal Processing (DSP)**:
-     - **Kapalabhati**: First-order difference bandpass filter focusing on turbulent 1.5 kHz – 4.5 kHz high-frequency nasal expulsion hiss. Employs a 280ms refractory lockout period to prevent double-counting.
+     - **Kapalabhati**: Biquad bandpass filter + 3-stage hysteresis state machine tuned for 35ms–300ms passive-active abdominal recoil expulsions.
      - **Bhastrika**: Dual-phase RMS energy peak detector capturing both forceful inhalation and sharp exhalation phases within a 650ms minimum bellows cycle envelope.
      - **Bhramari**: Low-frequency harmonic pitch tracker utilizing normalized autocorrelation over the 80 Hz – 250 Hz fundamental human humming swara band. Tracks continuous sustained hum duration and fires round completion upon exhalation drop-off.
 2. **`ManualTapBreathProvider.kt` (Touch Fallback & High-Cadence Tap)**:

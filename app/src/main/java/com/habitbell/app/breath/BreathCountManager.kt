@@ -116,6 +116,28 @@ class BreathCountManager(private val context: Context) {
     }
 
     /**
+     * Dynamically updates the microphone detection sensitivity (0.5f to 2.5f).
+     *
+     * @param sensitivity Multiplier scaling the acoustic trigger threshold.
+     */
+    fun setMicSensitivity(sensitivity: Float) {
+        val clamped = sensitivity.coerceIn(0.5f, 2.5f)
+        activeConfig = activeConfig?.copy(micSensitivity = clamped)
+        acousticProvider.setSensitivity(clamped)
+        _strokeFlow.update { it.copy(micSensitivity = clamped) }
+    }
+
+    /**
+     * Temporarily blanks/mutes acoustic stroke evaluation to prevent phone speaker audio
+     * (interval bells, voice guidance cues, stroke ticks) from self-triggering false strokes.
+     *
+     * @param durationMs Blanking duration in milliseconds.
+     */
+    fun blankAcousticDetection(durationMs: Long) {
+        acousticProvider.blankDetection(durationMs)
+    }
+
+    /**
      * Ingests primitive events emitted by active data source and advances the state machine.
      */
     private fun handleInputEvent(event: BreathInputEvent) {
@@ -140,6 +162,8 @@ class BreathCountManager(private val context: Context) {
                     totalSessionStrokes = newTotalStrokes,
                     cadenceBpm = event.instantaneousCadenceBpm,
                     audioAmplitudeRms = event.audioAmplitudeRms,
+                    thresholdRms = event.thresholdRms,
+                    micSensitivity = activeConfig?.micSensitivity ?: 1.0f,
                     humDurationSeconds = event.activeHumDurationSeconds,
                     timestampMillis = event.timestampMillis
                 )
@@ -155,6 +179,8 @@ class BreathCountManager(private val context: Context) {
             _strokeFlow.update {
                 it.copy(
                     audioAmplitudeRms = event.audioAmplitudeRms,
+                    thresholdRms = event.thresholdRms,
+                    micSensitivity = activeConfig?.micSensitivity ?: 1.0f,
                     humDurationSeconds = event.activeHumDurationSeconds
                 )
             }
@@ -179,6 +205,7 @@ class BreathCountManager(private val context: Context) {
      */
     private fun startRetentionPhase(config: BreathCounterConfig, currentRound: Int) {
         countdownJob?.cancel()
+        blankAcousticDetection(1800L)
         _strokeFlow.update {
             it.copy(
                 currentPhase = BreathCounterPhase.RETENTION_HOLD,
@@ -210,6 +237,7 @@ class BreathCountManager(private val context: Context) {
      */
     private fun startRestPhase(config: BreathCounterConfig, currentRound: Int) {
         countdownJob?.cancel()
+        blankAcousticDetection(1500L)
         _strokeFlow.update {
             it.copy(
                 currentPhase = BreathCounterPhase.REST,
@@ -240,6 +268,7 @@ class BreathCountManager(private val context: Context) {
         if (completedRound < config.targetRounds) {
             val nextRound = completedRound + 1
             val nextTarget = config.strokesForRound(nextRound)
+            blankAcousticDetection(1500L)
             _strokeFlow.update {
                 it.copy(
                     currentRound = nextRound,
@@ -252,6 +281,7 @@ class BreathCountManager(private val context: Context) {
             }
             onPhaseChanged?.invoke(BreathCounterPhase.STROKES)
         } else {
+            blankAcousticDetection(2500L)
             _strokeFlow.update {
                 it.copy(
                     currentPhase = BreathCounterPhase.COMPLETED,
@@ -270,6 +300,7 @@ class BreathCountManager(private val context: Context) {
     fun startSession(config: BreathCounterConfig) {
         activeConfig = config
         countdownJob?.cancel()
+        blankAcousticDetection(1500L)
 
         val initialTarget = config.strokesForRound(1)
         _strokeFlow.value = BreathStrokeUpdate(
@@ -281,7 +312,9 @@ class BreathCountManager(private val context: Context) {
             cadenceBpm = 0,
             currentPhase = BreathCounterPhase.STROKES,
             phaseRemainingSeconds = 0,
-            phaseDurationSeconds = 0
+            phaseDurationSeconds = 0,
+            thresholdRms = 0.05f,
+            micSensitivity = config.micSensitivity
         )
 
         // Apply config's preferred input mode if available

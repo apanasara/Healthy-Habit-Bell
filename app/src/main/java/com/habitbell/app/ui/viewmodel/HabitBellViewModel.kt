@@ -900,6 +900,15 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     /**
+     * Dynamically adjusts the microphone detection sensitivity for breath counting sessions.
+     *
+     * @param sensitivity Multiplier (0.5f to 2.5f; 0.7f = Low, 1.0f = Med, 1.5f = High).
+     */
+    fun setBreathMicSensitivity(sensitivity: Float) {
+        breathCountManager.setMicSensitivity(sensitivity)
+    }
+
+    /**
      * Persists and live-updates active Surya Namaskar timer sequence parameters, including
      * 12 posture durations, target repetition rounds, speed preset, custom pace, and global voice guidance.
      *
