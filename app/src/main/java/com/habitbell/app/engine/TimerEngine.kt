@@ -87,13 +87,21 @@ data class TimerSessionState(
     val preparationSecondsRemaining: Int = 0,
     val totalPreparationSeconds: Int = 5,
     // Breath Counter Tracking (Kapalabhati, Bhastrika, Bhramari)
-    val breathUpdate: com.habitbell.app.breath.BreathStrokeUpdate? = null
+    val breathUpdate: com.habitbell.app.breath.BreathStrokeUpdate? = null,
+    // Mantra & Sacred Verse Counter Tracking (Gayatri, Aumkar, Ram Japa, Tasbih)
+    val mantraUpdate: com.habitbell.app.mantra.MantraUpdate? = null
 ) {
     /**
      * Whether real-time breath stroke or hum counting is active for this session.
      */
     val isBreathCountingActive: Boolean
         get() = profile.isBreathCountingEnabled
+
+    /**
+     * Whether real-time acoustic or tap mantra recitation counting is active for this session.
+     */
+    val isMantraCountingActive: Boolean
+        get() = profile.isMantraCountingEnabled
 
     /**
      * Whether the session is currently in the 5-second lead-in preparation countdown.
@@ -575,6 +583,29 @@ class TimerEngine(
         }
 
         if (update.currentPhase == com.habitbell.app.breath.BreathCounterPhase.COMPLETED) {
+            onSessionCompleted()
+        }
+    }
+
+    /**
+     * Ingests real-time mantra bead and recitation updates from [com.habitbell.app.mantra.MantraCountManager].
+     * Synchronizes live bead count, CPM cadence, active verse timing, and triggers completion when target reached.
+     *
+     * @param update Authoritative mantra update containing live bead count, cadence, and completion status.
+     */
+    fun onMantraUpdated(update: com.habitbell.app.mantra.MantraUpdate) {
+        if (_state.value.status != SessionStatus.RUNNING) return
+        if (!_state.value.profile.isMantraCountingEnabled) return
+
+        _state.update {
+            it.copy(
+                mantraUpdate = update,
+                currentRound = update.currentMala,
+                totalRounds = update.targetMalas
+            )
+        }
+
+        if (update.isCompleted) {
             onSessionCompleted()
         }
     }

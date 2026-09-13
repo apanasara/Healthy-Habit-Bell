@@ -43,11 +43,16 @@ data class TimerProfile(
     val stepGoal: Int? = null,
     val stepInterval: Int? = null,
     val stepTriggerMode: StepTriggerMode = StepTriggerMode.TIME_OR_STEPS,
-    val breathCounterConfig: BreathCounterConfig? = null
+    val breathCounterConfig: BreathCounterConfig? = null,
+    val mantraConfig: MantraCounterConfig? = null
 ) {
     /** Whether this profile uses real-time breath stroke or hum counting (Kapalabhati, Bhastrika, Bhramari). */
     val isBreathCountingEnabled: Boolean
         get() = breathCounterConfig != null
+
+    /** Whether this profile uses real-time acoustic/tap mantra and sacred verse recitation counting. */
+    val isMantraCountingEnabled: Boolean
+        get() = mantraConfig != null
 
     /** Whether this profile uses step tracking or step-based interval cues. */
     val isStepTrackingEnabled: Boolean

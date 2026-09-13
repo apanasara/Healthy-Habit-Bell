@@ -171,6 +171,38 @@ class TimerRepository(private val context: Context) {
                 )
             }
 
+            // Restore any persistent Mantra Counter customizations
+            val restoredMantra = defaultProfile.mantraConfig?.let { baseConfig ->
+                val techName = prefs.getString("profile_mantra_technique_${defaultProfile.id}", null)
+                val technique = if (techName != null) {
+                    try {
+                        com.habitbell.app.mantra.MantraTechnique.valueOf(techName)
+                    } catch (_: Exception) {
+                        baseConfig.technique
+                    }
+                } else {
+                    baseConfig.technique
+                }
+                val beads = prefs.getInt("profile_mantra_beads_${defaultProfile.id}", baseConfig.targetBeads)
+                val malas = prefs.getInt("profile_mantra_malas_${defaultProfile.id}", baseConfig.targetMalas)
+                val minDur = prefs.getFloat("profile_mantra_min_dur_${defaultProfile.id}", baseConfig.minVerseDurationSec)
+                val pause = prefs.getFloat("profile_mantra_pause_${defaultProfile.id}", baseConfig.interVersePauseThresholdSec)
+                val hapticEnabled = prefs.getBoolean("profile_mantra_haptic_${defaultProfile.id}", baseConfig.isBeadHapticEnabled)
+                val chimeEnabled = prefs.getBoolean("profile_mantra_chime_${defaultProfile.id}", baseConfig.isMilestoneChimeEnabled)
+                val micSens = prefs.getFloat("profile_mantra_mic_sens_${defaultProfile.id}", baseConfig.micSensitivity)
+
+                val canonical = com.habitbell.app.data.model.MantraCounterConfig.forTechnique(technique)
+                canonical.copy(
+                    targetBeads = if (beads > 0) beads else canonical.targetBeads,
+                    targetMalas = if (malas > 0) malas else canonical.targetMalas,
+                    minVerseDurationSec = if (minDur > 0f) minDur else canonical.minVerseDurationSec,
+                    interVersePauseThresholdSec = if (pause > 0f) pause else canonical.interVersePauseThresholdSec,
+                    isBeadHapticEnabled = hapticEnabled,
+                    isMilestoneChimeEnabled = chimeEnabled,
+                    micSensitivity = micSens
+                )
+            }
+
             val finalTotalDuration = if (restoredCompound != null) {
                 restoredCompound.poses.sumOf { it.durationSeconds } * restoredCompound.targetRounds
             } else {
@@ -182,7 +214,8 @@ class TimerRepository(private val context: Context) {
                 intervalDurationSeconds = inter,
                 pranayamaConfig = restoredPranayama,
                 compoundConfig = restoredCompound,
-                breathCounterConfig = restoredBreath
+                breathCounterConfig = restoredBreath,
+                mantraConfig = restoredMantra
             )
         }
     }
@@ -506,6 +539,38 @@ class TimerRepository(private val context: Context) {
             list.map { profile ->
                 if (profile.id == profileId) {
                     profile.copy(breathCounterConfig = config)
+                } else {
+                    profile
+                }
+            }
+        }
+    }
+
+    /**
+     * Persists and updates custom mantra recitation counter configuration for a targeted profile.
+     *
+     * @param profileId Unique string ID of the profile (e.g. "mantra-japa-counter").
+     * @param config Updated [com.habitbell.app.data.model.MantraCounterConfig] model containing technique, target beads, rounds, and thresholds.
+     */
+    fun updateMantraCounterConfig(
+        profileId: String,
+        config: com.habitbell.app.data.model.MantraCounterConfig
+    ) {
+        prefs.edit()
+            .putString("profile_mantra_technique_$profileId", config.technique.name)
+            .putInt("profile_mantra_beads_$profileId", config.targetBeads)
+            .putInt("profile_mantra_malas_$profileId", config.targetMalas)
+            .putFloat("profile_mantra_min_dur_$profileId", config.minVerseDurationSec)
+            .putFloat("profile_mantra_pause_$profileId", config.interVersePauseThresholdSec)
+            .putBoolean("profile_mantra_haptic_$profileId", config.isBeadHapticEnabled)
+            .putBoolean("profile_mantra_chime_$profileId", config.isMilestoneChimeEnabled)
+            .putFloat("profile_mantra_mic_sens_$profileId", config.micSensitivity)
+            .apply()
+
+        _profiles.update { list ->
+            list.map { profile ->
+                if (profile.id == profileId) {
+                    profile.copy(mantraConfig = config)
                 } else {
                     profile
                 }

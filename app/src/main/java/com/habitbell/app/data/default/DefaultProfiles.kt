@@ -267,12 +267,38 @@ object DefaultProfiles {
         )
 
     /**
+     * Unified Acoustic Mantra & Sacred Verse Counter:
+     * Smart acoustic/tap sacred recitation and bead counter supporting multi-tradition modalities:
+     * - [com.habitbell.app.mantra.MantraTechnique.GAYATRI_MANTRA]: Extended Vedic solar metre across 108 beads.
+     * - [com.habitbell.app.mantra.MantraTechnique.MAHA_MRITYUNJAYA]: Great Death-Conquering hymn across 108 beads.
+     * - [com.habitbell.app.mantra.MantraTechnique.AUMKAR]: Deep primordial sustained resonance across 21 or 108 counts.
+     * - [com.habitbell.app.mantra.MantraTechnique.RAM_JAPA]: Rhythmic single-phrase Taraka mantra japa.
+     * - [com.habitbell.app.mantra.MantraTechnique.TASBIH_DHIKR]: Islamic prayer remembrance (33/33/34 beads).
+     * - [com.habitbell.app.mantra.MantraTechnique.JESUS_PRAYER]: Christian contemplative prayer rope (33/100 knots).
+     * - [com.habitbell.app.mantra.MantraTechnique.UNIVERSAL_VERSE]: Open-ended scripture recitation counter.
+     */
+    val MANTRA_COUNTER = TimerProfile(
+        id = "mantra-japa-counter",
+        name = "Mantra Counter",
+        type = TimerType.MULTI_INTERVAL,
+        category = "Sacred Recitation",
+        iconName = "all_inclusive",
+        theme = ThemeMode.AMOLED,
+        bellPattern = BellPattern.SINGLE,
+        displayMode = true,
+        pocketMode = false,
+        isFavorite = true,
+        mantraConfig = MantraCounterConfig.DEFAULT_GAYATRI
+    )
+
+    /**
      * Complete list of all curated default preset wellness profiles.
      * De-duplicated and consolidated around canonical mindfulness habits.
      */
     val ALL_PRESETS = listOf(
         PRANAYAMA_HATHA,
         BREATH_COUNTER,
+        MANTRA_COUNTER,
         EATING,
         REIKI,
         SURYA_NAMASKAR,

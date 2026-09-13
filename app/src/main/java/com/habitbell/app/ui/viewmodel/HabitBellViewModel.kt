@@ -940,6 +940,70 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
         updateBreathCounterConfig(currentProfile.id, updatedConfig)
     }
 
+    /** Central mantra and sacred verse recitation orchestrator from process singleton. */
+    val mantraCountManager: com.habitbell.app.mantra.MantraCountManager = sessionHandler.mantraCountManager
+
+    /** Active mantra input source type stream (Mic vs Tap). */
+    val selectedMantraInputSource: StateFlow<com.habitbell.app.mantra.MantraInputSourceType> =
+        mantraCountManager.selectedInputSource
+
+    /**
+     * Switches the active mantra input source between Acoustic Mic and Touch Tap.
+     *
+     * @param type Target provider typology ([com.habitbell.app.mantra.MantraInputSourceType]).
+     */
+    fun setMantraInputSource(type: com.habitbell.app.mantra.MantraInputSourceType) {
+        mantraCountManager.selectInputSource(type)
+    }
+
+    /**
+     * Registers an interactive touch bead advance on the mantra counter surface.
+     */
+    fun registerManualMantraBead() {
+        mantraCountManager.registerManualBead()
+    }
+
+    /**
+     * Dynamically adjusts the microphone detection sensitivity for mantra recitation sessions.
+     *
+     * @param sensitivity Multiplier (0.5f to 2.5f; 0.7f = Low, 1.0f = Med, 1.5f = High, 2.2f = Whisper).
+     */
+    fun setMantraMicSensitivity(sensitivity: Float) {
+        mantraCountManager.setMicSensitivity(sensitivity)
+    }
+
+    /**
+     * Persists and live-updates active mantra recitation counter configuration.
+     *
+     * @param profileId Unique string identifier of the target profile.
+     * @param config Updated [com.habitbell.app.data.model.MantraCounterConfig] model.
+     */
+    fun updateMantraCounterConfig(
+        profileId: String,
+        config: com.habitbell.app.data.model.MantraCounterConfig
+    ) {
+        repository.updateMantraCounterConfig(profileId, config)
+        if (sessionState.value.profile.id == profileId) {
+            val updated = sessionState.value.profile.copy(mantraConfig = config)
+            engine.loadProfile(updated)
+            if (sessionState.value.status == com.habitbell.app.engine.SessionStatus.IDLE) {
+                mantraCountManager.startSession(config)
+            }
+        }
+    }
+
+    /**
+     * Fast-switches the active sacred recitation technique during preparation or idle mode.
+     *
+     * @param technique Targeted sacred recitation modality ([com.habitbell.app.mantra.MantraTechnique]).
+     */
+    fun updateMantraTechnique(technique: com.habitbell.app.mantra.MantraTechnique) {
+        val currentProfile = sessionState.value.profile
+        val currentConfig = currentProfile.mantraConfig ?: com.habitbell.app.data.model.MantraCounterConfig.DEFAULT_GAYATRI
+        val updatedConfig = currentConfig.withTechnique(technique)
+        updateMantraCounterConfig(currentProfile.id, updatedConfig)
+    }
+
     /**
      * Persists and live-updates active Surya Namaskar timer sequence parameters, including
      * 12 posture durations, target repetition rounds, speed preset, custom pace, and global voice guidance.

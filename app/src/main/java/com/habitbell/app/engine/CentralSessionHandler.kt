@@ -156,6 +156,31 @@ class CentralSessionHandler(private val application: Application) {
         }
     }
 
+    /** Mantra and sacred verse recitation tracking orchestrator. */
+    val mantraCountManager: com.habitbell.app.mantra.MantraCountManager = com.habitbell.app.mantra.MantraCountManager(application).apply {
+        onBeadRegistered = { bead, targetBeads, mala, cadenceCpm ->
+            val profile = engine.state.value.profile
+            val config = profile.mantraConfig
+            if (config?.isBeadHapticEnabled == true) {
+                hapticManager.triggerMalaBeadHaptic()
+            }
+        }
+        onMilestoneReached = { _ ->
+            val profile = engine.state.value.profile
+            val config = profile.mantraConfig
+            if (config?.isMilestoneChimeEnabled == true) {
+                mantraCountManager.blankAcousticDetection(3500L)
+                audioManager.playIntervalBell()
+                hapticManager.triggerMalaMilestoneHaptic()
+            }
+        }
+        onSessionCompleted = {
+            mantraCountManager.blankAcousticDetection(8000L)
+            audioManager.playCompletionBell()
+            hapticManager.triggerCompletionHaptic()
+        }
+    }
+
     /** Gentle lady voice guidance coordinator for Pranayama breathwork. */
     val voiceGuide: PranayamaVoiceGuide = PranayamaVoiceGuide(application, bgMusicManager)
 
@@ -221,6 +246,7 @@ class CentralSessionHandler(private val application: Application) {
         setupCastListener()
         setupHealthStepListener()
         setupBreathCountListener()
+        setupMantraCountListener()
 
         // Initialize engine with default profile
         val initialProfile = repository.getProfileById("eating-mindful-20")
@@ -252,6 +278,19 @@ class CentralSessionHandler(private val application: Application) {
             breathCountManager.strokeFlow.collect { strokeUpdate ->
                 if (engine.state.value.status == SessionStatus.RUNNING) {
                     engine.onBreathStrokeUpdated(strokeUpdate)
+                }
+            }
+        }
+    }
+
+    /**
+     * Ingests live mantra recitation updates and pipes them to the active [TimerEngine] session.
+     */
+    private fun setupMantraCountListener() {
+        scope.launch {
+            mantraCountManager.mantraFlow.collect { mantraUpdate ->
+                if (engine.state.value.status == SessionStatus.RUNNING) {
+                    engine.onMantraUpdated(mantraUpdate)
                 }
             }
         }
@@ -395,6 +434,12 @@ class CentralSessionHandler(private val application: Application) {
                                 }
                             }
 
+                            if (state.profile.isMantraCountingEnabled) {
+                                state.profile.mantraConfig?.let { mConfig ->
+                                    mantraCountManager.startSession(mConfig)
+                                }
+                            }
+
                             if (castManager.isCasting.value) {
                                 if (lastCastProfileId != state.profile.id) {
                                     lastCastProfileId = state.profile.id
@@ -425,6 +470,10 @@ class CentralSessionHandler(private val application: Application) {
                                 breathCountManager.pauseSession()
                             }
 
+                            if (state.profile.isMantraCountingEnabled) {
+                                mantraCountManager.pauseSession()
+                            }
+
                             if (castManager.isCasting.value) {
                                 castManager.pause()
                             }
@@ -450,6 +499,10 @@ class CentralSessionHandler(private val application: Application) {
                                 breathCountManager.stopSession()
                             }
 
+                            if (state.profile.isMantraCountingEnabled) {
+                                mantraCountManager.stopSession()
+                            }
+
                             if (castManager.isCasting.value) {
                                 castManager.stop()
                             }
@@ -462,6 +515,7 @@ class CentralSessionHandler(private val application: Application) {
                             bgMusicManager.stop()
                             healthStepManager.resetSession()
                             breathCountManager.resetSession()
+                            mantraCountManager.resetSession()
                             lastCastProfileId = null
 
                             if (castManager.isCasting.value) {
@@ -710,6 +764,7 @@ class CentralSessionHandler(private val application: Application) {
             "posture" -> repository.getProfileById("posture") ?: repository.profiles.value.find { it.category.contains("Movement", ignoreCase = true) } ?: DefaultProfiles.EATING
             "breathing" -> repository.getProfileById("pranayama-hatha-classical") ?: DefaultProfiles.PRANAYAMA_HATHA
             "breath-counter", "kriya", "kapalabhati", "bhastrika", "bhramari" -> repository.getProfileById("kriya-breath-counter") ?: DefaultProfiles.BREATH_COUNTER
+            "mantra", "japa", "gayatri", "aumkar", "tasbih", "mantra-counter" -> repository.getProfileById("mantra-japa-counter") ?: DefaultProfiles.MANTRA_COUNTER
             else -> repository.getProfileById(mediaId) ?: repository.profiles.value.firstOrNull() ?: DefaultProfiles.EATING
         }
         startProfile(targetProfile)
@@ -732,7 +787,8 @@ class CentralSessionHandler(private val application: Application) {
                 (lowerMessage.contains("posture") && it.id == "posture") ||
                 (lowerMessage.contains("walk") && it.id.contains("walking")) ||
                 (lowerMessage.contains("pranayam") && it.id.contains("pranayama")) ||
-                ((lowerMessage.contains("kriya") || lowerMessage.contains("kapalabhati") || lowerMessage.contains("bhastrika") || lowerMessage.contains("bhramari") || lowerMessage.contains("breath")) && it.id.contains("breath-counter"))
+                ((lowerMessage.contains("kriya") || lowerMessage.contains("kapalabhati") || lowerMessage.contains("bhastrika") || lowerMessage.contains("bhramari") || lowerMessage.contains("breath")) && it.id.contains("breath-counter")) ||
+                ((lowerMessage.contains("mantra") || lowerMessage.contains("japa") || lowerMessage.contains("gayatri") || lowerMessage.contains("aumkar") || lowerMessage.contains("tasbih")) && it.id.contains("mantra"))
             )
         } ?: allProfiles.firstOrNull() ?: DefaultProfiles.EATING
 
@@ -824,6 +880,7 @@ class CentralSessionHandler(private val application: Application) {
         engine.destroy()
         healthStepManager.destroy()
         breathCountManager.destroy()
+        mantraCountManager.destroy()
         hapticManager.cancel()
         bgMusicManager.release()
         audioManager.release()

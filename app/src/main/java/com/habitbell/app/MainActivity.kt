@@ -87,6 +87,7 @@ class MainActivity : FragmentActivity() {
             val externalDisplayName by viewModel.screenMirroringManager.externalDisplayName.collectAsStateWithLifecycle()
             var hasActivityPermission by remember { mutableStateOf(viewModel.healthStepManager.hasActivityRecognitionPermission()) }
             val selectedBreathInputSource by viewModel.selectedBreathInputSource.collectAsStateWithLifecycle()
+            val selectedMantraInputSource by viewModel.selectedMantraInputSource.collectAsStateWithLifecycle()
             var hasAudioPermission by remember {
                 mutableStateOf(
                     androidx.core.content.ContextCompat.checkSelfPermission(
@@ -105,6 +106,18 @@ class MainActivity : FragmentActivity() {
                     viewModel.setBreathInputSource(com.habitbell.app.breath.BreathInputSourceType.ACOUSTIC_MIC)
                 } else {
                     viewModel.setBreathInputSource(com.habitbell.app.breath.BreathInputSourceType.MANUAL_TAP)
+                }
+            }
+
+            // Audio recording permission request launcher for acoustic mantra recitation counting
+            val recordMantraAudioLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+                contract = androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+            ) { isGranted ->
+                hasAudioPermission = isGranted
+                if (isGranted) {
+                    viewModel.setMantraInputSource(com.habitbell.app.mantra.MantraInputSourceType.ACOUSTIC_MIC)
+                } else {
+                    viewModel.setMantraInputSource(com.habitbell.app.mantra.MantraInputSourceType.MANUAL_BEAD_TAP)
                 }
             }
 
@@ -299,6 +312,23 @@ class MainActivity : FragmentActivity() {
                                 },
                                 onSelectBreathTechnique = { technique ->
                                     viewModel.updateBreathTechnique(technique)
+                                },
+                                selectedMantraInputSource = selectedMantraInputSource,
+                                onSelectMantraInputSource = { source ->
+                                    if (source == com.habitbell.app.mantra.MantraInputSourceType.ACOUSTIC_MIC && !hasAudioPermission) {
+                                        recordMantraAudioLauncher.launch(android.Manifest.permission.RECORD_AUDIO)
+                                    } else {
+                                        viewModel.setMantraInputSource(source)
+                                    }
+                                },
+                                onManualMantraBeadTap = {
+                                    viewModel.registerManualMantraBead()
+                                },
+                                onSelectMantraMicSensitivity = { sensitivity ->
+                                    viewModel.setMantraMicSensitivity(sensitivity)
+                                },
+                                onSelectMantraTechnique = { technique ->
+                                    viewModel.updateMantraTechnique(technique)
                                 }
                             )
                         }
@@ -353,6 +383,9 @@ class MainActivity : FragmentActivity() {
                             },
                             onUpdateBreathCounterConfig = { profileId, config ->
                                 viewModel.updateBreathCounterConfig(profileId, config)
+                            },
+                            onUpdateMantraCounterConfig = { profileId, config ->
+                                viewModel.updateMantraCounterConfig(profileId, config)
                             },
                             onTestVoiceCue = { style, isTriBandha, volume -> viewModel.testPranayamaVoiceCue(style, isTriBandha, volume) },
                             onTestPranayamaIntervalBell = { viewModel.testPranayamaIntervalBell() },
