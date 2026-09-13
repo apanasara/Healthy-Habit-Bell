@@ -159,7 +159,7 @@ class TimerRepository(private val context: Context) {
     val profiles: StateFlow<List<TimerProfile>> = _profiles.asStateFlow()
 
     /** Mutable backing stream tracking recently executed profile IDs (ordered most recent first). */
-    private val _recentProfileIds = MutableStateFlow<List<String>>(listOf("eating-mindful-20", "pranayama-box-breath", "reiki-session-45"))
+    private val _recentProfileIds = MutableStateFlow<List<String>>(listOf("eating-mindful-20", DefaultProfiles.PRANAYAMA_HATHA.id, "reiki-session-45"))
 
     /** Public read-only stream emitting list of recently used profile IDs. */
     val recentProfileIds: StateFlow<List<String>> = _recentProfileIds.asStateFlow()

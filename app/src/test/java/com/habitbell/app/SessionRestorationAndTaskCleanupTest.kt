@@ -91,9 +91,9 @@ class SessionRestorationAndTaskCleanupTest {
     fun testActiveSessionBannerVisibilityCondition() {
         val runningState = TimerSessionState(
             status = SessionStatus.RUNNING,
-            profile = DefaultProfiles.MINDFUL_READING,
+            profile = DefaultProfiles.EATING,
             remainingSeconds = 900,
-            totalSeconds = 1800
+            totalSeconds = 2700
         )
         val shouldShowBannerRunning = runningState.status == SessionStatus.RUNNING || runningState.status == SessionStatus.PAUSED
         assertTrue("Banner must be visible during running practice", shouldShowBannerRunning)

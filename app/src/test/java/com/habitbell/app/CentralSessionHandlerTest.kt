@@ -48,13 +48,13 @@ class CentralSessionHandlerTest {
         assertEquals(2700, eatingProfile.totalDurationSeconds)
         assertEquals(60, eatingProfile.intervalDurationSeconds)
 
-        val breathingProfile = DefaultProfiles.PRANAYAMA_BOX
-        assertEquals("pranayama-box-breath", breathingProfile.id)
-        assertEquals(20, breathingProfile.pranayamaConfig?.targetRounds)
+        val breathingProfile = DefaultProfiles.PRANAYAMA_HATHA
+        assertEquals("pranayama-hatha-classical", breathingProfile.id)
+        assertEquals(12, breathingProfile.pranayamaConfig?.targetRounds)
 
-        val postureProfile = DefaultProfiles.MINDFUL_READING
-        assertEquals("mindful-reading-30", postureProfile.id)
-        assertEquals(1800, postureProfile.totalDurationSeconds)
+        val walkingProfile = DefaultProfiles.MINDFUL_WALKING
+        assertEquals("mindful-walking-15", walkingProfile.id)
+        assertEquals(900, walkingProfile.totalDurationSeconds)
     }
 
     /**
@@ -93,8 +93,8 @@ class CentralSessionHandlerTest {
                 lower.contains(it.name.lowercase()) ||
                 it.name.lowercase().contains(lower) ||
                 (lower.contains("eat") && it.id.contains("eating")) ||
-                (lower.contains("read") && it.id.contains("reading")) ||
-                (lower.contains("walk") && it.id.contains("walking"))
+                (lower.contains("walk") && it.id.contains("walking")) ||
+                (lower.contains("pranayam") && it.id.contains("pranayama"))
             )
         }
 
@@ -104,8 +104,8 @@ class CentralSessionHandlerTest {
         val walkMatch = matchVoice("start walking timer")
         assertEquals(DefaultProfiles.MINDFUL_WALKING, walkMatch)
 
-        val readMatch = matchVoice("reading timer please")
-        assertEquals(DefaultProfiles.MINDFUL_READING, readMatch)
+        val pranayamaMatch = matchVoice("pranayama practice please")
+        assertEquals(DefaultProfiles.PRANAYAMA_HATHA, pranayamaMatch)
     }
 
     /**
