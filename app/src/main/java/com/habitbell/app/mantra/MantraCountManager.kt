@@ -50,6 +50,9 @@ class MantraCountManager(
     /** Job collecting primitive inputs from the active provider. */
     private var collectorJob: Job? = null
 
+    /** Coroutine job managing the ambient acoustic noise calibration countdown. */
+    private var countdownJob: Job? = null
+
     /** Callbacks for low-latency audio/haptic dispatching. */
     var onBeadRegistered: ((beadCount: Int, targetBeads: Int, malaRound: Int, cadenceCpm: Int) -> Unit)? = null
     var onMilestoneReached: ((beadCount: Int) -> Unit)? = null
@@ -142,6 +145,17 @@ class MantraCountManager(
 
         if (currentState.isCompleted) return
 
+        // If in ambient calibration phase, gate beads but forward live amplitude/threshold
+        if (currentState.isCalibrating) {
+            _mantraFlow.update {
+                it.copy(
+                    audioAmplitudeRms = event.audioAmplitudeRms,
+                    thresholdRms = event.thresholdRms
+                )
+            }
+            return
+        }
+
         if (event.beadDelta > 0) {
             val newBead = currentState.currentBead + event.beadDelta
             val newTotal = currentState.totalSessionChants + event.beadDelta
@@ -204,26 +218,15 @@ class MantraCountManager(
 
     /**
      * Initializes and starts a new mantra recitation session.
+     * When using [MantraInputSourceType.ACOUSTIC_MIC], executes an initial 3-second
+     * ambient calibration silent pause to profile room noise (AC, fan, wind) and establish
+     * dynamic speech formant thresholds before bead counting starts.
+     *
+     * @param config Active configuration determining target Malas, beads, and sensitivity.
      */
     fun startSession(config: MantraCounterConfig) {
         activeConfig = config
-        blankAcousticDetection(1500L)
-
-        _mantraFlow.value = MantraUpdate(
-            currentBead = 0,
-            targetBeads = config.targetBeads,
-            currentMala = 1,
-            targetMalas = config.targetMalas,
-            totalSessionChants = 0,
-            cadenceCpm = 0,
-            audioAmplitudeRms = 0f,
-            thresholdRms = 0.05f,
-            isReciting = false,
-            activeVerseDurationSeconds = 0f,
-            micSensitivity = config.micSensitivity,
-            technique = config.technique,
-            isCompleted = false
-        )
+        countdownJob?.cancel()
 
         if (config.defaultInputMode == MantraInputSourceType.ACOUSTIC_MIC && acousticProvider.isAvailable) {
             selectInputSource(MantraInputSourceType.ACOUSTIC_MIC)
@@ -231,7 +234,67 @@ class MantraCountManager(
             selectInputSource(MantraInputSourceType.MANUAL_BEAD_TAP)
         }
 
-        getSourceForType(_selectedInputSource.value).start(config)
+        val isAcoustic = _selectedInputSource.value == MantraInputSourceType.ACOUSTIC_MIC && acousticProvider.isAvailable
+
+        if (isAcoustic) {
+            val calibrationDurationSec = 3
+            _mantraFlow.value = MantraUpdate(
+                currentBead = 0,
+                targetBeads = config.targetBeads,
+                currentMala = 1,
+                targetMalas = config.targetMalas,
+                totalSessionChants = 0,
+                cadenceCpm = 0,
+                audioAmplitudeRms = 0f,
+                thresholdRms = 0.05f,
+                isReciting = false,
+                activeVerseDurationSeconds = 0f,
+                micSensitivity = config.micSensitivity,
+                isCalibrating = true,
+                calibrationSecondsRemaining = calibrationDurationSec,
+                technique = config.technique,
+                isCompleted = false
+            )
+
+            getSourceForType(_selectedInputSource.value).start(config)
+
+            countdownJob = scope.launch {
+                var remaining = calibrationDurationSec
+                while (remaining > 0 && isActive) {
+                    delay(1000L)
+                    remaining--
+                    _mantraFlow.update { it.copy(calibrationSecondsRemaining = remaining) }
+                }
+                if (isActive) {
+                    blankAcousticDetection(500L)
+                    _mantraFlow.update {
+                        it.copy(
+                            isCalibrating = false,
+                            calibrationSecondsRemaining = 0
+                        )
+                    }
+                }
+            }
+        } else {
+            _mantraFlow.value = MantraUpdate(
+                currentBead = 0,
+                targetBeads = config.targetBeads,
+                currentMala = 1,
+                targetMalas = config.targetMalas,
+                totalSessionChants = 0,
+                cadenceCpm = 0,
+                audioAmplitudeRms = 0f,
+                thresholdRms = 0.05f,
+                isReciting = false,
+                activeVerseDurationSeconds = 0f,
+                micSensitivity = config.micSensitivity,
+                isCalibrating = false,
+                calibrationSecondsRemaining = 0,
+                technique = config.technique,
+                isCompleted = false
+            )
+            getSourceForType(_selectedInputSource.value).start(config)
+        }
     }
 
     /**
@@ -252,6 +315,7 @@ class MantraCountManager(
      * Terminates the active counting session and halts hardware listeners.
      */
     fun stopSession() {
+        countdownJob?.cancel()
         getSourceForType(_selectedInputSource.value).stop()
         activeConfig = null
     }
@@ -260,6 +324,7 @@ class MantraCountManager(
      * Resets metrics back to clean baseline.
      */
     fun resetSession() {
+        countdownJob?.cancel()
         getSourceForType(_selectedInputSource.value).reset()
         _mantraFlow.value = MantraUpdate()
     }

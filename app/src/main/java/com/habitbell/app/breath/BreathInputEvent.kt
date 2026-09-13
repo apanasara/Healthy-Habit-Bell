@@ -7,7 +7,7 @@ package com.habitbell.app.breath
  *
  * ## Architectural Role & Relationships
  * - Dispatched by [AcousticBreathSensorProvider], [ManualTapBreathProvider], or [SimulatedBreathProvider].
- * - Ingested by [BreathCountManager] to evaluate stroke progression, cadence, and round state.
+ * - Ingested by [BreathCountManager] to evaluate stroke progression, cadence, ambient calibration, and round state.
  *
  * ## Lifecycle & Concurrency
  * Immutable value entity. Thread-safe across all dispatchers.
@@ -18,6 +18,8 @@ package com.habitbell.app.breath
  * @property isHummingActive Whether sustained vocal resonance (Bhramari) is actively detected.
  * @property activeHumDurationSeconds Unbroken duration of active humming in seconds.
  * @property thresholdRms Normalized acoustic trigger threshold (`0.0f` to `1.0f`) evaluated by DSP.
+ * @property isCalibrating Whether the acoustic provider is actively profiling environmental background noise (AC, wind, fan).
+ * @property calibrationProgress Fractional progress of ambient room calibration normalized from `0.0f` to `1.0f`.
  * @property timestampMillis Epoch timestamp in milliseconds.
  */
 data class BreathInputEvent(
@@ -27,5 +29,7 @@ data class BreathInputEvent(
     val isHummingActive: Boolean = false,
     val activeHumDurationSeconds: Float = 0f,
     val thresholdRms: Float = 0.04f,
+    val isCalibrating: Boolean = false,
+    val calibrationProgress: Float = 0f,
     val timestampMillis: Long = System.currentTimeMillis()
 )

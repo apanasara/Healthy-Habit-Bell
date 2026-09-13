@@ -147,8 +147,14 @@ class BreathCountManager(private val context: Context) {
 
         // Only register strokes when actively in the STROKES phase
         if (currentState.currentPhase != BreathCounterPhase.STROKES) {
-            // Forward audio amplitude for visual ripples even during retention/rest
-            _strokeFlow.update { it.copy(audioAmplitudeRms = event.audioAmplitudeRms) }
+            // Forward audio amplitude and threshold for visual ripples and gauges even during preparation/retention/rest
+            _strokeFlow.update {
+                it.copy(
+                    audioAmplitudeRms = event.audioAmplitudeRms,
+                    thresholdRms = event.thresholdRms,
+                    isCalibrating = event.isCalibrating
+                )
+            }
             return
         }
 
@@ -299,26 +305,17 @@ class BreathCountManager(private val context: Context) {
 
     /**
      * Initializes and starts a new breath counting session.
+     *
+     * When using [BreathInputSourceType.ACOUSTIC_MIC], executes an initial 3-second
+     * [BreathCounterPhase.PREPARATION] silent profiling window to sample environmental background
+     * noise (AC blower, wind, fan, leaves) and lock dynamic trigger thresholds before beginning active stroke counting.
+     * In [BreathInputSourceType.MANUAL_TAP] mode, begins directly in [BreathCounterPhase.STROKES].
+     *
+     * @param config Active configuration determining target rounds, strokes, and sensitivity.
      */
     fun startSession(config: BreathCounterConfig) {
         activeConfig = config
         countdownJob?.cancel()
-        blankAcousticDetection(1500L)
-
-        val initialTarget = config.strokesForRound(1)
-        _strokeFlow.value = BreathStrokeUpdate(
-            currentRoundStrokes = 0,
-            targetRoundStrokes = initialTarget,
-            totalSessionStrokes = 0,
-            currentRound = 1,
-            targetRounds = config.targetRounds,
-            cadenceBpm = 0,
-            currentPhase = BreathCounterPhase.STROKES,
-            phaseRemainingSeconds = 0,
-            phaseDurationSeconds = 0,
-            thresholdRms = 0.05f,
-            micSensitivity = config.micSensitivity
-        )
 
         // Apply config's preferred input mode if available
         if (config.defaultInputMode == BreathInputSourceType.ACOUSTIC_MIC && acousticProvider.isAvailable) {
@@ -327,7 +324,66 @@ class BreathCountManager(private val context: Context) {
             selectInputSource(BreathInputSourceType.MANUAL_TAP)
         }
 
-        getSourceForType(_selectedInputSource.value).start(config)
+        val initialTarget = config.strokesForRound(1)
+        val isAcoustic = _selectedInputSource.value == BreathInputSourceType.ACOUSTIC_MIC && acousticProvider.isAvailable
+
+        if (isAcoustic) {
+            val calibrationDurationSec = 3
+            _strokeFlow.value = BreathStrokeUpdate(
+                currentRoundStrokes = 0,
+                targetRoundStrokes = initialTarget,
+                totalSessionStrokes = 0,
+                currentRound = 1,
+                targetRounds = config.targetRounds,
+                cadenceBpm = 0,
+                currentPhase = BreathCounterPhase.PREPARATION,
+                phaseRemainingSeconds = calibrationDurationSec,
+                phaseDurationSeconds = calibrationDurationSec,
+                thresholdRms = 0.05f,
+                micSensitivity = config.micSensitivity,
+                isCalibrating = true
+            )
+            onPhaseChanged?.invoke(BreathCounterPhase.PREPARATION)
+
+            getSourceForType(BreathInputSourceType.ACOUSTIC_MIC).start(config)
+
+            countdownJob = scope.launch {
+                var remaining = calibrationDurationSec
+                while (remaining > 0 && isActive) {
+                    delay(1000L)
+                    remaining--
+                    _strokeFlow.update { it.copy(phaseRemainingSeconds = remaining) }
+                }
+                if (isActive) {
+                    blankAcousticDetection(500L)
+                    _strokeFlow.update {
+                        it.copy(
+                            currentPhase = BreathCounterPhase.STROKES,
+                            phaseRemainingSeconds = 0,
+                            phaseDurationSeconds = 0,
+                            isCalibrating = false
+                        )
+                    }
+                    onPhaseChanged?.invoke(BreathCounterPhase.STROKES)
+                }
+            }
+        } else {
+            _strokeFlow.value = BreathStrokeUpdate(
+                currentRoundStrokes = 0,
+                targetRoundStrokes = initialTarget,
+                totalSessionStrokes = 0,
+                currentRound = 1,
+                targetRounds = config.targetRounds,
+                cadenceBpm = 0,
+                currentPhase = BreathCounterPhase.STROKES,
+                phaseRemainingSeconds = 0,
+                phaseDurationSeconds = 0,
+                thresholdRms = 0.05f,
+                micSensitivity = config.micSensitivity,
+                isCalibrating = false
+            )
+            getSourceForType(_selectedInputSource.value).start(config)
+        }
     }
 
     /**

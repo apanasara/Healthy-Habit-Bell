@@ -98,6 +98,25 @@ class AcousticBreathSensorProvider(
     /** Previous chunk RMS for first-difference onset tracking. */
     private var previousBandpassRms: Float = 0.003f
 
+    /** Total frames allocated for ambient noise calibration (~2.88 seconds at 32ms per frame). */
+    private val CALIBRATION_TOTAL_FRAMES = 90
+
+    /** Remaining frames to process in the active ambient calibration window. */
+    private var calibrationFramesRemaining = CALIBRATION_TOTAL_FRAMES
+
+    /** Cumulative sum of bandpass RMS values for ambient room noise averaging. */
+    private var calibrationRmsSum = 0.0
+
+    /** Total valid non-outlier frames incorporated into ambient noise baseline calculation. */
+    private var calibrationValidFramesCount = 0
+
+    /** Peak bandpass ambient noise floor observed during calibration. */
+    private var calibrationPeakRms = 0f
+
+    /** Flag indicating whether the initial ambient acoustic calibration has completed. */
+    var isCalibrated: Boolean = false
+        private set
+
     // --- Kapalabhati Stateful Hysteresis Detector ---
     private enum class KapalabhatiState {
         IDLE_LISTENING,
@@ -155,9 +174,25 @@ class AcousticBreathSensorProvider(
         blankUntilMillis = max(blankUntilMillis, System.currentTimeMillis() + durationMs)
     }
 
+    /**
+     * Commences or re-triggers ambient noise floor calibration for the specified duration.
+     * Profiles stationary environmental noise (AC blowers, wind, leaves, mic noise) and
+     * sets dynamic trigger thresholds safely above ambient room levels.
+     *
+     * @param durationMs Duration of silent profiling window in milliseconds (default 2880ms / ~90 frames).
+     */
+    fun startCalibration(durationMs: Long = 2880L) {
+        calibrationFramesRemaining = ((durationMs / 32L).toInt()).coerceAtLeast(30)
+        calibrationRmsSum = 0.0
+        calibrationValidFramesCount = 0
+        calibrationPeakRms = 0f
+        isCalibrated = false
+    }
+
     override fun start(config: BreathCounterConfig) {
         activeConfig = config
         activeSensitivity = config.micSensitivity
+        startCalibration()
         resume()
     }
 
@@ -205,6 +240,11 @@ class AcousticBreathSensorProvider(
         isCurrentlyHumming = false
         dynamicNoiseFloorRms = 0.003f
         previousBandpassRms = 0.003f
+        calibrationFramesRemaining = CALIBRATION_TOTAL_FRAMES
+        calibrationRmsSum = 0.0
+        calibrationValidFramesCount = 0
+        calibrationPeakRms = 0f
+        isCalibrated = false
         kapalabhatiState = KapalabhatiState.IDLE_LISTENING
         strokeStartTimeMillis = 0L
         strokePeakRms = 0f
@@ -281,7 +321,6 @@ class AcousticBreathSensorProvider(
         try {
             audioRecord?.startRecording()
             val pcmBuffer = ShortArray(CHUNK_SIZE)
-            var initialCalibrationFrames = 25 // ~800ms quick bootstrap
 
             while (coroutineContext.isActive) {
                 val samplesRead = audioRecord?.read(pcmBuffer, 0, CHUNK_SIZE) ?: -1
@@ -305,15 +344,43 @@ class AcousticBreathSensorProvider(
                 val rawRms = sqrt(rawSumSquares / samplesRead).toFloat()
                 val bandpassRms = sqrt(filteredSumSquares / samplesRead).toFloat()
 
-                // 2. Initial noise floor bootstrapping
-                if (initialCalibrationFrames > 0) {
-                    dynamicNoiseFloorRms = (dynamicNoiseFloorRms * 0.85f) + (bandpassRms * 0.15f)
-                    initialCalibrationFrames--
+                // 2. Ambient Noise Calibration Window (Silent profiling pause: ~2.88s / 90 frames)
+                if (calibrationFramesRemaining > 0) {
+                    val totalFrames = CALIBRATION_TOTAL_FRAMES
+                    // Outlier rejection: ignore transient handling thuds/coughs (> 0.15 bandpass RMS or > 0.25 raw RMS)
+                    if (bandpassRms <= 0.15f && rawRms <= 0.25f) {
+                        calibrationRmsSum += bandpassRms
+                        calibrationValidFramesCount++
+                        calibrationPeakRms = max(calibrationPeakRms, bandpassRms)
+                        // Running smooth update of noise floor
+                        dynamicNoiseFloorRms = (calibrationRmsSum / calibrationValidFramesCount).toFloat().coerceIn(0.0005f, 0.05f)
+                    }
+
+                    calibrationFramesRemaining--
+                    val progress = 1.0f - (calibrationFramesRemaining.toFloat() / totalFrames.toFloat()).coerceIn(0f, 1f)
+
+                    val sensitivity = activeSensitivity.coerceIn(0.5f, 2.5f)
+                    val dynamicThreshold = (dynamicNoiseFloorRms * (2.2f / sensitivity) + (0.0016f / sensitivity)).coerceIn(0.0016f, 0.15f)
+                    val normalizedAmplitude = (rawRms * 12.0f).coerceIn(0f, 1f)
+                    val normalizedThreshold = (dynamicThreshold * 12.0f).coerceIn(0.05f, 0.95f)
+
                     _inputFlow.value = BreathInputEvent(
-                        audioAmplitudeRms = (rawRms * 3.5f).coerceIn(0f, 1f),
-                        thresholdRms = 0.05f,
+                        strokeDelta = 0,
+                        instantaneousCadenceBpm = 0,
+                        audioAmplitudeRms = normalizedAmplitude,
+                        thresholdRms = normalizedThreshold,
+                        isCalibrating = true,
+                        calibrationProgress = progress,
                         timestampMillis = now
                     )
+
+                    if (calibrationFramesRemaining == 0) {
+                        isCalibrated = true
+                        Log.i(TAG, "🎯 AMBIENT CALIBRATION COMPLETE! baselineFloor=%.5f, peakAmbient=%.5f, validFrames=$calibrationValidFramesCount".format(
+                            dynamicNoiseFloorRms, calibrationPeakRms
+                        ))
+                    }
+                    previousBandpassRms = bandpassRms
                     continue
                 }
 
