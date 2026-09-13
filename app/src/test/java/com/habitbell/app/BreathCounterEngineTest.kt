@@ -194,8 +194,8 @@ class BreathCounterEngineTest {
         val sampleRate = 16000f
         val filter = AcousticBreathSensorProvider.BiquadBandpassFilter(
             sampleRate = sampleRate,
-            centerFreq = 2400f,
-            q = 1.0f
+            centerFreq = 2000f,
+            q = 0.8f
         )
 
         // Helper to compute RMS of filtered sine wave of given frequency
@@ -214,12 +214,12 @@ class BreathCounterEngineTest {
             return kotlin.math.sqrt(sumSquares / (numSamples - 200))
         }
 
-        val passbandRms = measureFilterRms(2400f) // Center frequency (breath hiss)
+        val passbandRms = measureFilterRms(2000f) // Center frequency (breath hiss)
         val rumbleRms = measureFilterRms(100f)    // Room rumble / low humming
         val hissRms = measureFilterRms(7500f)     // High-frequency sensor hiss
 
         // Center frequency should pass with minimal attenuation (near 1.0 / sqrt(2) = 0.707)
-        assertTrue("Passband 2400 Hz RMS ($passbandRms) should be robust (> 0.5)", passbandRms > 0.5f)
+        assertTrue("Passband 2000 Hz RMS ($passbandRms) should be robust (> 0.5)", passbandRms > 0.5f)
 
         // 100 Hz rumble must be attenuated by at least 15x (> 23 dB)
         assertTrue(
