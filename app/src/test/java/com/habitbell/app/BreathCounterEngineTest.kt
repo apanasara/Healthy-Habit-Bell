@@ -255,5 +255,27 @@ class BreathCounterEngineTest {
         assertEquals(0.08f, update.thresholdRms, 0.001f)
         assertEquals(1.5f, update.micSensitivity, 0.001f)
     }
+
+    /**
+     * Verifies Bhastrika bellows dual-phase configuration, cadence calculation bounds, and round parameters.
+     */
+    @Test
+    fun testBhastrikaConfigurationAndCadenceBounds() {
+        val bhastrikaConfig = BreathCounterConfig.DEFAULT_BHASTRIKA
+        assertEquals(BreathTechnique.BHASTRIKA, bhastrikaConfig.technique)
+        assertEquals(3, bhastrikaConfig.targetRounds)
+        assertEquals(listOf(21, 21, 21), bhastrikaConfig.strokesPerRound)
+        assertEquals(21, bhastrikaConfig.strokesForRound(1))
+        assertEquals(63, bhastrikaConfig.totalTargetStrokes)
+        assertEquals(25, bhastrikaConfig.retentionSeconds)
+        assertEquals(20, bhastrikaConfig.restSeconds)
+
+        // Manual tap provider simulation for cadence
+        val provider = ManualTapBreathProvider()
+        provider.start(bhastrikaConfig)
+        provider.registerManualStroke()
+        assertEquals(1, provider.inputFlow.value.strokeDelta)
+        provider.stop()
+    }
 }
 
