@@ -32,6 +32,9 @@ import com.habitbell.app.R
 import com.habitbell.app.audio.VoiceCueMode
 import com.habitbell.app.breath.BreathInputSourceType
 import com.habitbell.app.breath.BreathTechnique
+import com.habitbell.app.mantra.MantraInputSourceType
+import com.habitbell.app.mantra.MantraMode
+import com.habitbell.app.mantra.MantraTechnique
 import com.habitbell.app.cast.ScreenOrientation
 import com.habitbell.app.data.SuryaDatabase
 import com.habitbell.app.data.model.*
@@ -109,6 +112,7 @@ import kotlinx.coroutines.launch
  * @param hasActivityPermission Whether runtime sensor permission is granted.
  * @param onUpdatePranayama Callback when classical 4-stage Pranayama configuration is adjusted.
  * @param onUpdateBreathCounterConfig Callback when breathwork stroke counter configuration is adjusted.
+ * @param onUpdateMantraCounterConfig Callback when sacred mantra/japa counter configuration is adjusted.
  * @param onTestVoiceCue Callback to audition vocal cues.
  * @param onTestPranayamaIntervalBell Callback to audition the 432Hz interval chime.
  * @param hasActivityPermission Whether runtime sensor permission is granted.
@@ -162,6 +166,7 @@ fun SettingsDrawer(
     onUpdateSteps: (goal: Int?, interval: Int?, mode: StepTriggerMode) -> Unit = { _, _, _ -> },
     onUpdatePranayama: (purak: Int, antar: Int, rechak: Int, bahya: Int, rounds: Int, intervalBellEnabled: Boolean, intervalCadence: Int, voiceEnabled: Boolean, voiceStyle: VoiceCueStyle, tribandhaVoiceEnabled: Boolean, voiceVolume: Float) -> Unit = { _, _, _, _, _, _, _, _, _, _, _ -> },
     onUpdateBreathCounterConfig: (profileId: String, config: BreathCounterConfig) -> Unit = { _, _ -> },
+    onUpdateMantraCounterConfig: (profileId: String, config: MantraCounterConfig) -> Unit = { _, _ -> },
     onTestVoiceCue: (VoiceCueStyle, Boolean, Float) -> Unit = { _, _, _ -> },
     onTestPranayamaIntervalBell: () -> Unit = {},
     hasActivityPermission: Boolean = true,
@@ -312,7 +317,8 @@ fun SettingsDrawer(
                             onPreviewBgMusic = onPreviewBgMusic,
                             onOpenSuryaEditor = onOpenSuryaEditor,
                             onUpdateSurya = onUpdateSurya,
-                            onUpdateBreathCounterConfig = onUpdateBreathCounterConfig
+                            onUpdateBreathCounterConfig = onUpdateBreathCounterConfig,
+                            onUpdateMantraCounterConfig = onUpdateMantraCounterConfig
                         )
                     }
                 } else {
@@ -379,7 +385,8 @@ private fun TimerSettingsContent(
     onPreviewBgMusic: (Boolean) -> Unit,
     onOpenSuryaEditor: () -> Unit = {},
     onUpdateSurya: (poses: List<CompoundPose>, targetRounds: Int, speedPreset: String, customPaceSeconds: Int, voiceCueMode: VoiceCueMode) -> Unit = { _, _, _, _, _ -> },
-    onUpdateBreathCounterConfig: (profileId: String, config: com.habitbell.app.data.model.BreathCounterConfig) -> Unit = { _, _ -> }
+    onUpdateBreathCounterConfig: (profileId: String, config: com.habitbell.app.data.model.BreathCounterConfig) -> Unit = { _, _ -> },
+    onUpdateMantraCounterConfig: (profileId: String, config: com.habitbell.app.data.model.MantraCounterConfig) -> Unit = { _, _ -> }
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
         // -------------------------------------------------------------
@@ -481,6 +488,26 @@ private fun TimerSettingsContent(
                     }
                 }
             }
+        } else if (profile.mantraConfig != null) {
+            // Dedicated Unified Acoustic Mantra, Japa & Sacred Verse Counter Configuration
+            MantraCounterSettingsSheet(
+                profile = profile,
+                onUpdateConfig = { config ->
+                    onUpdateMantraCounterConfig(profile.id, config)
+                },
+                isBgMusicEnabled = isBgMusicEnabled,
+                bgMusicType = bgMusicType,
+                bgMusicCustomName = bgMusicCustomName,
+                bgMusicYouTubeUrl = bgMusicYouTubeUrl,
+                bgMusicVolume = bgMusicVolume,
+                onBgMusicToggle = onBgMusicToggle,
+                onBgMusicTypeSelected = onBgMusicTypeSelected,
+                onPickCustomAudio = onPickCustomAudio,
+                onBgMusicYouTubeUrlChange = onBgMusicYouTubeUrlChange,
+                onBgMusicVolumeChange = onBgMusicVolumeChange,
+                onPreviewBgMusic = onPreviewBgMusic
+            )
+            return
         } else if (profile.breathCounterConfig != null) {
             // Dedicated Unified Acoustic Breathwork & Kriya Counter Configuration
             BreathCounterSettingsSheet(
@@ -3045,6 +3072,857 @@ private fun BreathCounterSettingsSheet(
                     }
 
                     Spacer(modifier = Modifier.height(14.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Ambient Volume (${(bgMusicVolume * 100).toInt()}%)",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                    Slider(
+                        value = bgMusicVolume,
+                        onValueChange = onBgMusicVolumeChange,
+                        valueRange = 0.05f..1.0f,
+                        colors = SliderDefaults.colors(
+                            thumbColor = MaterialTheme.colorScheme.primary,
+                            activeTrackColor = MaterialTheme.colorScheme.primary
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * # MantraCounterSettingsSheet
+ *
+ * Dedicated configuration sheet for the unified acoustic mantra, japa, and sacred verse counter profile.
+ * Provides fine-grained interactive controls for:
+ * 1. **Technique Selection**: Canonical spiritual chanting practices including Gayatri Mantra,
+ *    Maha Mrityunjaya, Aumkar Drone, Ram Naam Japa, Islamic Tasbih / Dhikr, Christian Jesus Prayer,
+ *    and Universal Scripture.
+ * 2. **Target Beads & Mala Rounds**: Configurable bead goals (108, 54, 33, 27, 21) and Mala rounds.
+ * 3. **Acoustic Detection Parameters**: Minimum cumulative verse duration and inter-verse pause bridging thresholds.
+ * 4. **Input Source Selection & Gain Tuning**: Acoustic microphone detection with sensitivity adjustment or manual touch bead advancement.
+ * 5. **Sensory Feedback**: Tactile bead vibration pulses and harmonic milestone bells.
+ * 6. **Subtle Background Ambient Soundscape**: Multi-track ambient drone, Tanpura, or YouTube streaming accompaniment.
+ *
+ * ## Architectural Role & Relationships
+ * Embedded within [SettingsDrawer] when `profile.mantraConfig != null`.
+ * Dispatches mutations upstream via [onUpdateConfig], persisting to [com.habitbell.app.data.repository.TimerRepository]
+ * and reconfiguring [com.habitbell.app.mantra.MantraCountManager] dynamically.
+ *
+ * ## Concurrency & Thread Safety
+ * Executed purely on Compose UI thread. State mutations trigger reactive recomposition and dispatch.
+ *
+ * @param profile Active mantra counter [TimerProfile].
+ * @param onUpdateConfig Callback propagating updated [MantraCounterConfig].
+ * @param isBgMusicEnabled Master toggle for ambient soundscapes.
+ * @param bgMusicType Selected ambient sound strategy ([BackgroundSoundType]).
+ * @param bgMusicCustomName Human-readable filename of selected local audio track.
+ * @param bgMusicYouTubeUrl YouTube link for ambient background audio streaming.
+ * @param bgMusicVolume Ambient background music gain level (0.0f..1.0f).
+ * @param onBgMusicToggle Callback to toggle ambient music.
+ * @param onBgMusicTypeSelected Callback to select sound strategy.
+ * @param onPickCustomAudio Callback to launch system file picker for audio files.
+ * @param onBgMusicYouTubeUrlChange Callback when YouTube URL input changes.
+ * @param onBgMusicVolumeChange Callback when ambient music volume slider is adjusted.
+ * @param onPreviewBgMusic Callback to audition or stop background ambient stream preview.
+ */
+@Composable
+private fun MantraCounterSettingsSheet(
+    profile: TimerProfile,
+    onUpdateConfig: (MantraCounterConfig) -> Unit,
+    isBgMusicEnabled: Boolean,
+    bgMusicType: BackgroundSoundType,
+    bgMusicCustomName: String?,
+    bgMusicYouTubeUrl: String,
+    bgMusicVolume: Float,
+    onBgMusicToggle: (Boolean) -> Unit,
+    onBgMusicTypeSelected: (BackgroundSoundType) -> Unit,
+    onPickCustomAudio: () -> Unit,
+    onBgMusicYouTubeUrlChange: (String) -> Unit,
+    onBgMusicVolumeChange: (Float) -> Unit,
+    onPreviewBgMusic: (Boolean) -> Unit
+) {
+    val initialConfig = profile.mantraConfig ?: MantraCounterConfig.DEFAULT_GAYATRI
+    var currentConfig by remember(profile.id, initialConfig) { mutableStateOf(initialConfig) }
+
+    fun dispatchConfig(newConfig: MantraCounterConfig) {
+        currentConfig = newConfig
+        onUpdateConfig(newConfig)
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        // -------------------------------------------------------------
+        // Card 1: Sacred Technique & Tradition Selection
+        // -------------------------------------------------------------
+        Card(
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = "Sacred Recitation & Tradition",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Select your holy mantra, japa recitation, or spiritual verse:",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Row 1: Gayatri, Maha Mrityunjaya
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    listOf(MantraTechnique.GAYATRI_MANTRA, MantraTechnique.MAHA_MRITYUNJAYA).forEach { tech ->
+                        val isSelected = currentConfig.technique == tech
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+                            border = BorderStroke(
+                                1.dp,
+                                if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                            ),
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable {
+                                    if (!isSelected) {
+                                        dispatchConfig(currentConfig.withTechnique(tech))
+                                    }
+                                }
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(vertical = 10.dp, horizontal = 6.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = if (tech == MantraTechnique.GAYATRI_MANTRA) "गायत्री" else "महामृत्युंजय",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = tech.displayName,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onBackground
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Row 2: Aumkar, Ram Japa
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    listOf(MantraTechnique.AUMKAR, MantraTechnique.RAM_JAPA).forEach { tech ->
+                        val isSelected = currentConfig.technique == tech
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+                            border = BorderStroke(
+                                1.dp,
+                                if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                            ),
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable {
+                                    if (!isSelected) {
+                                        dispatchConfig(currentConfig.withTechnique(tech))
+                                    }
+                                }
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(vertical = 10.dp, horizontal = 6.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = if (tech == MantraTechnique.AUMKAR) "ॐ ओंकार" else "श्री राम",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = tech.displayName,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onBackground
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Row 3: Tasbih, Jesus Prayer, Universal
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    listOf(MantraTechnique.TASBIH_DHIKR, MantraTechnique.JESUS_PRAYER, MantraTechnique.UNIVERSAL_VERSE).forEach { tech ->
+                        val isSelected = currentConfig.technique == tech
+                        val scriptLabel = when (tech) {
+                            MantraTechnique.TASBIH_DHIKR -> "تسبيح"
+                            MantraTechnique.JESUS_PRAYER -> "Kyrie"
+                            else -> "Śloka"
+                        }
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+                            border = BorderStroke(
+                                1.dp,
+                                if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                            ),
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable {
+                                    if (!isSelected) {
+                                        dispatchConfig(currentConfig.withTechnique(tech))
+                                    }
+                                }
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(vertical = 10.dp, horizontal = 6.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = scriptLabel,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = tech.displayName,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onBackground,
+                                    maxLines = 1
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Technique Detail & Mode Card
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = "${currentConfig.technique.displayName} (${currentConfig.technique.traditionalName})",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            val modeBadge = when (currentConfig.technique.defaultMode) {
+                                MantraMode.EXTENDED_VERSE -> "VERSE PAUSE BRIDGING"
+                                MantraMode.AUMKAR_DRONE -> "AUTOCORRELATION PITCH"
+                                MantraMode.SHORT_JAPA -> "RAPID JAPA CADENCE"
+                            }
+                            Surface(
+                                shape = RoundedCornerShape(4.dp),
+                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
+                            ) {
+                                Text(
+                                    text = modeBadge,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontSize = 9.sp,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Text(
+                            text = currentConfig.technique.scriptText,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = currentConfig.technique.description,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        }
+
+        // -------------------------------------------------------------
+        // Card 2: Mala Target Beads & Repetitions
+        // -------------------------------------------------------------
+        Card(
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = "Mala Target Beads & Rounds",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Configure bead counts per round and total Mala completions:",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Target Beads Stepper
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Beads Per Mala",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = "${currentConfig.targetBeads} beads",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        SmallAdjustButton("-10") {
+                            if (currentConfig.targetBeads > 10) {
+                                dispatchConfig(currentConfig.copy(targetBeads = currentConfig.targetBeads - 10))
+                            }
+                        }
+                        SmallAdjustButton("-1") {
+                            if (currentConfig.targetBeads > 1) {
+                                dispatchConfig(currentConfig.copy(targetBeads = currentConfig.targetBeads - 1))
+                            }
+                        }
+                        SmallAdjustButton("+1") {
+                            if (currentConfig.targetBeads < 1008) {
+                                dispatchConfig(currentConfig.copy(targetBeads = currentConfig.targetBeads + 1))
+                            }
+                        }
+                        SmallAdjustButton("+10") {
+                            if (currentConfig.targetBeads <= 998) {
+                                dispatchConfig(currentConfig.copy(targetBeads = currentConfig.targetBeads + 10))
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Canonical Bead Presets (108, 100, 54, 33, 21)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    listOf(108 to "108 (Full)", 54 to "54 (Half)", 100 to "100", 33 to "33", 21 to "21").forEach { (beads, label) ->
+                        val isSel = currentConfig.targetBeads == beads
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (isSel) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surface,
+                            border = BorderStroke(1.dp, if (isSel) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable {
+                                    dispatchConfig(currentConfig.copy(targetBeads = beads))
+                                }
+                        ) {
+                            Text(
+                                text = label,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = if (isSel) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isSel) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(vertical = 6.dp)
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Mala Rounds Stepper
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Mala Rounds",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = "${currentConfig.targetMalas} ${if (currentConfig.targetMalas == 1) "Mala" else "Malas"} (${currentConfig.totalTargetChants} total recitations)",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        SmallAdjustButton("-1") {
+                            if (currentConfig.targetMalas > 1) {
+                                dispatchConfig(currentConfig.copy(targetMalas = currentConfig.targetMalas - 1))
+                            }
+                        }
+                        SmallAdjustButton("+1") {
+                            if (currentConfig.targetMalas < 21) {
+                                dispatchConfig(currentConfig.copy(targetMalas = currentConfig.targetMalas + 1))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // -------------------------------------------------------------
+        // Card 3: Verse Duration & Pause Tolerances
+        // -------------------------------------------------------------
+        Card(
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = "Acoustic Duration & Pause Bridging",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Fine-tune vocal detection duration and intra-verse pause bridging:",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Min Verse Duration
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Min Vocal Duration",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = String.format(java.util.Locale.US, "%.1fs per recitation", currentConfig.minVerseDurationSec),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        SmallAdjustButton("-0.5s") {
+                            if (currentConfig.minVerseDurationSec > 0.5f) {
+                                dispatchConfig(currentConfig.copy(minVerseDurationSec = currentConfig.minVerseDurationSec - 0.5f))
+                            }
+                        }
+                        SmallAdjustButton("+0.5s") {
+                            if (currentConfig.minVerseDurationSec < 30.0f) {
+                                dispatchConfig(currentConfig.copy(minVerseDurationSec = currentConfig.minVerseDurationSec + 0.5f))
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Inter-Verse Completion Pause
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Completion Pause",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = String.format(java.util.Locale.US, "%.1fs silence required", currentConfig.interVersePauseThresholdSec),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        SmallAdjustButton("-0.2s") {
+                            if (currentConfig.interVersePauseThresholdSec > 0.4f) {
+                                dispatchConfig(currentConfig.copy(interVersePauseThresholdSec = currentConfig.interVersePauseThresholdSec - 0.2f))
+                            }
+                        }
+                        SmallAdjustButton("+0.2s") {
+                            if (currentConfig.interVersePauseThresholdSec < 4.0f) {
+                                dispatchConfig(currentConfig.copy(interVersePauseThresholdSec = currentConfig.interVersePauseThresholdSec + 0.2f))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // -------------------------------------------------------------
+        // Card 4: Acoustic Sensor & Sensitivity
+        // -------------------------------------------------------------
+        Card(
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = "Acoustic Sensor & Detection",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Input source and microphone sensitivity calibration:",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Mode Selector
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    listOf(
+                        MantraInputSourceType.ACOUSTIC_MIC to "🎤 Acoustic Mic",
+                        MantraInputSourceType.MANUAL_BEAD_TAP to "📿 Manual Bead Tap"
+                    ).forEach { (mode, label) ->
+                        val isSel = currentConfig.defaultInputMode == mode
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (isSel) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+                            border = BorderStroke(1.dp, if (isSel) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable {
+                                    dispatchConfig(currentConfig.copy(defaultInputMode = mode))
+                                }
+                        ) {
+                            Text(
+                                text = label,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = if (isSel) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isSel) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onBackground,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(vertical = 8.dp)
+                            )
+                        }
+                    }
+                }
+
+                if (currentConfig.defaultInputMode == MantraInputSourceType.ACOUSTIC_MIC) {
+                    Spacer(modifier = Modifier.height(14.dp))
+                    Text(
+                        text = "MICROPHONE SENSITIVITY",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    val sensOptions = listOf(
+                        0.7f to "Gentle (0.7x)",
+                        1.0f to "Normal (1.0x)",
+                        1.5f to "Sensitive (1.5x)",
+                        2.2f to "Whisper (2.2x)"
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        sensOptions.forEach { (sens, label) ->
+                            val isSel = kotlin.math.abs(currentConfig.micSensitivity - sens) < 0.1f
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (isSel) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surface,
+                                border = BorderStroke(1.dp, if (isSel) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable {
+                                        dispatchConfig(currentConfig.copy(micSensitivity = sens))
+                                    }
+                            ) {
+                                Text(
+                                    text = label,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = if (isSel) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (isSel) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground,
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.padding(vertical = 6.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // -------------------------------------------------------------
+        // Card 5: Sensory Feedback & Haptics
+        // -------------------------------------------------------------
+        Card(
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = "Sensory Feedback & Milestones",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Tactile haptic clicks and harmonic milestone chimes:",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Bead Haptic Toggle
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Tactile Bead Click Haptic",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = "Crisp physical sensation on every registered bead count",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = currentConfig.isBeadHapticEnabled,
+                        onCheckedChange = { dispatchConfig(currentConfig.copy(isBeadHapticEnabled = it)) }
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Milestone Bell Toggle
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Milestone & Completion Bells",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = "Harmonic bell chime at half-Mala (54) and temple gong on completion",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = currentConfig.isMilestoneChimeEnabled,
+                        onCheckedChange = { dispatchConfig(currentConfig.copy(isMilestoneChimeEnabled = it)) }
+                    )
+                }
+            }
+        }
+
+        // -------------------------------------------------------------
+        // Card 6: Ambient Background Soundscape
+        // -------------------------------------------------------------
+        Card(
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Ambient Soundscape & Drone",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Accompaniment with Tanpura drone, Aum, or custom stream",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = isBgMusicEnabled,
+                        onCheckedChange = onBgMusicToggle
+                    )
+                }
+
+                if (isBgMusicEnabled) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        val isAumSelected = bgMusicType == BackgroundSoundType.DEFAULT_AUM
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (isAumSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+                            border = BorderStroke(1.dp, if (isAumSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable { onBgMusicTypeSelected(BackgroundSoundType.DEFAULT_AUM) }
+                        ) {
+                            Text(
+                                text = "ॐ Aum",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = if (isAumSelected) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isAumSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onBackground,
+                                modifier = Modifier.padding(vertical = 10.dp).wrapContentWidth(Alignment.CenterHorizontally)
+                            )
+                        }
+
+                        val isYtSelected = bgMusicType == BackgroundSoundType.YOUTUBE_LINK
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (isYtSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+                            border = BorderStroke(1.dp, if (isYtSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                            modifier = Modifier
+                                .weight(1.2f)
+                                .clickable { onBgMusicTypeSelected(BackgroundSoundType.YOUTUBE_LINK) }
+                        ) {
+                            Text(
+                                text = "YouTube Audio",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = if (isYtSelected) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isYtSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onBackground,
+                                modifier = Modifier.padding(vertical = 10.dp).wrapContentWidth(Alignment.CenterHorizontally)
+                            )
+                        }
+
+                        val isCustomSelected = bgMusicType == BackgroundSoundType.CUSTOM_FILE
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (isCustomSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+                            border = BorderStroke(1.dp, if (isCustomSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable { onBgMusicTypeSelected(BackgroundSoundType.CUSTOM_FILE) }
+                        ) {
+                            Text(
+                                text = "Custom File",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = if (isCustomSelected) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isCustomSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onBackground,
+                                modifier = Modifier.padding(vertical = 10.dp).wrapContentWidth(Alignment.CenterHorizontally)
+                            )
+                        }
+                    }
+
+                    if (bgMusicType == BackgroundSoundType.YOUTUBE_LINK) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        var ytInput by remember(bgMusicYouTubeUrl) { mutableStateOf(bgMusicYouTubeUrl) }
+                        OutlinedTextField(
+                            value = ytInput,
+                            onValueChange = {
+                                ytInput = it
+                                onBgMusicYouTubeUrlChange(it)
+                            },
+                            label = { Text("YouTube URL (Audio Stream)") },
+                            singleLine = true,
+                            textStyle = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    } else if (bgMusicType == BackgroundSoundType.CUSTOM_FILE) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = bgMusicCustomName ?: "No custom file picked",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Button(
+                                onClick = onPickCustomAudio,
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                            ) {
+                                Text("Pick Audio", style = MaterialTheme.typography.labelSmall)
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,

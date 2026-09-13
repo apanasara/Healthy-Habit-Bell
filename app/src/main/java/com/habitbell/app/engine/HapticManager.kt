@@ -122,6 +122,42 @@ class HapticManager(private val context: Context) {
     }
 
     /**
+     * Triggers a crisp tactile impulse (32ms, amplitude 170) providing the physical
+     * sensation of clicking or rolling a wooden or stone prayer bead (Rudraksha/Tulsi/Tasbih)
+     * between the practitioner's fingers.
+     */
+    fun triggerMalaBeadHaptic() {
+        if (vibrator?.hasVibrator() != true) return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            vibrator.vibrate(
+                VibrationEffect.createOneShot(32, 170)
+            )
+        } else {
+            @Suppress("DEPRECATION")
+            vibrator.vibrate(32)
+        }
+    }
+
+    /**
+     * Triggers a distinctive dual-pulse crescendo vibration for half-Mala milestones
+     * (e.g. 54 beads of 108, or 33 of 100).
+     */
+    fun triggerMalaMilestoneHaptic() {
+        if (vibrator?.hasVibrator() != true) return
+        val timings = longArrayOf(0, 70, 70, 140)
+        val amplitudes = intArrayOf(0, 180, 0, 240)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            vibrator.vibrate(
+                VibrationEffect.createWaveform(timings, amplitudes, -1)
+            )
+        } else {
+            @Suppress("DEPRECATION")
+            vibrator.vibrate(timings, -1)
+        }
+    }
+
+    /**
      * Immediately halts any active or queued hardware vibration sequences.
      */
     fun cancel() {

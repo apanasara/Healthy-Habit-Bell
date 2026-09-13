@@ -84,6 +84,11 @@ fun SessionScreen(
     onSelectBreathMicSensitivity: (Float) -> Unit = {},
     onSelectBreathTechnique: (com.habitbell.app.breath.BreathTechnique) -> Unit = {},
     onManualBreathStrokeTap: () -> Unit = {},
+    selectedMantraInputSource: com.habitbell.app.mantra.MantraInputSourceType = com.habitbell.app.mantra.MantraInputSourceType.ACOUSTIC_MIC,
+    onSelectMantraInputSource: (com.habitbell.app.mantra.MantraInputSourceType) -> Unit = {},
+    onSelectMantraMicSensitivity: (Float) -> Unit = {},
+    onSelectMantraTechnique: (com.habitbell.app.mantra.MantraTechnique) -> Unit = {},
+    onManualMantraBeadTap: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val configuration = LocalConfiguration.current
@@ -127,7 +132,12 @@ fun SessionScreen(
                 onSelectBreathInputSource = onSelectBreathInputSource,
                 onSelectBreathMicSensitivity = onSelectBreathMicSensitivity,
                 onSelectBreathTechnique = onSelectBreathTechnique,
-                onManualBreathStrokeTap = onManualBreathStrokeTap
+                onManualBreathStrokeTap = onManualBreathStrokeTap,
+                selectedMantraInputSource = selectedMantraInputSource,
+                onSelectMantraInputSource = onSelectMantraInputSource,
+                onSelectMantraMicSensitivity = onSelectMantraMicSensitivity,
+                onSelectMantraTechnique = onSelectMantraTechnique,
+                onManualMantraBeadTap = onManualMantraBeadTap
             )
         } else {
             PortraitSessionLayout(
@@ -146,7 +156,12 @@ fun SessionScreen(
                 onSelectBreathInputSource = onSelectBreathInputSource,
                 onSelectBreathMicSensitivity = onSelectBreathMicSensitivity,
                 onSelectBreathTechnique = onSelectBreathTechnique,
-                onManualBreathStrokeTap = onManualBreathStrokeTap
+                onManualBreathStrokeTap = onManualBreathStrokeTap,
+                selectedMantraInputSource = selectedMantraInputSource,
+                onSelectMantraInputSource = onSelectMantraInputSource,
+                onSelectMantraMicSensitivity = onSelectMantraMicSensitivity,
+                onSelectMantraTechnique = onSelectMantraTechnique,
+                onManualMantraBeadTap = onManualMantraBeadTap
             )
         }
 
@@ -229,7 +244,12 @@ private fun LandscapeSessionLayout(
     onSelectBreathInputSource: (com.habitbell.app.breath.BreathInputSourceType) -> Unit = {},
     onSelectBreathMicSensitivity: (Float) -> Unit = {},
     onSelectBreathTechnique: (com.habitbell.app.breath.BreathTechnique) -> Unit = {},
-    onManualBreathStrokeTap: () -> Unit = {}
+    onManualBreathStrokeTap: () -> Unit = {},
+    selectedMantraInputSource: com.habitbell.app.mantra.MantraInputSourceType = com.habitbell.app.mantra.MantraInputSourceType.ACOUSTIC_MIC,
+    onSelectMantraInputSource: (com.habitbell.app.mantra.MantraInputSourceType) -> Unit = {},
+    onSelectMantraMicSensitivity: (Float) -> Unit = {},
+    onSelectMantraTechnique: (com.habitbell.app.mantra.MantraTechnique) -> Unit = {},
+    onManualMantraBeadTap: () -> Unit = {}
 ) {
     val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
     val buttonPillBg = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (isDark) 0.35f else 0.75f)
@@ -253,7 +273,7 @@ private fun LandscapeSessionLayout(
         horizontalArrangement = Arrangement.spacedBy(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Left Column: Visualizer Area (Hero Lotus / Eating Bowl / Circular Progress / Pose / Breath Counter)
+        // Left Column: Visualizer Area (Hero Lotus / Eating Bowl / Circular Progress / Pose / Breath Counter / Mantra Counter)
         Box(
             modifier = Modifier
                 .weight(1f)
@@ -267,7 +287,17 @@ private fun LandscapeSessionLayout(
                 )
             } else when (sessionState.profile.type) {
                 TimerType.MULTI_INTERVAL -> {
-                    if (sessionState.isBreathCountingActive && sessionState.breathUpdate != null) {
+                    if (sessionState.isMantraCountingActive && sessionState.mantraUpdate != null) {
+                        com.habitbell.app.ui.components.MantraCounterContent(
+                            sessionState = sessionState,
+                            mantraUpdate = sessionState.mantraUpdate,
+                            selectedInputSource = selectedMantraInputSource,
+                            onSelectInputSource = onSelectMantraInputSource,
+                            onSelectSensitivity = onSelectMantraMicSensitivity,
+                            onSelectTechnique = onSelectMantraTechnique,
+                            onManualBeadTap = onManualMantraBeadTap
+                        )
+                    } else if (sessionState.isBreathCountingActive && sessionState.breathUpdate != null) {
                         com.habitbell.app.ui.components.BreathCounterContent(
                             sessionState = sessionState,
                             breathUpdate = sessionState.breathUpdate,
@@ -675,7 +705,12 @@ private fun PortraitSessionLayout(
     onSelectBreathInputSource: (com.habitbell.app.breath.BreathInputSourceType) -> Unit = {},
     onSelectBreathMicSensitivity: (Float) -> Unit = {},
     onSelectBreathTechnique: (com.habitbell.app.breath.BreathTechnique) -> Unit = {},
-    onManualBreathStrokeTap: () -> Unit = {}
+    onManualBreathStrokeTap: () -> Unit = {},
+    selectedMantraInputSource: com.habitbell.app.mantra.MantraInputSourceType = com.habitbell.app.mantra.MantraInputSourceType.ACOUSTIC_MIC,
+    onSelectMantraInputSource: (com.habitbell.app.mantra.MantraInputSourceType) -> Unit = {},
+    onSelectMantraMicSensitivity: (Float) -> Unit = {},
+    onSelectMantraTechnique: (com.habitbell.app.mantra.MantraTechnique) -> Unit = {},
+    onManualMantraBeadTap: () -> Unit = {}
 ) {
     Column(
         modifier = Modifier
@@ -974,7 +1009,17 @@ private fun PortraitSessionLayout(
                 }
 
                 TimerType.MULTI_INTERVAL -> {
-                    if (sessionState.isBreathCountingActive && sessionState.breathUpdate != null) {
+                    if (sessionState.isMantraCountingActive && sessionState.mantraUpdate != null) {
+                        com.habitbell.app.ui.components.MantraCounterContent(
+                            sessionState = sessionState,
+                            mantraUpdate = sessionState.mantraUpdate,
+                            selectedInputSource = selectedMantraInputSource,
+                            onSelectInputSource = onSelectMantraInputSource,
+                            onSelectSensitivity = onSelectMantraMicSensitivity,
+                            onSelectTechnique = onSelectMantraTechnique,
+                            onManualBeadTap = onManualMantraBeadTap
+                        )
+                    } else if (sessionState.isBreathCountingActive && sessionState.breathUpdate != null) {
                         com.habitbell.app.ui.components.BreathCounterContent(
                             sessionState = sessionState,
                             breathUpdate = sessionState.breathUpdate,
