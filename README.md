@@ -4,7 +4,8 @@ Habit Bell is a distraction-free wellness timer ecosystem and personal wellness 
 
 ## 📖 Architecture & Developer Documentation
 For comprehensive architectural specifications, concurrency models, and module breakdown, consult:
-- **[ARCHITECTURE.md](ARCHITECTURE.md)** — Architectural blueprint, threading guarantees, and design standards.
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** — Architectural blueprint, master topology, and subsystem navigation index.
+- **[architecture/](architecture/)** — Modular subsystem documentation directory (Session & Timer engines, Audio DSP, TV & Living Room, Android Auto, Display Automation, Classical Pranayama, Surya Namaskar, Fast-Paced Breath Counter, and Concurrency & Standards).
 
 ## 🏛️ Codebase Structure
 ```
