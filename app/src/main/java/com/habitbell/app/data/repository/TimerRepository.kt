@@ -139,6 +139,37 @@ class TimerRepository(private val context: Context) {
                     voiceCueMode = sVoiceMode
                 )
             }
+            // Restore any persistent Breath Counter customizations
+            val restoredBreath = defaultProfile.breathCounterConfig?.let { baseConfig ->
+                val techName = prefs.getString("profile_breath_technique_${defaultProfile.id}", null)
+                val technique = if (techName != null) {
+                    try {
+                        com.habitbell.app.breath.BreathTechnique.valueOf(techName)
+                    } catch (_: Exception) {
+                        baseConfig.technique
+                    }
+                } else {
+                    baseConfig.technique
+                }
+                val rounds = prefs.getInt("profile_breath_rounds_${defaultProfile.id}", baseConfig.targetRounds)
+                val retention = prefs.getInt("profile_breath_retention_${defaultProfile.id}", baseConfig.retentionSeconds)
+                val rest = prefs.getInt("profile_breath_rest_${defaultProfile.id}", baseConfig.restSeconds)
+                val soundEnabled = prefs.getBoolean("profile_breath_sound_${defaultProfile.id}", baseConfig.isSoundFeedbackEnabled)
+                val hapticEnabled = prefs.getBoolean("profile_breath_haptic_${defaultProfile.id}", baseConfig.isHapticFeedbackEnabled)
+                val voiceEnabled = prefs.getBoolean("profile_breath_voice_${defaultProfile.id}", baseConfig.isVoiceGuidanceEnabled)
+                val micSens = prefs.getFloat("profile_breath_mic_sens_${defaultProfile.id}", baseConfig.micSensitivity)
+
+                val canonical = com.habitbell.app.data.model.BreathCounterConfig.forTechnique(technique)
+                canonical.copy(
+                    targetRounds = if (rounds > 0) rounds else canonical.targetRounds,
+                    retentionSeconds = if (retention >= 0) retention else canonical.retentionSeconds,
+                    restSeconds = if (rest >= 0) rest else canonical.restSeconds,
+                    isSoundFeedbackEnabled = soundEnabled,
+                    isHapticFeedbackEnabled = hapticEnabled,
+                    isVoiceGuidanceEnabled = voiceEnabled,
+                    micSensitivity = micSens
+                )
+            }
 
             val finalTotalDuration = if (restoredCompound != null) {
                 restoredCompound.poses.sumOf { it.durationSeconds } * restoredCompound.targetRounds
@@ -150,7 +181,8 @@ class TimerRepository(private val context: Context) {
                 totalDurationSeconds = finalTotalDuration,
                 intervalDurationSeconds = inter,
                 pranayamaConfig = restoredPranayama,
-                compoundConfig = restoredCompound
+                compoundConfig = restoredCompound,
+                breathCounterConfig = restoredBreath
             )
         }
     }
@@ -179,13 +211,34 @@ class TimerRepository(private val context: Context) {
     }.stateIn(scope, SharingStarted.Eagerly, DefaultProfiles.ALL_PRESETS.filter { it.isFavorite })
 
     /**
-     * Queries a profile by its unique ID.
+     * Queries a profile by its unique ID with legacy ID resolution fallback.
      *
      * @param id The unique profile string identifier.
      * @return Matching [TimerProfile] if found, or null otherwise.
      */
     fun getProfileById(id: String): TimerProfile? {
-        return _profiles.value.find { it.id == id }
+        val direct = _profiles.value.find { it.id == id }
+        if (direct != null) return direct
+
+        // Backward compatibility for legacy breath counter preset IDs
+        return when (id) {
+            "kriya-kapalabhati-counter" -> {
+                _profiles.value.find { it.id == "kriya-breath-counter" }?.let { profile ->
+                    profile.copy(breathCounterConfig = com.habitbell.app.data.model.BreathCounterConfig.DEFAULT_KAPALABHATI)
+                } ?: DefaultProfiles.KAPALABHATI_COUNTER
+            }
+            "kriya-bhastrika-counter" -> {
+                _profiles.value.find { it.id == "kriya-breath-counter" }?.let { profile ->
+                    profile.copy(breathCounterConfig = com.habitbell.app.data.model.BreathCounterConfig.DEFAULT_BHASTRIKA)
+                } ?: DefaultProfiles.BHASTRIKA_COUNTER
+            }
+            "kriya-bhramari-counter" -> {
+                _profiles.value.find { it.id == "kriya-breath-counter" }?.let { profile ->
+                    profile.copy(breathCounterConfig = com.habitbell.app.data.model.BreathCounterConfig.DEFAULT_BHRAMARI)
+                } ?: DefaultProfiles.BHRAMARI_COUNTER
+            }
+            else -> null
+        }
     }
 
     /**
@@ -421,6 +474,38 @@ class TimerRepository(private val context: Context) {
                             voiceCueMode = voiceCueMode
                         )
                     )
+                } else {
+                    profile
+                }
+            }
+        }
+    }
+
+    /**
+     * Persists and updates custom breath stroke counter configuration for a targeted profile.
+     *
+     * @param profileId Unique string ID of the profile (e.g. "kriya-breath-counter").
+     * @param config Updated [BreathCounterConfig] model containing technique, rounds, and thresholds.
+     */
+    fun updateBreathCounterConfig(
+        profileId: String,
+        config: BreathCounterConfig
+    ) {
+        prefs.edit()
+            .putString("profile_breath_technique_$profileId", config.technique.name)
+            .putInt("profile_breath_rounds_$profileId", config.targetRounds)
+            .putInt("profile_breath_retention_$profileId", config.retentionSeconds)
+            .putInt("profile_breath_rest_$profileId", config.restSeconds)
+            .putBoolean("profile_breath_sound_$profileId", config.isSoundFeedbackEnabled)
+            .putBoolean("profile_breath_haptic_$profileId", config.isHapticFeedbackEnabled)
+            .putBoolean("profile_breath_voice_$profileId", config.isVoiceGuidanceEnabled)
+            .putFloat("profile_breath_mic_sens_$profileId", config.micSensitivity)
+            .apply()
+
+        _profiles.update { list ->
+            list.map { profile ->
+                if (profile.id == profileId) {
+                    profile.copy(breathCounterConfig = config)
                 } else {
                     profile
                 }

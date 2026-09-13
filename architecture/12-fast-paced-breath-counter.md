@@ -34,16 +34,19 @@ The subsystem implements a modular, swappable data layer via the `BreathDataSour
 ### 1. `AcousticBreathSensorProvider.kt` (Hands-Free Acoustic DSP & Hysteresis Engine)
 - **Audio Record Pipeline**: Captures raw PCM audio via low-latency 16 kHz 16-bit Mono `AudioRecord` buffers on a dedicated background coroutine (`Dispatchers.IO`). Prioritizes standard `MediaRecorder.AudioSource.MIC` to capture clean unclipped physical breath turbulence without OEM voice gates, falling back to `VOICE_RECOGNITION`.
 - **2nd-Order Biquad IIR Bandpass Filter**: Center frequency $f_c = 2000\text{ Hz}$, $Q = 0.8$, passband 1.0 kHz – 3.5 kHz specifically isolating nasal expulsion turbulence. Rejects low-frequency room rumble (>22 dB attenuation at 100 Hz) and thermal high-frequency microphone hiss (>20 dB attenuation at 7.5 kHz).
-- **Continuous Dynamic Ambient Noise Floor Tracking**: Continuously adapts background noise floor in real time during calm idle state ($\alpha = 0.12$ quick fall, $\alpha = 0.02$ gentle rise). Dynamic stroke threshold scales:
-  $$\text{Threshold} = \left(\text{NoiseFloor} \times \frac{1.8}{\text{Sensitivity}} + \frac{0.007}{\text{Sensitivity}}\right)$$
-- **3-Stage Hysteresis State Machine**:
-  - `IDLE_LISTENING`: Enforces 180ms minimum refractory interval (~333 BPM ceiling). Triggers attack when bandpass energy exceeds calibrated threshold.
+- **Continuous Dynamic Ambient Noise Floor Tracking**: Continuously adapts background noise floor in real time during calm idle state ($\alpha = 0.12$ quick fall, $\alpha = 0.02$ gentle rise). Settles naturally down to $0.0005f$ in quiet rooms.
+- **Calibrated Distant Airborne Breath Threshold (30 cm – 1 Meter Placement)**:
+  Rather than requiring the phone to be held directly under the nostrils where wind pops the mic, the detection engine isolates airborne acoustic sound waves from a phone resting on a mat or table:
+  $$\text{Threshold} = \left(\text{NoiseFloor} \times \frac{2.2}{\text{Sensitivity}} + \frac{0.0016}{\text{Sensitivity}}\right).\text{coerceIn}(0.0016f, 0.15f)$$
+  At standard sensitivity ($1.0$), in a quiet room ($\text{NoiseFloor} \approx 0.0008f$), the threshold sits at $\approx 0.0034f$. A real airborne nasal expulsion at 50 cm produces $0.0050f$–$0.0080f$ RMS, cleanly crossing the threshold with $>4\times$ SNR separation from ambient room silence.
+- **3-Stage Hysteresis State Machine & Attack Onset Discrimination**:
+  - `IDLE_LISTENING`: Enforces 180ms minimum refractory interval (~333 BPM ceiling). Requires an **explosive attack onset** ($\Delta E > \text{Threshold} \times 0.12$ or $E > \text{Threshold} \times 1.35$), completely rejecting steady ambient drone, fans, and room acoustics.
   - `ATTACK_DETECTED`: Tracks local peak energy; validates physiological burst duration (20ms – 220ms). Aborts sustained noise (>220ms without decay) to prevent false runaway counting. Confirms exactly 1 stroke upon peak decay ($E < E_{\text{peak}} \times 0.75$).
-  - `COOLDOWN_VALLEY`: Enforces 150ms minimum valley check; transitions back to `IDLE_LISTENING` once signal drops below $90\%$ threshold or after 240ms safety timeout without corrupting stroke timestamps.
-- **Acoustic Self-Feedback Mitigation & Clean Sensing**:
-  - Decoupled speaker audio during hands-free `ACOUSTIC_MIC` mode: stroke feedback is delivered exclusively through tactile micro-haptics (`HapticManager.triggerStrokeHaptic()`) and live screen ripple canvas biofeedback. This prevents the phone's 2048 Hz metallic tingsha chime from reverberating into the microphone and deafening the detector for 2.3 seconds.
-  - Audible stroke chimes are safely reserved for `MANUAL_TAP` mode where the microphone is inactive.
-  - `blankDetection(2000L)` temporarily mutes acoustic evaluation during Kumbhaka retention bells and voice prompts.
+  - `COOLDOWN_VALLEY`: Enforces 140ms minimum valley check; transitions back to `IDLE_LISTENING` once signal drops below $88\%$ threshold or after 220ms safety timeout without corrupting stroke timestamps.
+- **Acoustic Self-Feedback Mitigation & Elimination of Post-Rechak Chimes**:
+  - **Elimination of Post-Rechak Bells**: Removed interval bell / 3-bell sequence trigger at the onset of `STROKES`. Previously, the Option C 3-bell sequence played through the speaker right as Round 2 began after Rechak, adding 3 false strokes before the user began breathing.
+  - **Extended Protective Blanking**: `blankDetection(5000L)` on Kumbhaka retention bell, `blankDetection(3000L)` on Rechak voice prompt, and `blankDetection(2500L)` on round advance guarantee 0% acoustic leakage into the detector.
+  - Decoupled speaker audio during hands-free `ACOUSTIC_MIC` mode: stroke feedback is delivered exclusively through tactile micro-haptics (`HapticManager.triggerStrokeHaptic()`) and live screen ripple canvas biofeedback. Audible stroke chimes are safely reserved for `MANUAL_TAP` mode where the microphone is inactive.
   - Interactive Sensitivity Selector chips (`Low 0.7x`, `Med 1.0x`, `High 1.5x`) and live real-time RMS needle gauge rendered on `BreathCounterContent.kt`.
 - **Technique-Specific Digital Signal Processing (DSP)**:
   - **Kapalabhati**: 2000 Hz Biquad bandpass filter + 3-stage hysteresis state machine tuned for 20ms–220ms passive-active abdominal recoil expulsions.
@@ -82,3 +85,26 @@ Integrated directly into `SessionScreen.kt` in both Portrait and Landscape orien
 - **Live Cadence Badge**: Displays real-time speed in breaths-per-minute (e.g., `⚡ 82 BPM`).
 - **Interactive Full-Screen Tap Surface**: In `MANUAL_TAP` mode, converts the entire lower viewport into a responsive touch pad with tactile ripples.
 - **Seamless Phase Displays**: Fluidly morphs into a glowing Kumbhaka retention countdown with holding directives, followed by a calm recovery rest countdown.
+
+---
+
+## 6. Unified Profile Architecture & In-Profile Technique Selection
+
+To prevent catalog bloat and provide a singular, cohesive breathwork interface, the acoustic breath counter is consolidated into a single unified profile:
+
+- **Canonical Preset**: `DefaultProfiles.BREATH_COUNTER` (`"Breathwork Counter"`, `kriya-breath-counter`).
+- **Dynamic In-Profile Technique Switching**:
+  - **Preparation Quick Chips**: Rendered on `BreathCounterContent` during `PREPARATION` or `IDLE` state (`कपालभाति Kapalabhati`, `भस्त्रिका Bhastrika`, `भ्रामरी Bhramari`).
+  - **Dedicated Settings Sheet**: `BreathCounterSettingsSheet` within `SettingsDrawer` exposes full technique selector, round count steppers, stroke goals per round, Antar Kumbhaka retention durations, recovery rest intervals, microphone sensitivity multipliers, and sensory feedback toggles.
+- **State Transition & Preference Preservation (`withTechnique`)**:
+  - Calling `BreathCounterConfig.withTechnique(newTechnique)` switches the physiological DSP parameters and round targets to the canonical defaults of the chosen technique, while **preserving** user hardware preferences (microphone sensitivity, acoustic click, haptic pulse, vocal cues).
+- **Automotive & Assistant Routing**:
+  - Media queries for `"breath-counter"`, `"kriya"`, `"kapalabhati"`, `"bhastrika"`, and `"bhramari"` in `CentralSessionHandler` route directly to `DefaultProfiles.BREATH_COUNTER`.
+
+---
+
+## 7. Scope Boundary: Dedicated Mantra Counter Decoupling
+
+Per user architectural requirements:
+- **Aumkar Chanting Exclusion**: Aumkar repetition is explicitly **not** included within the breath counter engine.
+- **Dedicated Subsystem Separation**: Vocal mantra chanting (Aumkar, Gayatri, Maha Mrityunjaya) requires specialized fundamental pitch tracking, harmonic overtone integration, and continuous chant resonance detection distinct from nasal expulsion turbulence. A dedicated, standalone **Mantra Counter** subsystem will be introduced separately.

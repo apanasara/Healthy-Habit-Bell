@@ -82,6 +82,7 @@ fun SessionScreen(
     selectedBreathInputSource: com.habitbell.app.breath.BreathInputSourceType = com.habitbell.app.breath.BreathInputSourceType.ACOUSTIC_MIC,
     onSelectBreathInputSource: (com.habitbell.app.breath.BreathInputSourceType) -> Unit = {},
     onSelectBreathMicSensitivity: (Float) -> Unit = {},
+    onSelectBreathTechnique: (com.habitbell.app.breath.BreathTechnique) -> Unit = {},
     onManualBreathStrokeTap: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -125,6 +126,7 @@ fun SessionScreen(
                 selectedBreathInputSource = selectedBreathInputSource,
                 onSelectBreathInputSource = onSelectBreathInputSource,
                 onSelectBreathMicSensitivity = onSelectBreathMicSensitivity,
+                onSelectBreathTechnique = onSelectBreathTechnique,
                 onManualBreathStrokeTap = onManualBreathStrokeTap
             )
         } else {
@@ -143,6 +145,7 @@ fun SessionScreen(
                 selectedBreathInputSource = selectedBreathInputSource,
                 onSelectBreathInputSource = onSelectBreathInputSource,
                 onSelectBreathMicSensitivity = onSelectBreathMicSensitivity,
+                onSelectBreathTechnique = onSelectBreathTechnique,
                 onManualBreathStrokeTap = onManualBreathStrokeTap
             )
         }
@@ -225,6 +228,7 @@ private fun LandscapeSessionLayout(
     selectedBreathInputSource: com.habitbell.app.breath.BreathInputSourceType = com.habitbell.app.breath.BreathInputSourceType.ACOUSTIC_MIC,
     onSelectBreathInputSource: (com.habitbell.app.breath.BreathInputSourceType) -> Unit = {},
     onSelectBreathMicSensitivity: (Float) -> Unit = {},
+    onSelectBreathTechnique: (com.habitbell.app.breath.BreathTechnique) -> Unit = {},
     onManualBreathStrokeTap: () -> Unit = {}
 ) {
     val isDark = MaterialTheme.colorScheme.background.luminance() < 0.5f
@@ -245,14 +249,14 @@ private fun LandscapeSessionLayout(
             .statusBarsPadding()
             .displayCutoutPadding()
             .navigationBarsPadding()
-            .padding(horizontal = 24.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
+            .padding(horizontal = 20.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         // Left Column: Visualizer Area (Hero Lotus / Eating Bowl / Circular Progress / Pose / Breath Counter)
         Box(
             modifier = Modifier
-                .weight(1.15f)
+                .weight(1f)
                 .fillMaxHeight(),
             contentAlignment = Alignment.Center
         ) {
@@ -270,6 +274,7 @@ private fun LandscapeSessionLayout(
                             selectedInputSource = selectedBreathInputSource,
                             onSelectInputSource = onSelectBreathInputSource,
                             onSelectSensitivity = onSelectBreathMicSensitivity,
+                            onSelectTechnique = onSelectBreathTechnique,
                             onManualStrokeTap = onManualBreathStrokeTap
                         )
                     } else {
@@ -669,6 +674,7 @@ private fun PortraitSessionLayout(
     selectedBreathInputSource: com.habitbell.app.breath.BreathInputSourceType = com.habitbell.app.breath.BreathInputSourceType.ACOUSTIC_MIC,
     onSelectBreathInputSource: (com.habitbell.app.breath.BreathInputSourceType) -> Unit = {},
     onSelectBreathMicSensitivity: (Float) -> Unit = {},
+    onSelectBreathTechnique: (com.habitbell.app.breath.BreathTechnique) -> Unit = {},
     onManualBreathStrokeTap: () -> Unit = {}
 ) {
     Column(
@@ -975,6 +981,7 @@ private fun PortraitSessionLayout(
                             selectedInputSource = selectedBreathInputSource,
                             onSelectInputSource = onSelectBreathInputSource,
                             onSelectSensitivity = onSelectBreathMicSensitivity,
+                            onSelectTechnique = onSelectBreathTechnique,
                             onManualStrokeTap = onManualBreathStrokeTap
                         )
                     } else {

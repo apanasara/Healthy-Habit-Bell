@@ -30,6 +30,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.habitbell.app.R
 import com.habitbell.app.audio.VoiceCueMode
+import com.habitbell.app.breath.BreathInputSourceType
+import com.habitbell.app.breath.BreathTechnique
 import com.habitbell.app.cast.ScreenOrientation
 import com.habitbell.app.data.SuryaDatabase
 import com.habitbell.app.data.model.*
@@ -105,6 +107,11 @@ import kotlinx.coroutines.launch
  * @param onTestStep Callback to inject synthetic steps for testing.
  * @param onUpdateSteps Callback when step goal or interval thresholds are adjusted.
  * @param hasActivityPermission Whether runtime sensor permission is granted.
+ * @param onUpdatePranayama Callback when classical 4-stage Pranayama configuration is adjusted.
+ * @param onUpdateBreathCounterConfig Callback when breathwork stroke counter configuration is adjusted.
+ * @param onTestVoiceCue Callback to audition vocal cues.
+ * @param onTestPranayamaIntervalBell Callback to audition the 432Hz interval chime.
+ * @param hasActivityPermission Whether runtime sensor permission is granted.
  * @param onRequestActivityPermission Callback to trigger Android runtime permission request.
  * @param activeTab Currently displayed tab ([SettingsDrawerTab.TIMER] or [SettingsDrawerTab.GLOBAL]).
  * @param onTabSelected Callback invoked when user switches between Timer and Global tabs.
@@ -154,6 +161,7 @@ fun SettingsDrawer(
     onTestStep: () -> Unit = {},
     onUpdateSteps: (goal: Int?, interval: Int?, mode: StepTriggerMode) -> Unit = { _, _, _ -> },
     onUpdatePranayama: (purak: Int, antar: Int, rechak: Int, bahya: Int, rounds: Int, intervalBellEnabled: Boolean, intervalCadence: Int, voiceEnabled: Boolean, voiceStyle: VoiceCueStyle, tribandhaVoiceEnabled: Boolean, voiceVolume: Float) -> Unit = { _, _, _, _, _, _, _, _, _, _, _ -> },
+    onUpdateBreathCounterConfig: (profileId: String, config: BreathCounterConfig) -> Unit = { _, _ -> },
     onTestVoiceCue: (VoiceCueStyle, Boolean, Float) -> Unit = { _, _, _ -> },
     onTestPranayamaIntervalBell: () -> Unit = {},
     hasActivityPermission: Boolean = true,
@@ -303,7 +311,8 @@ fun SettingsDrawer(
                             onBgMusicVolumeChange = onBgMusicVolumeChange,
                             onPreviewBgMusic = onPreviewBgMusic,
                             onOpenSuryaEditor = onOpenSuryaEditor,
-                            onUpdateSurya = onUpdateSurya
+                            onUpdateSurya = onUpdateSurya,
+                            onUpdateBreathCounterConfig = onUpdateBreathCounterConfig
                         )
                     }
                 } else {
@@ -369,7 +378,8 @@ private fun TimerSettingsContent(
     onBgMusicVolumeChange: (Float) -> Unit,
     onPreviewBgMusic: (Boolean) -> Unit,
     onOpenSuryaEditor: () -> Unit = {},
-    onUpdateSurya: (poses: List<CompoundPose>, targetRounds: Int, speedPreset: String, customPaceSeconds: Int, voiceCueMode: VoiceCueMode) -> Unit = { _, _, _, _, _ -> }
+    onUpdateSurya: (poses: List<CompoundPose>, targetRounds: Int, speedPreset: String, customPaceSeconds: Int, voiceCueMode: VoiceCueMode) -> Unit = { _, _, _, _, _ -> },
+    onUpdateBreathCounterConfig: (profileId: String, config: com.habitbell.app.data.model.BreathCounterConfig) -> Unit = { _, _ -> }
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
         // -------------------------------------------------------------
@@ -471,6 +481,26 @@ private fun TimerSettingsContent(
                     }
                 }
             }
+        } else if (profile.breathCounterConfig != null) {
+            // Dedicated Unified Acoustic Breathwork & Kriya Counter Configuration
+            BreathCounterSettingsSheet(
+                profile = profile,
+                onUpdateConfig = { config ->
+                    onUpdateBreathCounterConfig(profile.id, config)
+                },
+                isBgMusicEnabled = isBgMusicEnabled,
+                bgMusicType = bgMusicType,
+                bgMusicCustomName = bgMusicCustomName,
+                bgMusicYouTubeUrl = bgMusicYouTubeUrl,
+                bgMusicVolume = bgMusicVolume,
+                onBgMusicToggle = onBgMusicToggle,
+                onBgMusicTypeSelected = onBgMusicTypeSelected,
+                onPickCustomAudio = onPickCustomAudio,
+                onBgMusicYouTubeUrlChange = onBgMusicYouTubeUrlChange,
+                onBgMusicVolumeChange = onBgMusicVolumeChange,
+                onPreviewBgMusic = onPreviewBgMusic
+            )
+            return
         } else if (profile.type == TimerType.MULTI_INTERVAL || profile.pranayamaConfig != null) {
             // Dedicated Classical Pranayama Breathwork Configuration
             PranayamaSettingsSheet(
@@ -2262,6 +2292,780 @@ private fun PranayamaSettingsSheet(
                             }
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * # BreathCounterSettingsSheet
+ *
+ * Dedicated configuration sheet for the unified acoustic breathwork and kriya counter profile.
+ * Provides fine-grained interactive controls for:
+ * 1. **Technique Selection**: Seamless switching between Kapalabhati (कपालभाति),
+ *    Bhastrika (भस्त्रिका), and Bhramari (भ्रामरी) with physiological descriptions.
+ * 2. **Practice Rounds & Stroke Goals**: Configurable round counts and strokes per round.
+ * 3. **Internal Retention (Antar Kumbhaka) & Rest Intervals**: Post-round retention hold and recovery rest pacing.
+ * 4. **Microphone Detection & Sensitivity**: Real-time gain multiplier adjustment and input mode selection.
+ * 5. **Sensory Feedback**: Acoustic stroke ticks, haptic vibration pulses, and vocal round transition cues.
+ * 6. **Subtle Background Ambient Soundscape**: Multi-track ambient drone or YouTube streaming accompaniment.
+ *
+ * ## Architectural Role & Relationships
+ * Embedded within [SettingsDrawer] when `profile.breathCounterConfig != null`.
+ * Dispatches mutations upstream via [onUpdateBreathCounterConfig], updating SharedPreferences
+ * and reconfiguring active breath engines dynamically.
+ *
+ * ## Concurrency & Thread Safety
+ * Executed purely on Compose UI thread. State mutations trigger reactive recomposition and dispatch.
+ *
+ * @param profile Active breath counter [TimerProfile].
+ * @param onUpdateBreathCounterConfig Callback propagating updated [BreathCounterConfig].
+ * @param isBgMusicEnabled Master toggle for ambient soundscapes.
+ * @param bgMusicType Selected ambient sound strategy ([BackgroundSoundType]).
+ * @param bgMusicCustomName Human-readable filename of selected local audio track.
+ * @param bgMusicYouTubeUrl YouTube link for ambient background audio streaming.
+ * @param bgMusicVolume Ambient background music gain level (0.0f..1.0f).
+ * @param onBgMusicToggle Callback to toggle ambient music.
+ * @param onBgMusicTypeSelected Callback to select sound strategy.
+ * @param onPickCustomAudio Callback to launch system file picker for audio files.
+ * @param onBgMusicYouTubeUrlChange Callback when YouTube URL input changes.
+ * @param onBgMusicVolumeChange Callback when ambient music volume slider is adjusted.
+ * @param onPreviewBgMusic Callback to audition or stop background ambient stream preview.
+ */
+@Composable
+private fun BreathCounterSettingsSheet(
+    profile: TimerProfile,
+    onUpdateConfig: (BreathCounterConfig) -> Unit,
+    isBgMusicEnabled: Boolean,
+    bgMusicType: BackgroundSoundType,
+    bgMusicCustomName: String?,
+    bgMusicYouTubeUrl: String,
+    bgMusicVolume: Float,
+    onBgMusicToggle: (Boolean) -> Unit,
+    onBgMusicTypeSelected: (BackgroundSoundType) -> Unit,
+    onPickCustomAudio: () -> Unit,
+    onBgMusicYouTubeUrlChange: (String) -> Unit,
+    onBgMusicVolumeChange: (Float) -> Unit,
+    onPreviewBgMusic: (Boolean) -> Unit
+) {
+    val initialConfig = profile.breathCounterConfig ?: BreathCounterConfig.DEFAULT_KAPALABHATI
+
+    var currentConfig by remember(profile.id, initialConfig) { mutableStateOf(initialConfig) }
+
+    fun dispatchConfig(newConfig: BreathCounterConfig) {
+        currentConfig = newConfig
+        onUpdateConfig(newConfig)
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        // -------------------------------------------------------------
+        // Card 1: Breathwork Technique Selection (कपालभाति, भस्त्रिका, भ्रामरी)
+        // -------------------------------------------------------------
+        Card(
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = "Breathwork Technique",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Select your target kriya or pranayama practice:",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Technique Selector Chips
+                val techniques = listOf(
+                    BreathTechnique.KAPALABHATI,
+                    BreathTechnique.BHASTRIKA,
+                    BreathTechnique.BHRAMARI
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    techniques.forEach { technique ->
+                        val isSelected = currentConfig.technique == technique
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+                            border = BorderStroke(
+                                1.dp,
+                                if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                            ),
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable {
+                                    if (!isSelected) {
+                                        val updated = currentConfig.withTechnique(technique)
+                                        dispatchConfig(updated)
+                                    }
+                                }
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(vertical = 10.dp, horizontal = 6.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Text(
+                                    text = technique.sanskritScript,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = technique.displayName,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onBackground
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Detail Box describing the currently selected technique
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.7f),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.25f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                text = "${currentConfig.technique.sanskritScript} • ${currentConfig.technique.displayName} (${currentConfig.technique.sanskritName})",
+                                style = MaterialTheme.typography.labelMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = currentConfig.technique.description,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        }
+
+        // -------------------------------------------------------------
+        // Card 2: Practice Rounds & Stroke Target
+        // -------------------------------------------------------------
+        Card(
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = "Practice Rounds & Targets",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Configure session duration, rounds, and repetition targets:",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Rounds Stepper
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Target Rounds",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = "${currentConfig.targetRounds} ${if (currentConfig.targetRounds == 1) "round" else "rounds"}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        SmallAdjustButton("-1") {
+                            if (currentConfig.targetRounds > 1) {
+                                val newRounds = currentConfig.targetRounds - 1
+                                val newStrokes = if (currentConfig.strokesPerRound.size > newRounds) {
+                                    currentConfig.strokesPerRound.take(newRounds)
+                                } else {
+                                    currentConfig.strokesPerRound
+                                }
+                                dispatchConfig(currentConfig.copy(targetRounds = newRounds, strokesPerRound = newStrokes))
+                            }
+                        }
+                        SmallAdjustButton("+1") {
+                            if (currentConfig.targetRounds < 21) {
+                                val newRounds = currentConfig.targetRounds + 1
+                                val lastStroke = currentConfig.strokesPerRound.lastOrNull() ?: 30
+                                val newStrokes = if (currentConfig.strokesPerRound.size < newRounds) {
+                                    currentConfig.strokesPerRound + lastStroke
+                                } else {
+                                    currentConfig.strokesPerRound
+                                }
+                                dispatchConfig(currentConfig.copy(targetRounds = newRounds, strokesPerRound = newStrokes))
+                            }
+                        }
+                    }
+                }
+
+                // Preset round quick chips
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    listOf(1, 3, 5, 7).forEach { r ->
+                        val isSel = currentConfig.targetRounds == r
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (isSel) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surface,
+                            border = BorderStroke(1.dp, if (isSel) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable {
+                                    val newStrokes = List(r) { idx -> currentConfig.strokesForRound(idx + 1) }
+                                    dispatchConfig(currentConfig.copy(targetRounds = r, strokesPerRound = newStrokes))
+                                }
+                        ) {
+                            Text(
+                                text = "$r ${if (r == 1) "Round" else "Rounds"}",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = if (isSel) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isSel) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(vertical = 6.dp)
+                            )
+                        }
+                    }
+                }
+
+                if (currentConfig.technique != BreathTechnique.BHRAMARI) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    val baseStrokes = currentConfig.strokesForRound(1)
+                    val strokeUnit = if (currentConfig.technique == BreathTechnique.BHASTRIKA) "bellows cycles" else "strokes"
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Base Strokes per Round",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = "$baseStrokes $strokeUnit / round (Total: ${currentConfig.totalTargetStrokes})",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            val stepDelta = if (currentConfig.technique == BreathTechnique.BHASTRIKA) 5 else 10
+                            SmallAdjustButton("-$stepDelta") {
+                                val newBase = (baseStrokes - stepDelta).coerceAtLeast(5)
+                                val newStrokes = List(currentConfig.targetRounds) { newBase }
+                                dispatchConfig(currentConfig.copy(strokesPerRound = newStrokes))
+                            }
+                            SmallAdjustButton("+$stepDelta") {
+                                val newBase = (baseStrokes + stepDelta).coerceAtMost(300)
+                                val newStrokes = List(currentConfig.targetRounds) { newBase }
+                                dispatchConfig(currentConfig.copy(strokesPerRound = newStrokes))
+                            }
+                        }
+                    }
+
+                    // Preset stroke quick chips
+                    Spacer(modifier = Modifier.height(8.dp))
+                    val strokePresets = if (currentConfig.technique == BreathTechnique.BHASTRIKA) {
+                        listOf(15, 21, 27, 36)
+                    } else {
+                        listOf(20, 30, 60, 108)
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        strokePresets.forEach { s ->
+                            val isSel = baseStrokes == s
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (isSel) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surface,
+                                border = BorderStroke(1.dp, if (isSel) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable {
+                                        val newStrokes = List(currentConfig.targetRounds) { s }
+                                        dispatchConfig(currentConfig.copy(strokesPerRound = newStrokes))
+                                    }
+                            ) {
+                                Text(
+                                    text = "$s",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = if (isSel) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (isSel) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground,
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.padding(vertical = 6.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // -------------------------------------------------------------
+        // Card 3: Internal Retention (Antar Kumbhaka) & Rest Interval
+        // -------------------------------------------------------------
+        Card(
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = "Retention & Rest Intervals",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Pacing for internal Kumbhaka hold and post-round recovery:",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Antar Kumbhaka hold
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Antar Kumbhaka (Hold)",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = if (currentConfig.retentionSeconds == 0) "Disabled (0s)" else "${currentConfig.retentionSeconds}s hold with Mula Bandha",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        SmallAdjustButton("-5s") {
+                            val newHold = (currentConfig.retentionSeconds - 5).coerceAtLeast(0)
+                            dispatchConfig(currentConfig.copy(retentionSeconds = newHold))
+                        }
+                        SmallAdjustButton("+5s") {
+                            val newHold = (currentConfig.retentionSeconds + 5).coerceAtMost(120)
+                            dispatchConfig(currentConfig.copy(retentionSeconds = newHold))
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Rest & Recovery
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Rest & Recovery Pacing",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = if (currentConfig.restSeconds == 0) "Immediate (0s)" else "${currentConfig.restSeconds}s resting pause before next round",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        SmallAdjustButton("-5s") {
+                            val newRest = (currentConfig.restSeconds - 5).coerceAtLeast(0)
+                            dispatchConfig(currentConfig.copy(restSeconds = newRest))
+                        }
+                        SmallAdjustButton("+5s") {
+                            val newRest = (currentConfig.restSeconds + 5).coerceAtMost(60)
+                            dispatchConfig(currentConfig.copy(restSeconds = newRest))
+                        }
+                    }
+                }
+            }
+        }
+
+        // -------------------------------------------------------------
+        // Card 4: Microphone Sensitivity & Input Provider
+        // -------------------------------------------------------------
+        Card(
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = "Acoustic Sensor & Detection",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Microphone sensitivity tuning for acoustic stroke detection:",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Mode Selector
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    listOf(
+                        BreathInputSourceType.ACOUSTIC_MIC to "🎤 Acoustic Mic",
+                        BreathInputSourceType.MANUAL_TAP to "👆 Manual Tap"
+                    ).forEach { (mode, label) ->
+                        val isSel = currentConfig.defaultInputMode == mode
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (isSel) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+                            border = BorderStroke(1.dp, if (isSel) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable {
+                                    dispatchConfig(currentConfig.copy(defaultInputMode = mode))
+                                }
+                        ) {
+                            Text(
+                                text = label,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = if (isSel) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isSel) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onBackground,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(vertical = 8.dp)
+                            )
+                        }
+                    }
+                }
+
+                if (currentConfig.defaultInputMode == BreathInputSourceType.ACOUSTIC_MIC) {
+                    Spacer(modifier = Modifier.height(14.dp))
+                    Text(
+                        text = "MICROPHONE SENSITIVITY",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    val sensOptions = listOf(
+                        0.7f to "Gentle (0.7x)",
+                        1.0f to "Normal (1.0x)",
+                        1.5f to "Sensitive (1.5x)",
+                        2.0f to "Distant (2.0x)"
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        sensOptions.forEach { (sens, label) ->
+                            val isSel = kotlin.math.abs(currentConfig.micSensitivity - sens) < 0.1f
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = if (isSel) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surface,
+                                border = BorderStroke(1.dp, if (isSel) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable {
+                                        dispatchConfig(currentConfig.copy(micSensitivity = sens))
+                                    }
+                            ) {
+                                Text(
+                                    text = label,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = if (isSel) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (isSel) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground,
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.padding(vertical = 6.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // -------------------------------------------------------------
+        // Card 5: Sensory Feedback (Audio Click, Haptics, Voice)
+        // -------------------------------------------------------------
+        Card(
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = "Sensory Feedback",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Tactile and auditory cues on registered strokes and transitions:",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+
+                SettingsToggleRow(
+                    title = "Sound Click on Stroke",
+                    subtitle = "Auditory click cue through SoundPool on every registered stroke",
+                    checked = currentConfig.isSoundFeedbackEnabled,
+                    onCheckedChange = { dispatchConfig(currentConfig.copy(isSoundFeedbackEnabled = it)) }
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                Spacer(modifier = Modifier.height(8.dp))
+
+                SettingsToggleRow(
+                    title = "Haptic Vibration Pulse",
+                    subtitle = "Subtle micro-vibration feedback on stroke detection",
+                    checked = currentConfig.isHapticFeedbackEnabled,
+                    onCheckedChange = { dispatchConfig(currentConfig.copy(isHapticFeedbackEnabled = it)) }
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                Spacer(modifier = Modifier.height(8.dp))
+
+                SettingsToggleRow(
+                    title = "Vocal Round Guidance",
+                    subtitle = "Vocal cues guiding retention holds and round completions",
+                    checked = currentConfig.isVoiceGuidanceEnabled,
+                    onCheckedChange = { dispatchConfig(currentConfig.copy(isVoiceGuidanceEnabled = it)) }
+                )
+            }
+        }
+
+        // -------------------------------------------------------------
+        // Card 6: Subtle Ambient Background Soundscape
+        // -------------------------------------------------------------
+        Card(
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                SettingsToggleRow(
+                    title = "Background Ambient Sound",
+                    subtitle = "Subtle continuous drone or soundscape during practice",
+                    checked = isBgMusicEnabled,
+                    onCheckedChange = onBgMusicToggle
+                )
+
+                if (isBgMusicEnabled) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "SOUND SOURCE",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        val isAumSelected = bgMusicType == BackgroundSoundType.DEFAULT_AUM
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (isAumSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+                            border = BorderStroke(1.dp, if (isAumSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable { onBgMusicTypeSelected(BackgroundSoundType.DEFAULT_AUM) }
+                        ) {
+                            Text(
+                                text = "ॐ Aum",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = if (isAumSelected) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isAumSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onBackground,
+                                modifier = Modifier.padding(vertical = 10.dp).wrapContentWidth(Alignment.CenterHorizontally)
+                            )
+                        }
+
+                        val isYtSelected = bgMusicType == BackgroundSoundType.YOUTUBE_LINK
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (isYtSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+                            border = BorderStroke(1.dp, if (isYtSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                            modifier = Modifier
+                                .weight(1.2f)
+                                .clickable { onBgMusicTypeSelected(BackgroundSoundType.YOUTUBE_LINK) }
+                        ) {
+                            Text(
+                                text = "YouTube Audio",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = if (isYtSelected) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isYtSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onBackground,
+                                modifier = Modifier.padding(vertical = 10.dp).wrapContentWidth(Alignment.CenterHorizontally)
+                            )
+                        }
+
+                        val isCustomSelected = bgMusicType == BackgroundSoundType.CUSTOM_FILE
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (isCustomSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+                            border = BorderStroke(1.dp, if (isCustomSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable { onBgMusicTypeSelected(BackgroundSoundType.CUSTOM_FILE) }
+                        ) {
+                            Text(
+                                text = "Custom File",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = if (isCustomSelected) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isCustomSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onBackground,
+                                modifier = Modifier.padding(vertical = 10.dp).wrapContentWidth(Alignment.CenterHorizontally)
+                            )
+                        }
+                    }
+
+                    if (bgMusicType == BackgroundSoundType.YOUTUBE_LINK) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        var ytInput by remember(bgMusicYouTubeUrl) { mutableStateOf(bgMusicYouTubeUrl) }
+                        OutlinedTextField(
+                            value = ytInput,
+                            onValueChange = {
+                                ytInput = it
+                                onBgMusicYouTubeUrlChange(it)
+                            },
+                            label = { Text("YouTube URL (Audio Stream)") },
+                            singleLine = true,
+                            textStyle = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "✓ Ad-free background playback",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            var isTestingYt by remember { mutableStateOf(false) }
+                            TextButton(
+                                onClick = {
+                                    isTestingYt = !isTestingYt
+                                    onPreviewBgMusic(isTestingYt)
+                                }
+                            ) {
+                                Text(
+                                    if (isTestingYt) "⏹ Stop" else "▶ Test Stream",
+                                    style = MaterialTheme.typography.labelSmall
+                                )
+                            }
+                        }
+                    }
+
+                    if (bgMusicType == BackgroundSoundType.CUSTOM_FILE) {
+                        Spacer(modifier = Modifier.height(10.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                text = bgMusicCustomName ?: "No custom file chosen",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Button(
+                                onClick = onPickCustomAudio,
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                            ) {
+                                Text("Choose File", style = MaterialTheme.typography.labelSmall)
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Ambient Volume (${(bgMusicVolume * 100).toInt()}%)",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                    Slider(
+                        value = bgMusicVolume,
+                        onValueChange = onBgMusicVolumeChange,
+                        valueRange = 0.05f..1.0f,
+                        colors = SliderDefaults.colors(
+                            thumbColor = MaterialTheme.colorScheme.primary,
+                            activeTrackColor = MaterialTheme.colorScheme.primary
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
             }
         }
