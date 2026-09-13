@@ -293,6 +293,9 @@ class MainActivity : FragmentActivity() {
                                 },
                                 onManualBreathStrokeTap = {
                                     viewModel.registerManualBreathStroke()
+                                },
+                                onSelectBreathMicSensitivity = { sensitivity ->
+                                    viewModel.setBreathMicSensitivity(sensitivity)
                                 }
                             )
                         }

@@ -2,6 +2,7 @@ package com.habitbell.app.ui.components
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -52,6 +53,7 @@ import com.habitbell.app.engine.TimerSessionState
  * @param breathUpdate Real-time breath metrics and round progression.
  * @param selectedInputSource Active input provider ([BreathInputSourceType]).
  * @param onSelectInputSource Callback to switch between microphone and touch screen mode.
+ * @param onSelectSensitivity Callback to adjust microphone detection sensitivity.
  * @param onManualStrokeTap Callback invoked when user taps the active counting surface.
  * @param modifier Composable layout modifier.
  */
@@ -61,6 +63,7 @@ fun BreathCounterContent(
     breathUpdate: BreathStrokeUpdate,
     selectedInputSource: BreathInputSourceType,
     onSelectInputSource: (BreathInputSourceType) -> Unit,
+    onSelectSensitivity: (Float) -> Unit = {},
     onManualStrokeTap: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -75,8 +78,8 @@ fun BreathCounterContent(
         label = "AcousticRms"
     )
 
-    // Breathing pulse for continuous subtle motion
-    val infiniteTransition = rememberInfiniteTransition(label = "PulseTransition")
+    // Breathing pulse for ambient resting circles
+    val infiniteTransition = rememberInfiniteTransition(label = "AcousticAmbientPulse")
     val ambientPulse by infiniteTransition.animateFloat(
         initialValue = 0.96f,
         targetValue = 1.04f,
@@ -134,7 +137,7 @@ fun BreathCounterContent(
                 maxLines = 2
             )
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
             // Input Mode Switcher Chips (Mic vs Tap)
             Row(
@@ -152,6 +155,81 @@ fun BreathCounterContent(
                     onClick = { onSelectInputSource(BreathInputSourceType.MANUAL_TAP) },
                     label = { Text("👆 Tap Counter", fontSize = 12.sp) }
                 )
+            }
+
+            // Live Mic Sensitivity & Audio Level Meter (Acoustic Mode)
+            if (selectedInputSource == BreathInputSourceType.ACOUSTIC_MIC && breathUpdate.currentPhase == BreathCounterPhase.STROKES) {
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Sensitivity selector chips: [Low] [Med] [High]
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center,
+                    modifier = Modifier.padding(bottom = 6.dp)
+                ) {
+                    Text(
+                        text = "Sensitivity: ",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                    )
+                    val currentSens = breathUpdate.micSensitivity
+                    listOf(
+                        Pair("Low", 0.7f),
+                        Pair("Med", 1.0f),
+                        Pair("High", 1.5f)
+                    ).forEach { (label, value) ->
+                        val isSelected = kotlin.math.abs(currentSens - value) < 0.2f
+                        Surface(
+                            shape = RoundedCornerShape(10.dp),
+                            color = if (isSelected) phaseAuraColor.copy(alpha = 0.25f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                            border = if (isSelected) BorderStroke(1.dp, phaseAuraColor) else null,
+                            modifier = Modifier
+                                .padding(horizontal = 3.dp)
+                                .clickable { onSelectSensitivity(value) }
+                        ) {
+                            Text(
+                                text = label,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (isSelected) phaseAuraColor else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                            )
+                        }
+                    }
+                }
+
+                // Live Audio Level & Threshold Gauge Bar
+                BoxWithConstraints(
+                    modifier = Modifier
+                        .fillMaxWidth(0.75f)
+                        .height(6.dp)
+                        .clip(RoundedCornerShape(3.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                ) {
+                    val totalWidth = maxWidth
+                    val fillWidth = totalWidth * animatedRms.coerceIn(0f, 1f)
+                    val thresholdOffset = totalWidth * breathUpdate.thresholdRms.coerceIn(0f, 1f)
+                    val isOverThreshold = animatedRms >= breathUpdate.thresholdRms
+
+                    // Active energy level
+                    Box(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .width(fillWidth)
+                            .background(
+                                if (isOverThreshold) phaseAuraColor else Color(0xFF4CAF50).copy(alpha = 0.85f)
+                            )
+                    )
+
+                    // Vertical Threshold Needle
+                    Box(
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .width(2.dp)
+                            .offset(x = thresholdOffset)
+                            .background(Color.White)
+                    )
+                }
             }
         }
 

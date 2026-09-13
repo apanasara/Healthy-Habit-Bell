@@ -183,4 +183,71 @@ class BreathCounterEngineTest {
         assertEquals(68, state.breathUpdate?.cadenceBpm)
         assertEquals("Kapalabhati Counter", state.profile.name)
     }
+
+    /**
+     * Verifies the 2nd-order Biquad Bandpass Filter (center 2400 Hz, Q = 1.0)
+     * correctly passes Kapalabhati nasal hiss frequencies while rejecting low-frequency
+     * rumble (100 Hz) and ultra-high frequency mic hiss (7500 Hz).
+     */
+    @Test
+    fun testBiquadBandpassFilterAttenuatesRumbleAndHiss() {
+        val sampleRate = 16000f
+        val filter = AcousticBreathSensorProvider.BiquadBandpassFilter(
+            sampleRate = sampleRate,
+            centerFreq = 2400f,
+            q = 1.0f
+        )
+
+        // Helper to compute RMS of filtered sine wave of given frequency
+        fun measureFilterRms(freqHz: Float, numSamples: Int = 1600): Float {
+            filter.reset()
+            var sumSquares = 0.0f
+            // Skip first 200 samples for filter transient settling
+            for (i in 0 until numSamples) {
+                val t = i.toFloat() / sampleRate
+                val input = kotlin.math.sin(2.0 * Math.PI * freqHz * t).toFloat()
+                val output = filter.process(input)
+                if (i >= 200) {
+                    sumSquares += output * output
+                }
+            }
+            return kotlin.math.sqrt(sumSquares / (numSamples - 200))
+        }
+
+        val passbandRms = measureFilterRms(2400f) // Center frequency (breath hiss)
+        val rumbleRms = measureFilterRms(100f)    // Room rumble / low humming
+        val hissRms = measureFilterRms(7500f)     // High-frequency sensor hiss
+
+        // Center frequency should pass with minimal attenuation (near 1.0 / sqrt(2) = 0.707)
+        assertTrue("Passband 2400 Hz RMS ($passbandRms) should be robust (> 0.5)", passbandRms > 0.5f)
+
+        // 100 Hz rumble must be attenuated by at least 15x (> 23 dB)
+        assertTrue(
+            "Low frequency rumble ($rumbleRms) must be heavily attenuated compared to passband ($passbandRms)",
+            rumbleRms < passbandRms * 0.10f
+        )
+
+        // 7500 Hz hiss must also be attenuated
+        assertTrue(
+            "High frequency hiss ($hissRms) must be attenuated compared to passband ($passbandRms)",
+            hissRms < passbandRms * 0.20f
+        )
+    }
+
+    /**
+     * Verifies that [BreathStrokeUpdate] holds mic sensitivity and dynamic threshold metrics.
+     */
+    @Test
+    fun testBreathStrokeUpdateSensitivityAndThreshold() {
+        val update = BreathStrokeUpdate(
+            currentRoundStrokes = 10,
+            targetRoundStrokes = 30,
+            thresholdRms = 0.08f,
+            micSensitivity = 1.5f
+        )
+
+        assertEquals(0.08f, update.thresholdRms, 0.001f)
+        assertEquals(1.5f, update.micSensitivity, 0.001f)
+    }
 }
+

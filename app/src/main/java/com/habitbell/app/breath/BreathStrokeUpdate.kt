@@ -26,6 +26,8 @@ package com.habitbell.app.breath
  * @property phaseDurationSeconds Total allocated seconds for the active timed phase.
  * @property humDurationSeconds Length of active unbroken humming vibration in seconds (used for [BreathTechnique.BHRAMARI]).
  * @property audioAmplitudeRms Normalized acoustic energy envelope level (`0.0f` to `1.0f`) used for visual waveform ripples.
+ * @property thresholdRms Dynamic acoustic trigger threshold level (`0.0f` to `1.0f`) used for visual gauge display.
+ * @property micSensitivity Active microphone sensitivity multiplier (0.5f to 2.5f).
  * @property timestampMillis Epoch timestamp in milliseconds when this metric update was generated.
  */
 data class BreathStrokeUpdate(
@@ -40,6 +42,8 @@ data class BreathStrokeUpdate(
     val phaseDurationSeconds: Int = 0,
     val humDurationSeconds: Float = 0f,
     val audioAmplitudeRms: Float = 0f,
+    val thresholdRms: Float = 0.04f,
+    val micSensitivity: Float = 1.0f,
     val timestampMillis: Long = System.currentTimeMillis()
 ) {
     /**

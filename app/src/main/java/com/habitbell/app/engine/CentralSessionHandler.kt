@@ -105,14 +105,26 @@ class CentralSessionHandler(private val application: Application) {
         onStrokeRegistered = { _, _ ->
             val profile = engine.state.value.profile
             val config = profile.breathCounterConfig
-            if (config?.isSoundFeedbackEnabled == true) {
-                audioManager.playStrokeFeedback()
-            }
+            val isMic = breathCountManager.selectedInputSource.value == com.habitbell.app.breath.BreathInputSourceType.ACOUSTIC_MIC
+
+            // Tactile haptic feedback gives immediate physical sensation with zero acoustic interference
             if (config?.isHapticFeedbackEnabled == true) {
                 hapticManager.triggerStrokeHaptic()
             }
+
+            // In ACOUSTIC_MIC mode, playing audio through the phone speaker right next to the mic can self-trigger
+            // false strokes. When on mic, we blank the detector for 320ms so the chime is ignored.
+            if (config?.isSoundFeedbackEnabled == true) {
+                if (!isMic) {
+                    audioManager.playStrokeFeedback()
+                } else {
+                    breathCountManager.blankAcousticDetection(320L)
+                    audioManager.playStrokeFeedback(volume = 0.20f)
+                }
+            }
         }
         onPhaseChanged = { phase ->
+            breathCountManager.blankAcousticDetection(2000L)
             when (phase) {
                 com.habitbell.app.breath.BreathCounterPhase.RETENTION_HOLD -> {
                     audioManager.playPranayamaIntervalBell()
