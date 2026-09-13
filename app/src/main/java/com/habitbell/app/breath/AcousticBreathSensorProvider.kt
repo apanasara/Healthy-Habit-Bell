@@ -399,8 +399,8 @@ class AcousticBreathSensorProvider(
 
         when (kapalabhatiState) {
             KapalabhatiState.IDLE_LISTENING -> {
-                // Enforce minimum refractory interval (280ms = max ~214 BPM)
-                if (bandpassRms > dynamicThreshold && timeSinceLastStroke >= 280L) {
+                // Enforce minimum refractory interval (180ms = max ~333 BPM)
+                if (bandpassRms > dynamicThreshold && timeSinceLastStroke >= 180L) {
                     kapalabhatiState = KapalabhatiState.ATTACK_DETECTED
                     strokeStartTimeMillis = now
                     strokePeakRms = bandpassRms
@@ -443,18 +443,13 @@ class AcousticBreathSensorProvider(
 
             KapalabhatiState.COOLDOWN_VALLEY -> {
                 val elapsedSinceStroke = now - lastStrokeTimeMillis
-                // If ambient noise is still louder than threshold, stay in cooldown to avoid runaway loop
-                if (bandpassRms > dynamicThreshold) {
-                    lastStrokeTimeMillis = now
-                } else {
-                    val isInValley = bandpassRms < (dynamicThreshold * 0.85f)
-                    val isMinRefractoryPassed = elapsedSinceStroke >= 200L
-                    val isCooldownExpired = elapsedSinceStroke >= 280L
+                val isMinRefractoryPassed = elapsedSinceStroke >= 150L
+                val isInValley = bandpassRms < (dynamicThreshold * 0.90f)
+                val isCooldownExpired = elapsedSinceStroke >= 240L
 
-                    if ((isInValley && isMinRefractoryPassed) || isCooldownExpired) {
-                        kapalabhatiState = KapalabhatiState.IDLE_LISTENING
-                        Log.d(TAG, "🔄 COOLDOWN COMPLETE -> IDLE_LISTENING (elapsed=${elapsedSinceStroke}ms, bandpassRms=%.4f)".format(bandpassRms))
-                    }
+                if (isMinRefractoryPassed && (isInValley || isCooldownExpired)) {
+                    kapalabhatiState = KapalabhatiState.IDLE_LISTENING
+                    Log.d(TAG, "🔄 COOLDOWN COMPLETE -> IDLE_LISTENING (elapsed=${elapsedSinceStroke}ms, bandpassRms=%.4f)".format(bandpassRms))
                 }
             }
         }

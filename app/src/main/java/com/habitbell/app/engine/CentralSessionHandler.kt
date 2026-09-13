@@ -112,15 +112,13 @@ class CentralSessionHandler(private val application: Application) {
                 hapticManager.triggerStrokeHaptic()
             }
 
-            // In ACOUSTIC_MIC mode, playing audio through the phone speaker right next to the mic can self-trigger
-            // false strokes. When on mic, we blank the detector for 320ms so the chime is ignored.
-            if (config?.isSoundFeedbackEnabled == true) {
-                if (!isMic) {
-                    audioManager.playStrokeFeedback()
-                } else {
-                    breathCountManager.blankAcousticDetection(320L)
-                    audioManager.playStrokeFeedback(volume = 0.20f)
-                }
+            // In ACOUSTIC_MIC mode, playing an audio chime through the phone speaker right next to the mic
+            // saturates the acoustic sensor for >2.3 seconds (tingsha reverberation tail), deafening the detector
+            // and dropping rapid breath strokes.
+            // For hands-free acoustic sensing, feedback is purely tactile (haptic pulse) and visual (screen ripple).
+            // Audible stroke chimes are safely reserved for MANUAL_TAP mode where the mic is inactive.
+            if (config?.isSoundFeedbackEnabled == true && !isMic) {
+                audioManager.playStrokeFeedback()
             }
         }
         onPhaseChanged = { phase ->
