@@ -8,7 +8,7 @@ package com.habitbell.app.mantra
  *
  * ## Architectural Role & Component Relationships
  * - Dispatched from background audio DSP loops or touch input handlers.
- * - Ingested by [MantraCountManager] to increment beads, track cadence, and advance Mala rounds.
+ * - Ingested by [MantraCountManager] to increment beads, track cadence, evaluate ambient calibration, and advance Mala rounds.
  * - Forwards live vocal RMS audio amplitude and threshold metrics for real-time UI biofeedback.
  *
  * ## Lifecycle & Concurrency
@@ -20,6 +20,8 @@ package com.habitbell.app.mantra
  * @property thresholdRms Normalized detection threshold level (0.0f to 1.0f) for the live needle gauge.
  * @property isSpeechActive True when human vocal energy is actively detected in the current window.
  * @property activeVerseDurationSeconds Cumulative vocal duration of the ongoing verse or Aumkar drone in seconds.
+ * @property isCalibrating Whether the acoustic sensor is actively measuring stationary ambient room noise (AC, fan, wind).
+ * @property calibrationProgress Fractional progress of room ambient calibration normalized from `0.0f` to `1.0f`.
  * @property timestampMillis Monotonic system timestamp in milliseconds when this event was recorded.
  */
 data class MantraInputEvent(
@@ -29,5 +31,7 @@ data class MantraInputEvent(
     val thresholdRms: Float = 0.05f,
     val isSpeechActive: Boolean = false,
     val activeVerseDurationSeconds: Float = 0f,
+    val isCalibrating: Boolean = false,
+    val calibrationProgress: Float = 0f,
     val timestampMillis: Long = System.currentTimeMillis()
 )

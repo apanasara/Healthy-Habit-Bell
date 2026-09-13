@@ -134,6 +134,17 @@ fun MantraCounterContent(
                 color = MaterialTheme.colorScheme.onBackground
             )
 
+            if (mantraUpdate.isCalibrating) {
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "Remain silent. Calibrating room acoustics (AC, fan, wind)...",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    maxLines = 2
+                )
+            }
+
             Spacer(modifier = Modifier.height(6.dp))
 
             // Technique Fast-Switcher Chips (Preparation or Idle)
@@ -390,6 +401,25 @@ fun MantraCounterContent(
                     Text(
                         text = "Purna Sadhana Finished",
                         style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                } else if (mantraUpdate.isCalibrating) {
+                    Text(
+                        text = "CALIBRATING ROOM",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = sacredColor,
+                        letterSpacing = 2.sp
+                    )
+                    Text(
+                        text = if (mantraUpdate.calibrationSecondsRemaining > 0) "${mantraUpdate.calibrationSecondsRemaining}s" else "Calibrating",
+                        fontSize = 52.sp,
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = FontFamily.Monospace,
+                        color = sacredColor
+                    )
+                    Text(
+                        text = "Measuring ambient sound",
+                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 } else {

@@ -99,7 +99,7 @@ fun BreathCounterContent(
             BreathCounterPhase.RETENTION_HOLD -> Color(0xFFFFD700) // Sacred golden Kumbhaka
             BreathCounterPhase.REST -> Color(0xFF00E5FF) // Cool calm cyan
             BreathCounterPhase.COMPLETED -> Color(0xFF4CAF50) // Vibrant emerald
-            BreathCounterPhase.PREPARATION -> Color(0xFFB0BEC5) // Gentle silver
+            BreathCounterPhase.PREPARATION -> Color(0xFF00E5FF) // Cool calm cyan ambient calibration
         },
         animationSpec = tween(durationMillis = 600),
         label = "PhaseAura"
@@ -184,7 +184,8 @@ fun BreathCounterContent(
             }
 
             // Live Mic Sensitivity & Audio Level Meter (Acoustic Mode)
-            if (selectedInputSource == BreathInputSourceType.ACOUSTIC_MIC && breathUpdate.currentPhase == BreathCounterPhase.STROKES) {
+            if (selectedInputSource == BreathInputSourceType.ACOUSTIC_MIC && 
+                (breathUpdate.currentPhase == BreathCounterPhase.STROKES || breathUpdate.currentPhase == BreathCounterPhase.PREPARATION)) {
                 Spacer(modifier = Modifier.height(8.dp))
 
                 // Sensitivity selector chips: [Low] [Med] [High]
@@ -445,16 +446,22 @@ fun BreathCounterContent(
 
                         BreathCounterPhase.PREPARATION -> {
                             Text(
-                                text = "PREPARE",
+                                text = "CALIBRATING ROOM",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = phaseAuraColor,
                                 letterSpacing = 2.sp
                             )
                             Text(
-                                text = "Inhale",
-                                fontSize = 42.sp,
+                                text = if (breathUpdate.phaseRemainingSeconds > 0) "${breathUpdate.phaseRemainingSeconds}s" else "Calibrating",
+                                fontSize = 52.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onBackground
+                                fontFamily = FontFamily.Monospace,
+                                color = phaseAuraColor
+                            )
+                            Text(
+                                text = "Measuring ambient sound",
+                                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }

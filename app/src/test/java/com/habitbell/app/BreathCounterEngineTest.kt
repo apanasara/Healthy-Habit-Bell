@@ -277,5 +277,45 @@ class BreathCounterEngineTest {
         assertEquals(1, provider.inputFlow.value.strokeDelta)
         provider.stop()
     }
+
+    /**
+     * Verifies that [BreathCounterPhase.PREPARATION] correctly computes fractional progress
+     * during the 3-second ambient acoustic room calibration window and carries calibration flags.
+     */
+    @Test
+    fun testAmbientAcousticCalibrationProgressAndPhases() {
+        // 1. Initial calibration state: 3s remaining of 3s total -> progress 0.0f
+        val prepStart = BreathStrokeUpdate(
+            currentPhase = BreathCounterPhase.PREPARATION,
+            phaseRemainingSeconds = 3,
+            phaseDurationSeconds = 3,
+            isCalibrating = true
+        )
+        assertTrue("Preparation state must have isCalibrating=true", prepStart.isCalibrating)
+        assertEquals(0.0f, prepStart.roundProgressFraction, 0.01f)
+
+        // 2. Mid calibration state: 1s remaining of 3s total -> progress ~0.67f
+        val prepMid = prepStart.copy(phaseRemainingSeconds = 1)
+        assertEquals(2f / 3f, prepMid.roundProgressFraction, 0.01f)
+
+        // 3. Complete calibration state: 0s remaining -> progress 1.0f
+        val prepComplete = prepStart.copy(phaseRemainingSeconds = 0)
+        assertEquals(1.0f, prepComplete.roundProgressFraction, 0.01f)
+
+        // 4. BreathInputEvent carries calibration telemetry
+        val event = BreathInputEvent(
+            strokeDelta = 0,
+            audioAmplitudeRms = 0.04f,
+            thresholdRms = 0.08f,
+            isCalibrating = true,
+            calibrationProgress = 0.50f
+        )
+        assertTrue(event.isCalibrating)
+        assertEquals(0.50f, event.calibrationProgress, 0.001f)
+
+        // 5. Verify PREPARATION phase metadata
+        assertEquals("Calibrate & Settle", BreathCounterPhase.PREPARATION.displayName)
+        assertTrue(BreathCounterPhase.PREPARATION.guidanceCue.contains("calibrat", ignoreCase = true))
+    }
 }
 

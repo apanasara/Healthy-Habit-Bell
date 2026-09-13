@@ -80,6 +80,11 @@ The subsystem introduces an **Intra-Verse Pause Bridging State Machine**:
 - **2nd-Order Biquad Voice Bandpass Filter**: Center frequency $f_c = 800\text{ Hz}$, $Q = 0.5$, passband 150 Hz – 2500 Hz. Captures natural human speech formants (vowels, resonance) while rejecting low-frequency room rumble (60/100 Hz attenuated by >15 dB) and high-frequency mic hiss (7.5 kHz attenuated by >14 dB).
 - **Dynamic Noise Floor Adaptation**: Tracks ambient room noise ($\alpha = 0.12$ fall, $\alpha = 0.02$ rise), establishing dynamic vocal threshold:
   $$\text{Threshold} = \left(\text{NoiseFloor} \times \frac{2.2}{\text{Sensitivity}} + \frac{0.002}{\text{Sensitivity}}\right).\text{coerceIn}(0.002f, 0.20f)$$
+- **Ambient Acoustic Noise Floor Calibration (3-Second Silent Profiling Window)**:
+  Before active recitation begins in `ACOUSTIC_MIC` mode, `MantraCountManager` executes an initial 3-second silent pause (90 frames $\times 32\text{ms} \approx 2.88\text{s}$) to measure stationary room background sound (AC blowers, ceiling fans, wind, leaves, mic noise floor).
+  - **Outlier Rejection**: Rejects sharp transient spikes ($RMS > 0.20f$ bandpass or $> 0.30f$ raw) such as table taps or dropped mala beads.
+  - **Dynamic Baseline Locking**: Computes steady ambient noise floor baseline and locks the speech formant trigger threshold before japa/verse detection begins.
+  - **Gated Bead Emission**: Prevents phantom bead triggers during the initial settling period while continuously streaming live amplitude/threshold metrics to the UI.
 - **Autocorrelation Pitch Estimator**:
   $$R(\text{lag}) = \frac{\sum_{i} x[i] \cdot x[i + \text{lag}]}{\sqrt{\sum x[i]^2 \cdot \sum x[i+\text{lag}]^2}}$$
   Searches lags between $64$ and $200$ samples at 16 kHz ($80\text{ Hz} - 250\text{ Hz}$). Successfully validates fundamental Aum frequency (e.g., 136.1 Hz Vedic C#).

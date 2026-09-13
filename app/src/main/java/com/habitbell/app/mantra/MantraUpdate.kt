@@ -26,6 +26,8 @@ package com.habitbell.app.mantra
  * @property isReciting True when active speech energy is detected in the current window.
  * @property activeVerseDurationSeconds Cumulative vocal duration of ongoing recitation in seconds.
  * @property micSensitivity Multiplier adjusting detection sensitivity (0.5f to 2.5f).
+ * @property isCalibrating True when actively profiling environmental room noise floor before chanting starts.
+ * @property calibrationSecondsRemaining Remaining seconds in the ambient noise calibration countdown.
  * @property technique Active sacred recitation modality ([MantraTechnique]).
  * @property isCompleted True when all target Malas and beads have been achieved.
  * @property timestampMillis Monotonic system timestamp in milliseconds.
@@ -42,6 +44,8 @@ data class MantraUpdate(
     val isReciting: Boolean = false,
     val activeVerseDurationSeconds: Float = 0f,
     val micSensitivity: Float = 1.0f,
+    val isCalibrating: Boolean = false,
+    val calibrationSecondsRemaining: Int = 0,
     val technique: MantraTechnique = MantraTechnique.GAYATRI_MANTRA,
     val isCompleted: Boolean = false,
     val timestampMillis: Long = System.currentTimeMillis()

@@ -24,12 +24,12 @@ enum class BreathCounterPhase(
     val sanskritScript: String
 ) {
     /**
-     * Settle into meditation posture and prepare lungs.
+     * Settle into meditation posture and calibrate ambient room acoustics (AC, wind, fan).
      */
     PREPARATION(
-        displayName = "Prepare",
-        guidanceCue = "Settle in a comfortable seated posture. Spine upright.",
-        sanskritScript = "प्रारम्भिक स्थिति"
+        displayName = "Calibrate & Settle",
+        guidanceCue = "Remain silent. Calibrating room ambience...",
+        sanskritScript = "प्रारम्भिक स्थिति / समंजन"
     ),
 
     /**
