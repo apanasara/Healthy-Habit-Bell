@@ -4,8 +4,17 @@ import com.habitbell.app.breath.*
 import com.habitbell.app.data.model.*
 
 /**
+ * # DefaultProfiles
+ *
  * Pre-configured wellness timer profiles based on scientifically validated health habits,
  * yogic traditions, and mindfulness practices.
+ *
+ * ## Architectural Role & Component Relationships
+ * Single source of truth defining canonical preset profiles consumed by [com.habitbell.app.data.repository.TimerRepository],
+ * [com.habitbell.app.engine.CentralSessionHandler], and [com.habitbell.app.auto.HabitBellCarScreen].
+ *
+ * ## Lifecycle & Thread Safety
+ * Global singleton immutable definitions. Thread-safe across all coroutine dispatchers and background services.
  */
 object DefaultProfiles {
 
@@ -83,57 +92,6 @@ object DefaultProfiles {
         )
     )
 
-    /**
-     * Box Breathing (Sama Vritti): Equalized 4-4-4-4 ratio across 20 cycles.
-     * Inhale 4s, Hold In 4s, Exhale 4s, Rest Empty 4s.
-     * Clinically proven to regulate the autonomic nervous system and lower cortisol.
-     */
-    val PRANAYAMA_BOX = TimerProfile(
-        id = "pranayama-box-breath",
-        name = "Pranayama (Box Breath)",
-        type = TimerType.MULTI_INTERVAL,
-        category = "Breathwork",
-        iconName = "self_improvement",
-        theme = ThemeMode.AMOLED,
-        displayMode = true,
-        pocketMode = false,
-        isFavorite = true,
-        pranayamaConfig = PranayamaConfig(
-            steps = listOf(
-                PranayamaStep(PranayamaPhase.INHALE, 4),
-                PranayamaStep(PranayamaPhase.HOLD_IN, 4),
-                PranayamaStep(PranayamaPhase.EXHALE, 4),
-                PranayamaStep(PranayamaPhase.HOLD_OUT, 4)
-            ),
-            targetRounds = 20
-        )
-    )
-
-    /**
-     * 4-7-8 Relaxing Breath: Dr. Andrew Weil technique across 15 cycles.
-     * Inhale 4s, Hold In 7s, Exhale 8s, Rest 2s.
-     * Activates the parasympathetic vagal response for deep tranquility and sleep preparation.
-     */
-    val PRANAYAMA_478 = TimerProfile(
-        id = "pranayama-478-relax",
-        name = "Pranayama (4-7-8 Deep Relax)",
-        type = TimerType.MULTI_INTERVAL,
-        category = "Deep Relaxation",
-        iconName = "air",
-        theme = ThemeMode.AMOLED,
-        displayMode = true,
-        pocketMode = false,
-        isFavorite = false,
-        pranayamaConfig = PranayamaConfig(
-            steps = listOf(
-                PranayamaStep(PranayamaPhase.INHALE, 4),
-                PranayamaStep(PranayamaPhase.HOLD_IN, 7),
-                PranayamaStep(PranayamaPhase.EXHALE, 8),
-                PranayamaStep(PranayamaPhase.HOLD_OUT, 2)
-            ),
-            targetRounds = 15
-        )
-    )
 
     /**
      * Surya Namaskar (Sun Salutation): 12-asana compound sequence across 5 full rounds.
@@ -236,23 +194,6 @@ object DefaultProfiles {
         stepTriggerMode = StepTriggerMode.TIME_OR_STEPS
     )
 
-    /**
-     * Mindful Reading: 30-minute focused study/reading sprint with 10-minute eye relief chimes.
-     */
-    val MINDFUL_READING = TimerProfile(
-        id = "mindful-reading-30",
-        name = "Mindful Reading",
-        type = TimerType.LINEAR,
-        category = "Focus",
-        iconName = "menu_book",
-        totalDurationSeconds = 1800,     // 30 minutes
-        intervalDurationSeconds = 600,   // 10-minute eye/posture reset
-        bellPattern = BellPattern.SINGLE,
-        theme = ThemeMode.EYE_COMFORT,
-        displayMode = true,
-        pocketMode = false,
-        isFavorite = false
-    )
 
     /**
      * Hydration Habit: 60-minute recurring reminder chime encouraging regular water intake.
@@ -358,7 +299,8 @@ object DefaultProfiles {
     )
 
     /**
-     * Complete list of all default preset wellness profiles.
+     * Complete list of all curated default preset wellness profiles.
+     * De-duplicated and consolidated around canonical mindfulness habits.
      */
     val ALL_PRESETS = listOf(
         PRANAYAMA_HATHA,
@@ -367,13 +309,10 @@ object DefaultProfiles {
         BHRAMARI_COUNTER,
         EATING,
         REIKI,
-        PRANAYAMA_BOX,
-        PRANAYAMA_478,
         SURYA_NAMASKAR,
         MINDFUL_WALKING,
         STEP_WALK_MEDITATION,
         POWER_STEP_WALK,
-        MINDFUL_READING,
         HYDRATION
     )
 }

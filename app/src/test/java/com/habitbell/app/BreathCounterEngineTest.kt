@@ -67,7 +67,7 @@ class BreathCounterEngineTest {
     }
 
     /**
-     * Strict verification that classical guided Pranayama (Visama Vritti 4:16:8:16, Box, 4-7-8)
+     * Strict verification that classical guided Pranayama (Visama Vritti 4:16:8:16)
      * has NOT been modified or compromised in any way.
      */
     @Test
@@ -82,10 +82,9 @@ class BreathCounterEngineTest {
         assertEquals(8, hatha.pranayamaConfig!!.rechakSeconds)
         assertEquals(16, hatha.pranayamaConfig!!.bahyaKumbhakSeconds)
 
-        val box = DefaultProfiles.PRANAYAMA_BOX
-        assertFalse("Box breath must not be marked as breath counter", box.isBreathCountingEnabled)
-        assertNotNull(box.pranayamaConfig)
-        assertEquals(20, box.pranayamaConfig!!.targetRounds)
+        val surya = DefaultProfiles.SURYA_NAMASKAR
+        assertFalse("Surya Namaskar compound must not be marked as breath counter", surya.isBreathCountingEnabled)
+        assertEquals(TimerType.COMPOUND, surya.type)
 
         val eating = DefaultProfiles.EATING
         assertFalse("Eating profile must not have breath counting enabled", eating.isBreathCountingEnabled)

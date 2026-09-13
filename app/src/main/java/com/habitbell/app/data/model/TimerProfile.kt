@@ -6,7 +6,7 @@ package com.habitbell.app.data.model
  * Encapsulates the timer typology, timing parameters, chime patterns, visual themes,
  * and hardware mode settings (Pocket Mode, Keep Screen On).
  *
- * @property id Unique identifier key (e.g. "eating-mindful-20", "pranayama-box-breath").
+ * @property id Unique identifier key (e.g. "eating-mindful-20", "pranayama-hatha-classical").
  * @property name User-facing display title for the profile.
  * @property type The timer execution topology ([TimerType.LINEAR], [TimerType.MULTI_INTERVAL], or [TimerType.COMPOUND]).
  * @property category Conceptual classification grouping (e.g. "Mindful Eating", "Energy Healing", "Breathwork").

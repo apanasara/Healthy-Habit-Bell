@@ -43,17 +43,17 @@ class TimerEngineTest {
     }
 
     /**
-     * Verifies the 4-phase Sama Vritti (Box Breathing) 4-4-4-4 second ratio configuration.
+     * Verifies the 4-phase classical Chaturanga Pranayama (Visama Vritti 4:16:8:16) configuration.
      */
     @Test
-    fun testPranayamaBoxBreathConfig() {
-        val pranayama = DefaultProfiles.PRANAYAMA_BOX
+    fun testPranayamaHathaClassicalConfig() {
+        val pranayama = DefaultProfiles.PRANAYAMA_HATHA
         val config = pranayama.pranayamaConfig
         assertNotNull(config)
         assertEquals(4, config!!.steps.size)
         val roundSeconds = config.steps.sumOf { it.durationSeconds }
-        assertEquals(16, roundSeconds) // 4s inhale + 4s hold + 4s exhale + 4s hold
-        assertEquals(20, config.targetRounds)
+        assertEquals(44, roundSeconds) // 4s Purak + 16s Antar + 8s Rechak + 16s Bahya
+        assertEquals(12, config.targetRounds) // Classical Adhama standard
     }
 
     /**

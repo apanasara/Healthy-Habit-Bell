@@ -688,8 +688,8 @@ class CentralSessionHandler(private val application: Application) {
     fun startProfileById(mediaId: String) {
         val targetProfile = when (mediaId) {
             "eating", "eating-mindful-20" -> repository.getProfileById("eating-mindful-20") ?: DefaultProfiles.EATING
-            "posture" -> repository.getProfileById("posture") ?: repository.getProfileById("mindful-reading-30") ?: DefaultProfiles.MINDFUL_READING
-            "breathing" -> repository.getProfileById("pranayama-box-breath") ?: DefaultProfiles.PRANAYAMA_BOX
+            "posture" -> repository.getProfileById("posture") ?: repository.profiles.value.find { it.category.contains("Movement", ignoreCase = true) } ?: DefaultProfiles.EATING
+            "breathing" -> repository.getProfileById("pranayama-hatha-classical") ?: DefaultProfiles.PRANAYAMA_HATHA
             else -> repository.getProfileById(mediaId) ?: repository.profiles.value.firstOrNull() ?: DefaultProfiles.EATING
         }
         startProfile(targetProfile)
@@ -710,8 +710,7 @@ class CentralSessionHandler(private val application: Application) {
                 it.name.lowercase().contains(lowerMessage) ||
                 (lowerMessage.contains("eat") && it.id.contains("eating")) ||
                 (lowerMessage.contains("posture") && it.id == "posture") ||
-                (lowerMessage.contains("read") && it.id == "reading") ||
-                (lowerMessage.contains("walk") && it.id == "walking")
+                (lowerMessage.contains("walk") && it.id.contains("walking"))
             )
         } ?: allProfiles.firstOrNull() ?: DefaultProfiles.EATING
 
