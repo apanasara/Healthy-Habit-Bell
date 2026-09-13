@@ -270,7 +270,8 @@ class BreathCountManager(private val context: Context) {
         if (completedRound < config.targetRounds) {
             val nextRound = completedRound + 1
             val nextTarget = config.strokesForRound(nextRound)
-            blankAcousticDetection(1500L)
+            // Blank acoustic detection during the round transition settling interval
+            blankAcousticDetection(2500L)
             _strokeFlow.update {
                 it.copy(
                     currentRound = nextRound,

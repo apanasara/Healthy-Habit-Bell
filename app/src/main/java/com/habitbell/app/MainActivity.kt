@@ -296,6 +296,9 @@ class MainActivity : FragmentActivity() {
                                 },
                                 onSelectBreathMicSensitivity = { sensitivity ->
                                     viewModel.setBreathMicSensitivity(sensitivity)
+                                },
+                                onSelectBreathTechnique = { technique ->
+                                    viewModel.updateBreathTechnique(technique)
                                 }
                             )
                         }
@@ -347,6 +350,9 @@ class MainActivity : FragmentActivity() {
                             },
                             onUpdatePranayama = { purak, antar, rechak, bahya, rounds, intervalBellEnabled, intervalCadence, voiceEnabled, voiceStyle, tribandhaVoiceEnabled, voiceVolume ->
                                 viewModel.updateActivePranayamaSettings(purak, antar, rechak, bahya, rounds, intervalBellEnabled, intervalCadence, voiceEnabled, voiceStyle, tribandhaVoiceEnabled, voiceVolume)
+                            },
+                            onUpdateBreathCounterConfig = { profileId, config ->
+                                viewModel.updateBreathCounterConfig(profileId, config)
                             },
                             onTestVoiceCue = { style, isTriBandha, volume -> viewModel.testPranayamaVoiceCue(style, isTriBandha, volume) },
                             onTestPranayamaIntervalBell = { viewModel.testPranayamaIntervalBell() },

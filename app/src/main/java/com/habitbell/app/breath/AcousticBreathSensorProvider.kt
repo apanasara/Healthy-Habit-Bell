@@ -93,10 +93,10 @@ class AcousticBreathSensorProvider(
     private val strokeIntervals = ArrayDeque<Long>(6)
 
     /** Continuous moving average ambient noise floor estimate. */
-    private var dynamicNoiseFloorRms: Float = 0.015f
+    private var dynamicNoiseFloorRms: Float = 0.003f
 
     /** Previous chunk RMS for first-difference onset tracking. */
-    private var previousBandpassRms: Float = 0.015f
+    private var previousBandpassRms: Float = 0.003f
 
     // --- Kapalabhati Stateful Hysteresis Detector ---
     private enum class KapalabhatiState {
@@ -189,8 +189,8 @@ class AcousticBreathSensorProvider(
         strokeIntervals.clear()
         humStartTimeMillis = 0L
         isCurrentlyHumming = false
-        dynamicNoiseFloorRms = 0.015f
-        previousBandpassRms = 0.015f
+        dynamicNoiseFloorRms = 0.003f
+        previousBandpassRms = 0.003f
         kapalabhatiState = KapalabhatiState.IDLE_LISTENING
         strokeStartTimeMillis = 0L
         strokePeakRms = 0f
@@ -365,26 +365,26 @@ class AcousticBreathSensorProvider(
     ) {
         val sensitivity = activeSensitivity.coerceIn(0.5f, 2.5f)
 
-        // Dynamic threshold calibrated for natural breath acoustics:
+        // Dynamic threshold calibrated for natural airborne breath acoustics at distance (30cm - 1 meter):
         // Scaled inversely by sensitivity (0.7 = Low, 1.0 = Med, 1.5 = High)
-        val thresholdMultiplier = 1.8f / sensitivity
-        val minFloor = 0.007f / sensitivity
-        val dynamicThreshold = (dynamicNoiseFloorRms * thresholdMultiplier + minFloor).coerceIn(0.007f, 0.20f)
+        val thresholdMultiplier = 2.2f / sensitivity
+        val minFloor = 0.0016f / sensitivity
+        val dynamicThreshold = (dynamicNoiseFloorRms * thresholdMultiplier + minFloor).coerceIn(0.0016f, 0.15f)
 
         // Continuous ambient noise floor tracking (only update when in calm idle state)
         if (kapalabhatiState == KapalabhatiState.IDLE_LISTENING) {
             if (bandpassRms < dynamicNoiseFloorRms) {
                 // Fast downward adaptation to quiet
                 dynamicNoiseFloorRms = (dynamicNoiseFloorRms * 0.88f) + (bandpassRms * 0.12f)
-            } else if (bandpassRms < dynamicThreshold * 0.65f) {
+            } else if (bandpassRms < dynamicThreshold * 0.60f) {
                 // Gentle upward adaptation to quiet room ambience
                 dynamicNoiseFloorRms = (dynamicNoiseFloorRms * 0.98f) + (bandpassRms * 0.02f)
             }
-            dynamicNoiseFloorRms = dynamicNoiseFloorRms.coerceIn(0.002f, 0.06f)
+            dynamicNoiseFloorRms = dynamicNoiseFloorRms.coerceIn(0.0005f, 0.05f)
         }
 
-        val normalizedAmplitude = (rawRms * 3.5f).coerceIn(0f, 1f)
-        val normalizedThreshold = (dynamicThreshold * 3.5f).coerceIn(0.05f, 0.95f)
+        val normalizedAmplitude = (rawRms * 12.0f).coerceIn(0f, 1f)
+        val normalizedThreshold = (dynamicThreshold * 12.0f).coerceIn(0.05f, 0.95f)
 
         var strokeEmitted = false
         val timeSinceLastStroke = now - lastStrokeTimeMillis
@@ -399,13 +399,16 @@ class AcousticBreathSensorProvider(
 
         when (kapalabhatiState) {
             KapalabhatiState.IDLE_LISTENING -> {
-                // Enforce minimum refractory interval (180ms = max ~333 BPM)
-                if (bandpassRms > dynamicThreshold && timeSinceLastStroke >= 180L) {
+                val energyRise = bandpassRms - previousBandpassRms
+                val isExplosiveAttack = energyRise > (dynamicThreshold * 0.12f) || bandpassRms > (dynamicThreshold * 1.35f)
+
+                // Enforce minimum refractory interval (180ms = max ~333 BPM) and explosive onset
+                if (bandpassRms > dynamicThreshold && isExplosiveAttack && timeSinceLastStroke >= 180L) {
                     kapalabhatiState = KapalabhatiState.ATTACK_DETECTED
                     strokeStartTimeMillis = now
                     strokePeakRms = bandpassRms
                     Log.d(TAG, "⚡ ATTACK ONSET: bandpassRms=%.4f > thresh=%.4f (rise=%.4f)".format(
-                        bandpassRms, dynamicThreshold, bandpassRms - previousBandpassRms
+                        bandpassRms, dynamicThreshold, energyRise
                     ))
                 }
             }
@@ -443,9 +446,9 @@ class AcousticBreathSensorProvider(
 
             KapalabhatiState.COOLDOWN_VALLEY -> {
                 val elapsedSinceStroke = now - lastStrokeTimeMillis
-                val isMinRefractoryPassed = elapsedSinceStroke >= 150L
-                val isInValley = bandpassRms < (dynamicThreshold * 0.90f)
-                val isCooldownExpired = elapsedSinceStroke >= 240L
+                val isMinRefractoryPassed = elapsedSinceStroke >= 140L
+                val isInValley = bandpassRms < (dynamicThreshold * 0.88f)
+                val isCooldownExpired = elapsedSinceStroke >= 220L
 
                 if (isMinRefractoryPassed && (isInValley || isCooldownExpired)) {
                     kapalabhatiState = KapalabhatiState.IDLE_LISTENING

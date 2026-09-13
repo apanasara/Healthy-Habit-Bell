@@ -909,6 +909,38 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     /**
+     * Persists and live-updates active breath stroke counter configuration.
+     *
+     * @param profileId Unique string identifier of the target profile.
+     * @param config Updated [com.habitbell.app.data.model.BreathCounterConfig] model.
+     */
+    fun updateBreathCounterConfig(
+        profileId: String,
+        config: com.habitbell.app.data.model.BreathCounterConfig
+    ) {
+        repository.updateBreathCounterConfig(profileId, config)
+        if (sessionState.value.profile.id == profileId) {
+            val updated = sessionState.value.profile.copy(breathCounterConfig = config)
+            engine.loadProfile(updated)
+            if (sessionState.value.status == com.habitbell.app.engine.SessionStatus.IDLE) {
+                breathCountManager.startSession(config)
+            }
+        }
+    }
+
+    /**
+     * Fast-switches the active breathwork technique during preparation or idle mode.
+     *
+     * @param technique Targeted breathwork modality ([com.habitbell.app.breath.BreathTechnique]).
+     */
+    fun updateBreathTechnique(technique: com.habitbell.app.breath.BreathTechnique) {
+        val currentProfile = sessionState.value.profile
+        val currentConfig = currentProfile.breathCounterConfig ?: com.habitbell.app.data.model.BreathCounterConfig.DEFAULT_KAPALABHATI
+        val updatedConfig = currentConfig.withTechnique(technique)
+        updateBreathCounterConfig(currentProfile.id, updatedConfig)
+    }
+
+    /**
      * Persists and live-updates active Surya Namaskar timer sequence parameters, including
      * 12 posture durations, target repetition rounds, speed preset, custom pace, and global voice guidance.
      *

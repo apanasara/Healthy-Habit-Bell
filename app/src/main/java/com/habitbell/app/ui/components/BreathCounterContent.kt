@@ -54,6 +54,7 @@ import com.habitbell.app.engine.TimerSessionState
  * @param selectedInputSource Active input provider ([BreathInputSourceType]).
  * @param onSelectInputSource Callback to switch between microphone and touch screen mode.
  * @param onSelectSensitivity Callback to adjust microphone detection sensitivity.
+ * @param onSelectTechnique Callback to switch between classical breathwork modalities.
  * @param onManualStrokeTap Callback invoked when user taps the active counting surface.
  * @param modifier Composable layout modifier.
  */
@@ -64,6 +65,7 @@ fun BreathCounterContent(
     selectedInputSource: BreathInputSourceType,
     onSelectInputSource: (BreathInputSourceType) -> Unit,
     onSelectSensitivity: (Float) -> Unit = {},
+    onSelectTechnique: (BreathTechnique) -> Unit = {},
     onManualStrokeTap: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -122,7 +124,7 @@ fun BreathCounterContent(
                 letterSpacing = 2.sp
             )
             Text(
-                text = profile.name,
+                text = "${technique.displayName} Counter",
                 style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
                 color = MaterialTheme.colorScheme.onBackground
             )
@@ -137,7 +139,31 @@ fun BreathCounterContent(
                 maxLines = 2
             )
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Quick Technique Switcher Chips (Available in Preparation or Idle)
+            if (sessionState.status == com.habitbell.app.engine.SessionStatus.IDLE || breathUpdate.currentPhase == BreathCounterPhase.PREPARATION) {
+                Row(
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.padding(bottom = 6.dp)
+                ) {
+                    val techniques = listOf(
+                        BreathTechnique.KAPALABHATI,
+                        BreathTechnique.BHASTRIKA,
+                        BreathTechnique.BHRAMARI
+                    )
+                    techniques.forEach { t ->
+                        val isSelected = technique == t
+                        FilterChip(
+                            selected = isSelected,
+                            onClick = { onSelectTechnique(t) },
+                            label = { Text("${t.sanskritScript} ${t.displayName}", fontSize = 11.sp) },
+                            modifier = Modifier.padding(horizontal = 3.dp)
+                        )
+                    }
+                }
+            }
 
             // Input Mode Switcher Chips (Mic vs Tap)
             Row(

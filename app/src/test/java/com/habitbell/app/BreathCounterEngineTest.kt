@@ -30,40 +30,46 @@ class BreathCounterEngineTest {
      */
     @Test
     fun testBreathCounterDefaultProfiles() {
-        // 1. Kapalabhati Counter: 3 rounds (30, 60, 90 strokes), 20s Kumbhaka, 15s rest
-        val kapalabhati = DefaultProfiles.KAPALABHATI_COUNTER
-        assertTrue("Kapalabhati must have breath counting enabled", kapalabhati.isBreathCountingEnabled)
-        val kConfig = kapalabhati.breathCounterConfig
-        assertNotNull("Kapalabhati config must not be null", kConfig)
-        assertEquals(BreathTechnique.KAPALABHATI, kConfig!!.technique)
-        assertEquals(3, kConfig.targetRounds)
-        assertEquals(listOf(30, 60, 90), kConfig.strokesPerRound)
-        assertEquals(20, kConfig.retentionSeconds)
-        assertEquals(15, kConfig.restSeconds)
-        assertEquals(30, kConfig.strokesForRound(1))
-        assertEquals(60, kConfig.strokesForRound(2))
-        assertEquals(90, kConfig.strokesForRound(3))
-        assertEquals(180, kConfig.totalTargetStrokes)
-
-        // 2. Bhastrika Counter: 3 rounds of 21 bellows cycles, 25s Kumbhaka, 20s rest
-        val bhastrika = DefaultProfiles.BHASTRIKA_COUNTER
-        assertTrue("Bhastrika must have breath counting enabled", bhastrika.isBreathCountingEnabled)
-        val bConfig = bhastrika.breathCounterConfig
-        assertNotNull(bConfig)
-        assertEquals(BreathTechnique.BHASTRIKA, bConfig!!.technique)
+        // 1. Unified Breathwork Counter: 3 rounds (30, 60, 90 strokes), 20s Kumbhaka, 15s rest
+        val breathCounter = DefaultProfiles.BREATH_COUNTER
+        assertTrue("Unified Breath Counter must have breath counting enabled", breathCounter.isBreathCountingEnabled)
+        assertEquals("kriya-breath-counter", breathCounter.id)
+        val bConfig = breathCounter.breathCounterConfig
+        assertNotNull("Breath counter config must not be null", bConfig)
+        assertEquals(BreathTechnique.KAPALABHATI, bConfig!!.technique)
         assertEquals(3, bConfig.targetRounds)
-        assertEquals(listOf(21, 21, 21), bConfig.strokesPerRound)
-        assertEquals(25, bConfig.retentionSeconds)
-        assertEquals(20, bConfig.restSeconds)
+        assertEquals(listOf(30, 60, 90), bConfig.strokesPerRound)
+        assertEquals(20, bConfig.retentionSeconds)
+        assertEquals(15, bConfig.restSeconds)
+        assertEquals(30, bConfig.strokesForRound(1))
+        assertEquals(60, bConfig.strokesForRound(2))
+        assertEquals(90, bConfig.strokesForRound(3))
+        assertEquals(180, bConfig.totalTargetStrokes)
 
-        // 3. Bhramari Counter: 7 rounds of humming resonance
+        // 2. Dynamic technique switching preserves hardware preferences
+        val bhastrikaConfig = bConfig.withTechnique(BreathTechnique.BHASTRIKA)
+        assertEquals(BreathTechnique.BHASTRIKA, bhastrikaConfig.technique)
+        assertEquals(3, bhastrikaConfig.targetRounds)
+        assertEquals(listOf(21, 21, 21), bhastrikaConfig.strokesPerRound)
+        assertEquals(25, bhastrikaConfig.retentionSeconds)
+        assertEquals(20, bhastrikaConfig.restSeconds)
+
+        val bhramariConfig = bConfig.withTechnique(BreathTechnique.BHRAMARI)
+        assertEquals(BreathTechnique.BHRAMARI, bhramariConfig.technique)
+        assertEquals(7, bhramariConfig.targetRounds)
+        assertEquals(0, bhramariConfig.retentionSeconds)
+        assertEquals(5, bhramariConfig.restSeconds)
+
+        // 3. Backwards-compatible accessor aliases
+        val kapalabhati = DefaultProfiles.KAPALABHATI_COUNTER
+        assertEquals(BreathTechnique.KAPALABHATI, kapalabhati.breathCounterConfig?.technique)
+        val bhastrika = DefaultProfiles.BHASTRIKA_COUNTER
+        assertEquals(BreathTechnique.BHASTRIKA, bhastrika.breathCounterConfig?.technique)
         val bhramari = DefaultProfiles.BHRAMARI_COUNTER
-        assertTrue("Bhramari must have breath counting enabled", bhramari.isBreathCountingEnabled)
-        val bhConfig = bhramari.breathCounterConfig
-        assertNotNull(bhConfig)
-        assertEquals(BreathTechnique.BHRAMARI, bhConfig!!.technique)
-        assertEquals(7, bhConfig.targetRounds)
-        assertEquals(0, bhConfig.retentionSeconds)
+        assertEquals(BreathTechnique.BHRAMARI, bhramari.breathCounterConfig?.technique)
+
+        // 4. Catalog size verification: 9 core profiles
+        assertEquals(9, DefaultProfiles.ALL_PRESETS.size)
     }
 
     /**

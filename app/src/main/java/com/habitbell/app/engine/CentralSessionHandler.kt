@@ -122,9 +122,10 @@ class CentralSessionHandler(private val application: Application) {
             }
         }
         onPhaseChanged = { phase ->
-            breathCountManager.blankAcousticDetection(2000L)
             when (phase) {
                 com.habitbell.app.breath.BreathCounterPhase.RETENTION_HOLD -> {
+                    // Long blanking (5s) so the retention transition bell cannot trigger strokes
+                    breathCountManager.blankAcousticDetection(5000L)
                     audioManager.playPranayamaIntervalBell()
                     voiceGuide.speakPhaseCue(
                         phase = com.habitbell.app.data.model.PranayamaPhase.HOLD_IN,
@@ -132,17 +133,25 @@ class CentralSessionHandler(private val application: Application) {
                     )
                 }
                 com.habitbell.app.breath.BreathCounterPhase.REST -> {
+                    // Blank during Rechak spoken prompt (3s)
+                    breathCountManager.blankAcousticDetection(3000L)
                     voiceGuide.speakPhaseCue(
                         phase = com.habitbell.app.data.model.PranayamaPhase.EXHALE
                     )
                 }
                 com.habitbell.app.breath.BreathCounterPhase.STROKES -> {
-                    audioManager.playPranayamaIntervalBell()
+                    // CRITICAL: Do NOT play multi-strike interval bells at the start of pumping strokes!
+                    // Playing bells after Rechak/Rest reverberates into the microphone and falsely adds strokes.
+                    // Provide a 1.5s silent settling window for the practitioner to take position.
+                    breathCountManager.blankAcousticDetection(1500L)
                 }
                 com.habitbell.app.breath.BreathCounterPhase.COMPLETED -> {
+                    breathCountManager.blankAcousticDetection(8000L)
                     audioManager.playCompletionBell()
                 }
-                else -> {}
+                else -> {
+                    breathCountManager.blankAcousticDetection(1500L)
+                }
             }
         }
     }
@@ -700,6 +709,7 @@ class CentralSessionHandler(private val application: Application) {
             "eating", "eating-mindful-20" -> repository.getProfileById("eating-mindful-20") ?: DefaultProfiles.EATING
             "posture" -> repository.getProfileById("posture") ?: repository.profiles.value.find { it.category.contains("Movement", ignoreCase = true) } ?: DefaultProfiles.EATING
             "breathing" -> repository.getProfileById("pranayama-hatha-classical") ?: DefaultProfiles.PRANAYAMA_HATHA
+            "breath-counter", "kriya", "kapalabhati", "bhastrika", "bhramari" -> repository.getProfileById("kriya-breath-counter") ?: DefaultProfiles.BREATH_COUNTER
             else -> repository.getProfileById(mediaId) ?: repository.profiles.value.firstOrNull() ?: DefaultProfiles.EATING
         }
         startProfile(targetProfile)
@@ -720,7 +730,9 @@ class CentralSessionHandler(private val application: Application) {
                 it.name.lowercase().contains(lowerMessage) ||
                 (lowerMessage.contains("eat") && it.id.contains("eating")) ||
                 (lowerMessage.contains("posture") && it.id == "posture") ||
-                (lowerMessage.contains("walk") && it.id.contains("walking"))
+                (lowerMessage.contains("walk") && it.id.contains("walking")) ||
+                (lowerMessage.contains("pranayam") && it.id.contains("pranayama")) ||
+                ((lowerMessage.contains("kriya") || lowerMessage.contains("kapalabhati") || lowerMessage.contains("bhastrika") || lowerMessage.contains("bhramari") || lowerMessage.contains("breath")) && it.id.contains("breath-counter"))
             )
         } ?: allProfiles.firstOrNull() ?: DefaultProfiles.EATING
 
