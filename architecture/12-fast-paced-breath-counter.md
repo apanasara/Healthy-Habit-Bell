@@ -37,11 +37,13 @@ The subsystem implements a modular, swappable data layer via the `BreathDataSour
 - **Continuous Dynamic Ambient Noise Floor Tracking**: Continuously adapts background noise floor in real time during calm idle state ($\alpha = 0.12$ quick fall, $\alpha = 0.02$ gentle rise). Dynamic stroke threshold scales:
   $$\text{Threshold} = \left(\text{NoiseFloor} \times \frac{1.8}{\text{Sensitivity}} + \frac{0.007}{\text{Sensitivity}}\right)$$
 - **3-Stage Hysteresis State Machine**:
-  - `IDLE_LISTENING`: Enforces 280ms minimum refractory interval (~214 BPM ceiling). Triggers attack when bandpass energy exceeds calibrated threshold.
+  - `IDLE_LISTENING`: Enforces 180ms minimum refractory interval (~333 BPM ceiling). Triggers attack when bandpass energy exceeds calibrated threshold.
   - `ATTACK_DETECTED`: Tracks local peak energy; validates physiological burst duration (20ms – 220ms). Aborts sustained noise (>220ms without decay) to prevent false runaway counting. Confirms exactly 1 stroke upon peak decay ($E < E_{\text{peak}} \times 0.75$).
-  - `COOLDOWN_VALLEY`: Requires signal to drop below $85\%$ threshold or 280ms elapsed time before re-arming to `IDLE_LISTENING`.
-- **Acoustic Self-Feedback Mitigation & Blanking**:
-  - `blankDetection(durationMs)` allows `CentralSessionHandler` to temporarily mute acoustic detection (320ms on stroke chime, 2000ms on phase transition cues) so speaker audio does not create an uncontrolled counting feedback loop.
+  - `COOLDOWN_VALLEY`: Enforces 150ms minimum valley check; transitions back to `IDLE_LISTENING` once signal drops below $90\%$ threshold or after 240ms safety timeout without corrupting stroke timestamps.
+- **Acoustic Self-Feedback Mitigation & Clean Sensing**:
+  - Decoupled speaker audio during hands-free `ACOUSTIC_MIC` mode: stroke feedback is delivered exclusively through tactile micro-haptics (`HapticManager.triggerStrokeHaptic()`) and live screen ripple canvas biofeedback. This prevents the phone's 2048 Hz metallic tingsha chime from reverberating into the microphone and deafening the detector for 2.3 seconds.
+  - Audible stroke chimes are safely reserved for `MANUAL_TAP` mode where the microphone is inactive.
+  - `blankDetection(2000L)` temporarily mutes acoustic evaluation during Kumbhaka retention bells and voice prompts.
   - Interactive Sensitivity Selector chips (`Low 0.7x`, `Med 1.0x`, `High 1.5x`) and live real-time RMS needle gauge rendered on `BreathCounterContent.kt`.
 - **Technique-Specific Digital Signal Processing (DSP)**:
   - **Kapalabhati**: 2000 Hz Biquad bandpass filter + 3-stage hysteresis state machine tuned for 20ms–220ms passive-active abdominal recoil expulsions.
