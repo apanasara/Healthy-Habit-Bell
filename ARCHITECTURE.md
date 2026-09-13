@@ -27,9 +27,10 @@ Habit Bell is an offline-first, distraction-free wellness operating system engin
 |  - CentralSessionHandler (Authoritative Hub)  |     |  - TimerRepository                  |
 |  - MediaSessionCompat ("HabitBellMediaSession)|     |  - SharedPreferences JSON Store    |
 |  - TimerEngine (1Hz FSM Countdown Core)       |     |  - Predefined Profiles & Reminders  |
-|  - AudioBellManager (SoundPool + Procedural)  |     |  - Domain Models (TimerProfile,     |
-|  - BackgroundMusicManager (Aum / SAF / YouTube|     |    PranayamaConfig, CompoundConfig) |
-|  - BatteryOptimizer & TimerService            |     +-------------------------------------+
+|  - BreathCountManager (Fast Breath Counter)   |     |  - Domain Models (TimerProfile,     |
+|  - AudioBellManager (SoundPool + Procedural)  |     |    PranayamaConfig, CompoundConfig) |
+|  - BackgroundMusicManager (Aum / SAF / YouTube|     +-------------------------------------+
+|  - BatteryOptimizer & TimerService            |
 |  - HapticManager (Pocket-Mode Vibrations)     |
 |  - HealthStepManager (Multi-Platform Steps)   |
 +---------------------------------------+-------+
@@ -858,6 +859,55 @@ The Surya Namaskar subsystem provides comprehensive data persistence, animated v
 
 ---
 
+### 2.14. Fast-Paced Breath Counter Subsystem (`com.habitbell.app.breath`)
+
+#### 1. Architectural Role & Decoupling from Guided Pranayama
+- **Distinct Modalities**: While classical guided Pranayama (Section 2.12) relies on rhythmic pacing counts (e.g. 4:16:8:16 Visama Vritti, Box Breathing) with blooming lotus animations and vocal directives, fast-paced yogic breath practices—such as **Kapalabhati** (skull-shining rapid exhalations, 60–120 BPM), **Bhastrika** (bellows rapid inhalation/exhalation, 30–60 BPM), and **Bhramari** (prolonged resonant bee humming)—require an autonomous **step-counter style tracking engine**.
+- **Preservation Guarantee**: The existing guided Pranayama module remains 100% intact, active, and unchanged. The fast-paced counter functions as an autonomous telemetry subsystem that tracks strokes, computes live cadence (BPM), dynamically orchestrates inter-round Kumbhaka (breath retention holds), and manages rest intervals.
+
+#### 2. Domain Models & Telemetry Payload
+- **`BreathTechnique`**: Enum identifying `KAPALABHATI`, `BHASTRIKA`, `BHRAMARI`, and `FREE_COUNT`.
+- **`BreathCounterPhase`**: State machine phases: `PREPARATION` (5s countdown) ➔ `STROKES` (active pumping / humming) ➔ `RETENTION_HOLD` (Kumbhaka) ➔ `REST` (recovery) ➔ `COMPLETED`.
+- **`BreathInputSourceType`**: Tri-state input modality: `ACOUSTIC_MIC` (hands-free acoustic detection), `MANUAL_TAP` (touch-screen tap fallback), and `SIMULATED` (deterministic automated testing).
+- **`BreathStrokeUpdate`**: Immutable reactive state holding `currentRound`, `targetRounds`, `currentRoundStrokes`, `targetRoundStrokes`, `totalSessionStrokes`, `cadenceBpm`, `currentPhase`, `phaseSecondsRemaining`, `humDurationSeconds`, and `audioAmplitudeRms` (0.0f..1.0f).
+- **`BreathCounterConfig`**: Configuration model embedded in `TimerProfile`, specifying target rounds, strokes per round, retention duration, rest duration, and microphone sensitivity.
+
+#### 3. Pluggable Data Sources (`BreathDataSource`)
+The subsystem implements a modular, swappable data layer via the `BreathDataSource` interface (`start`, `pause`, `resume`, `stop`, `reset`, `registerManualStroke`):
+1. **`AcousticBreathSensorProvider.kt` (Hands-Free Acoustic DSP)**:
+   - **Audio Record Pipeline**: Captures raw PCM audio via low-latency 16 kHz 16-bit Mono `AudioRecord` buffers on a dedicated background coroutine (`Dispatchers.IO`).
+   - **Dynamic Ambient Noise Floor Calibration**: Continuously tracks background noise floor with exponential smoothing ($\alpha = 0.05$). Thresholds automatically scale relative to ambient environment.
+   - **Technique-Specific Digital Signal Processing (DSP)**:
+     - **Kapalabhati**: First-order difference bandpass filter focusing on turbulent 1.5 kHz – 4.5 kHz high-frequency nasal expulsion hiss. Employs a 280ms refractory lockout period to prevent double-counting.
+     - **Bhastrika**: Dual-phase RMS energy peak detector capturing both forceful inhalation and sharp exhalation phases within a 650ms minimum bellows cycle envelope.
+     - **Bhramari**: Low-frequency harmonic pitch tracker utilizing normalized autocorrelation over the 80 Hz – 250 Hz fundamental human humming swara band. Tracks continuous sustained hum duration and fires round completion upon exhalation drop-off.
+2. **`ManualTapBreathProvider.kt` (Touch Fallback & High-Cadence Tap)**:
+   - Provides an instantaneous tactile counting alternative when practicing in noisy environments or when microphone permissions are withheld.
+   - Computes rolling cadence (BPM) using a 5-tap sliding-window ring buffer based on monotonic `SystemClock.elapsedRealtime()`.
+3. **`SimulatedBreathProvider.kt` (Synthetic Telemetry)**:
+   - Emits synthetic strokes at steady, realistic intervals (e.g. 75 BPM for Kapalabhati, 40 BPM for Bhastrika) for unit testing, CI pipelines, and Compose UI previews.
+
+#### 4. Orchestration & State Machine (`BreathCountManager.kt`)
+The `BreathCountManager` acts as the central coordinator between data providers and session orchestration:
+- **Round & Kumbhaka Progression**:
+  - Automatically transitions from `STROKES` to `RETENTION_HOLD` when target strokes are reached.
+  - Automatically transitions from `RETENTION_HOLD` to `REST`, and from `REST` to the next round of strokes.
+  - Fires `COMPLETED` when all planned rounds are achieved.
+- **Auditory & Haptic Feedback Coordination**:
+  - **Stroke Feedback**: Dispatches a crisp 25ms tactile haptic impulse (`HapticManager.triggerStrokeHaptic()`) and a high-pitched 1.6x tingsha chime (`AudioBellManager.playStrokeFeedback()`) on every detected breath stroke.
+  - **Kumbhaka Transition Bell**: Triggers Option C Zen Tingsha strike and spoken Tri-Bandha guidance cue (*"Jalandhara, Uddiyana, Mula Bandha"*) at the onset of breath retention.
+  - **Session Completion Gong**: Sounds the resonant Tibetan temple gong upon session completion.
+
+#### 5. Presentation Layer (`BreathCounterContent.kt`)
+Integrated directly into `SessionScreen.kt` in both Portrait and Landscape orientations:
+- **Acoustic Ripple Canvas**: A reactive Canvas that dynamically pulses expanding concentric rings proportional to live `audioAmplitudeRms`, delivering instant visual biofeedback.
+- **Large Stroke Counter & Progress Arc**: High-visibility stroke display (`45 / 60`) with smooth animated circular sweep indicator and round badges (`ROUND 1 OF 3`).
+- **Live Cadence Badge**: Displays real-time speed in breaths-per-minute (e.g., `⚡ 82 BPM`).
+- **Interactive Full-Screen Tap Surface**: In `MANUAL_TAP` mode, converts the entire lower viewport into a responsive touch pad with tactile ripples.
+- **Seamless Phase Displays**: Fluidly morphs into a glowing Kumbhaka retention countdown with holding directives, followed by a calm recovery rest countdown.
+
+---
+
 ## 3. Concurrency & Threading Architecture
 
 | Component | Scope / Execution Context | Dispatcher | Architectural Rationale |
@@ -879,6 +929,8 @@ The Surya Namaskar subsystem provides comprehensive data persistence, animated v
 | `SuryaTimerViewModel` | `viewModelScope` | `Dispatchers.Main.immediate` | Observes reactive step StateFlows and dispatches preset updates and background seeding to IO. |
 | `SuryaSyncManager` | Dedicated Sync Scope | `Dispatchers.IO` | Serializes configuration JSON payloads and pushes them over Wearable DataClient asynchronously. |
 | `SuryaVoicePlayer` | Main Thread Coroutine Scope | `Dispatchers.Main` / AudioTrack | Manages speech cue MediaPlayer instances, 120ms lead delay, and background music ducking. |
+| `AcousticBreathSensorProvider` | Dedicated IO Coroutine Job | `Dispatchers.IO` | Reads non-blocking 16kHz PCM audio buffers from `AudioRecord`, executes bandpass DSP / autocorrelation pitch detection, and computes RMS energy off UI thread. |
+| `BreathCountManager` | `CoroutineScope(SupervisorJob())` | `Dispatchers.Default` | Manages breath state transitions (`STROKES` -> `RETENTION_HOLD` -> `REST`), milestone triggers, and telemetry emission. |
 
 ---
 
@@ -890,6 +942,7 @@ The Surya Namaskar subsystem provides comprehensive data persistence, animated v
 4. **Automotive Audio Routing & Ambient Volume Preservation (Requirement E2)**: Routes bell and soundscape streams via `AudioAttributes.USAGE_MEDIA` with `CONTENT_TYPE_MUSIC` to car audio systems while keeping ambient volume constant without intrusive ducking or volume snapping.
 5. **Pedometer & Activity Recognition Management**: Registers hardware step counter sensors with `SENSOR_DELAY_UI` only during active walking timer sessions; unregisters immediately upon pause, stop, or completion to prevent battery drain. Dynamically checks and requests `Manifest.permission.ACTIVITY_RECOGNITION` on Android 10+ (API 29+).
 6. **Multi-Sensor Display Automation**: Powers off OLED pixels using `#000000` blackout curtain across Pocket Mode, Android Auto Car HUD, Smart TV casting, and Wear OS companion states. Employs hardware `TYPE_SIGNIFICANT_MOTION` trigger and Z-axis gravity vector analysis for battery-efficient, zero-latency Lift-to-Wake and 10-second flat inactivity timeout.
+7. **Microphone Audio Recording Lifecycle & Privacy/Power Conservation**: Registers `AudioRecord` with 16kHz 16-bit Mono strictly during active `STROKES` phases of breath counting sessions. Immediately halts recording, flushes buffers, and releases hardware handles during `RETENTION_HOLD` (Kumbhaka), `REST`, pause states, and session termination, ensuring zero background battery drain and absolute user privacy.
 
 ---
 

@@ -876,6 +876,29 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
         audioManager.playPranayamaIntervalPreview()
     }
 
+    /** Central breath stroke counter orchestrator from process singleton. */
+    val breathCountManager: com.habitbell.app.breath.BreathCountManager = sessionHandler.breathCountManager
+
+    /** Active breath input source type stream (Mic vs Tap). */
+    val selectedBreathInputSource: StateFlow<com.habitbell.app.breath.BreathInputSourceType> =
+        breathCountManager.selectedInputSource
+
+    /**
+     * Switches the active breath input source between Acoustic Mic and Touch Tap.
+     *
+     * @param type Target provider typology ([com.habitbell.app.breath.BreathInputSourceType]).
+     */
+    fun setBreathInputSource(type: com.habitbell.app.breath.BreathInputSourceType) {
+        breathCountManager.selectInputSource(type)
+    }
+
+    /**
+     * Registers an interactive touch stroke on the breath counter surface.
+     */
+    fun registerManualBreathStroke() {
+        breathCountManager.registerManualStroke()
+    }
+
     /**
      * Persists and live-updates active Surya Namaskar timer sequence parameters, including
      * 12 posture durations, target repetition rounds, speed preset, custom pace, and global voice guidance.

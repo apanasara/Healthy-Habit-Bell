@@ -86,6 +86,27 @@ class MainActivity : FragmentActivity() {
             val isScreenMirroringManual by viewModel.screenMirroringManager.isScreenMirroringManual.collectAsStateWithLifecycle()
             val externalDisplayName by viewModel.screenMirroringManager.externalDisplayName.collectAsStateWithLifecycle()
             var hasActivityPermission by remember { mutableStateOf(viewModel.healthStepManager.hasActivityRecognitionPermission()) }
+            val selectedBreathInputSource by viewModel.selectedBreathInputSource.collectAsStateWithLifecycle()
+            var hasAudioPermission by remember {
+                mutableStateOf(
+                    androidx.core.content.ContextCompat.checkSelfPermission(
+                        this@MainActivity,
+                        android.Manifest.permission.RECORD_AUDIO
+                    ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                )
+            }
+
+            // Audio recording permission request launcher for acoustic breath counting
+            val recordAudioLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+                contract = androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+            ) { isGranted ->
+                hasAudioPermission = isGranted
+                if (isGranted) {
+                    viewModel.setBreathInputSource(com.habitbell.app.breath.BreathInputSourceType.ACOUSTIC_MIC)
+                } else {
+                    viewModel.setBreathInputSource(com.habitbell.app.breath.BreathInputSourceType.MANUAL_TAP)
+                }
+            }
 
             // Activity recognition permission request launcher for step counting
             val activityRecognitionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
@@ -261,6 +282,17 @@ class MainActivity : FragmentActivity() {
                                 },
                                 onOpenCastSettings = {
                                     viewModel.openCastSheet(true)
+                                },
+                                selectedBreathInputSource = selectedBreathInputSource,
+                                onSelectBreathInputSource = { source ->
+                                    if (source == com.habitbell.app.breath.BreathInputSourceType.ACOUSTIC_MIC && !hasAudioPermission) {
+                                        recordAudioLauncher.launch(android.Manifest.permission.RECORD_AUDIO)
+                                    } else {
+                                        viewModel.setBreathInputSource(source)
+                                    }
+                                },
+                                onManualBreathStrokeTap = {
+                                    viewModel.registerManualBreathStroke()
                                 }
                             )
                         }

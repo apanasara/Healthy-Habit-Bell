@@ -18,6 +18,9 @@
     <uses-permission android:name="android.permission.health.WRITE_STEPS" />
     <uses-permission android:name="android.permission.health.WRITE_EXERCISE" />
 
+    <!-- Acoustic Breath Counter Sensor Permission (Kapalabhati, Bhastrika, Bhramari) -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
     <!-- Optional step counter hardware feature declaration -->
     <uses-feature
         android:name="android.hardware.sensor.stepcounter"

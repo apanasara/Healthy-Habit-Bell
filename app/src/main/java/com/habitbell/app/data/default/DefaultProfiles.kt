@@ -1,5 +1,6 @@
 package com.habitbell.app.data.default
 
+import com.habitbell.app.breath.*
 import com.habitbell.app.data.model.*
 
 /**
@@ -272,10 +273,98 @@ object DefaultProfiles {
     )
 
     /**
+     * Kapalabhati (Skull Shining Kriya Counter):
+     * Smart acoustic/tap stroke counter across 3 rounds of progressive pumping:
+     * - Round 1: 30 strokes -> 20s Kumbhaka retention hold -> 15s rest.
+     * - Round 2: 60 strokes -> 20s Kumbhaka retention hold -> 15s rest.
+     * - Round 3: 90 strokes -> 30s Kumbhaka retention hold -> Meditative stillness.
+     */
+    val KAPALABHATI_COUNTER = TimerProfile(
+        id = "kriya-kapalabhati-counter",
+        name = "Kapalabhati Counter",
+        type = TimerType.MULTI_INTERVAL,
+        category = "Cleansing Kriya",
+        iconName = "air",
+        theme = ThemeMode.AMOLED,
+        displayMode = true,
+        pocketMode = false,
+        isFavorite = true,
+        breathCounterConfig = BreathCounterConfig(
+            technique = BreathTechnique.KAPALABHATI,
+            targetRounds = 3,
+            strokesPerRound = listOf(30, 60, 90),
+            retentionSeconds = 20,
+            restSeconds = 15,
+            defaultInputMode = BreathInputSourceType.ACOUSTIC_MIC,
+            isSoundFeedbackEnabled = true,
+            isHapticFeedbackEnabled = true,
+            isVoiceGuidanceEnabled = true
+        )
+    )
+
+    /**
+     * Bhastrika (Bellows Breath Counter):
+     * Smart acoustic/tap bellows cycle counter across 3 rounds:
+     * - 21 bellows breaths per round -> 25s Antar Kumbhaka with Tri-Bandha -> 20s rest.
+     */
+    val BHASTRIKA_COUNTER = TimerProfile(
+        id = "kriya-bhastrika-counter",
+        name = "Bhastrika Counter",
+        type = TimerType.MULTI_INTERVAL,
+        category = "Vital Energy",
+        iconName = "whatshot",
+        theme = ThemeMode.AMOLED,
+        displayMode = true,
+        pocketMode = false,
+        isFavorite = true,
+        breathCounterConfig = BreathCounterConfig(
+            technique = BreathTechnique.BHASTRIKA,
+            targetRounds = 3,
+            strokesPerRound = listOf(21, 21, 21),
+            retentionSeconds = 25,
+            restSeconds = 20,
+            defaultInputMode = BreathInputSourceType.ACOUSTIC_MIC,
+            isSoundFeedbackEnabled = true,
+            isHapticFeedbackEnabled = true,
+            isVoiceGuidanceEnabled = true
+        )
+    )
+
+    /**
+     * Bhramari (Humming Resonance Counter):
+     * Smart vocal drone counter tracking humming vibration duration across 7 rounds.
+     */
+    val BHRAMARI_COUNTER = TimerProfile(
+        id = "kriya-bhramari-counter",
+        name = "Bhramari Counter",
+        type = TimerType.MULTI_INTERVAL,
+        category = "Resonance Meditation",
+        iconName = "graphic_eq",
+        theme = ThemeMode.AMOLED,
+        displayMode = true,
+        pocketMode = false,
+        isFavorite = false,
+        breathCounterConfig = BreathCounterConfig(
+            technique = BreathTechnique.BHRAMARI,
+            targetRounds = 7,
+            strokesPerRound = listOf(1, 1, 1, 1, 1, 1, 1),
+            retentionSeconds = 0,
+            restSeconds = 5,
+            defaultInputMode = BreathInputSourceType.ACOUSTIC_MIC,
+            isSoundFeedbackEnabled = false,
+            isHapticFeedbackEnabled = true,
+            isVoiceGuidanceEnabled = true
+        )
+    )
+
+    /**
      * Complete list of all default preset wellness profiles.
      */
     val ALL_PRESETS = listOf(
         PRANAYAMA_HATHA,
+        KAPALABHATI_COUNTER,
+        BHASTRIKA_COUNTER,
+        BHRAMARI_COUNTER,
         EATING,
         REIKI,
         PRANAYAMA_BOX,

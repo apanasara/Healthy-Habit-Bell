@@ -23,6 +23,7 @@ package com.habitbell.app.data.model
  * @property stepGoal Optional target step count required to complete session (e.g. 2000, 5000 steps).
  * @property stepInterval Optional interval chime cadence triggered every N steps (e.g. every 250, 500 steps).
  * @property stepTriggerMode Trigger evaluation rule governing completion ([StepTriggerMode.TIME_OR_STEPS], etc.).
+ * @property breathCounterConfig Breath stroke counting parameters (used for acoustic/tap counter sessions).
  */
 data class TimerProfile(
     val id: String,
@@ -41,8 +42,13 @@ data class TimerProfile(
     val compoundConfig: CompoundConfig? = null,
     val stepGoal: Int? = null,
     val stepInterval: Int? = null,
-    val stepTriggerMode: StepTriggerMode = StepTriggerMode.TIME_OR_STEPS
+    val stepTriggerMode: StepTriggerMode = StepTriggerMode.TIME_OR_STEPS,
+    val breathCounterConfig: BreathCounterConfig? = null
 ) {
+    /** Whether this profile uses real-time breath stroke or hum counting (Kapalabhati, Bhastrika, Bhramari). */
+    val isBreathCountingEnabled: Boolean
+        get() = breathCounterConfig != null
+
     /** Whether this profile uses step tracking or step-based interval cues. */
     val isStepTrackingEnabled: Boolean
         get() = (stepGoal != null && stepGoal > 0) ||
