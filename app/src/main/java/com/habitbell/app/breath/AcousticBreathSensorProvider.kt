@@ -6,6 +6,8 @@ import android.content.pm.PackageManager
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
+import android.media.audiofx.AcousticEchoCanceler
+import android.media.audiofx.NoiseSuppressor
 import android.util.Log
 import androidx.core.content.ContextCompat
 import com.habitbell.app.data.model.BreathCounterConfig
@@ -27,20 +29,23 @@ import kotlin.math.sqrt
  *
  * ## Architectural Role & Relationships
  * - Interfaces directly with the device microphone via low-latency [AudioRecord] PCM streams.
- * - Uses [MediaRecorder.AudioSource.VOICE_RECOGNITION] to eliminate aggressive OEM noise gating
- *   and acoustic echo cancellation (AEC) that would otherwise suppress subtle breath exhalations.
+ * - Prioritizes speech/breath-tuned [MediaRecorder.AudioSource.VOICE_RECOGNITION] with hardware AEC attachment.
  * - Implements real-time Digital Signal Processing (DSP) algorithms:
  *   1. **Biquad Bandpass Filter**: 2nd-order IIR bandpass centered at 2400 Hz (Q = 1.0),
  *      isolating turbulent nasal expulsion hiss (1.2 kHz - 4.0 kHz) while rejecting low-frequency
  *      desk rumble (-28 dB at 100 Hz) and high-frequency thermal hiss (-26 dB at 7500 Hz).
  *   2. **Continuous Adaptive Noise Floor**: Continuously adapts to ambient background sound level
  *      using asymmetric attack/decay smoothing, preventing calibration freeze and drift.
- *   3. **Stateful Hysteresis Peak-Valley Detector**: Detects rapid energy onset (Attack),
+ *   3. **Hardware Acoustic Echo Cancellation (AEC) & Noise Suppression (NS)**: Attaches Android
+ *      [AcousticEchoCanceler] and [NoiseSuppressor] to cancel phone loudspeaker bleed at the hardware DSP layer.
+ *   4. **Ambient Background Music Isolation**: Dynamically elevates detection thresholds with an
+ *      active safety margin when local background music is actively outputting from phone speakers.
+ *   5. **Stateful Hysteresis Peak-Valley Detector**: Detects rapid energy onset (Attack),
  *      tracks maximum peak amplitude, enforces physiological burst duration (40ms - 280ms),
  *      and mandates a valley drop-off (silent passive inhalation) before re-arming.
- *   4. **Acoustic Self-Feedback Blanking**: Disables stroke evaluation during internal speaker
+ *   6. **Acoustic Self-Feedback Blanking**: Disables stroke evaluation during internal speaker
  *      playback (e.g. interval bells, vocal prompts) to eliminate runaway acoustic loops.
- *   5. **Autocorrelation Pitch Tracker**: Validates sustained periodic vocal resonance for
+ *   7. **Autocorrelation Pitch Tracker**: Validates sustained periodic vocal resonance for
  *      Bhramari bee humming across 80 Hz - 250 Hz swara band.
  * - Dispatches primitive [BreathInputEvent] metrics into [BreathCountManager].
  *
@@ -52,7 +57,7 @@ import kotlin.math.sqrt
  * @param scope Coroutine scope governing the background audio processing pipeline.
  */
 class AcousticBreathSensorProvider(
-    private val context: Context,
+    private val context: Context? = null,
     private val scope: CoroutineScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 ) : BreathDataSource {
 
@@ -67,10 +72,12 @@ class AcousticBreathSensorProvider(
     private val CHUNK_SIZE = 512
 
     override val isAvailable: Boolean
-        get() = ContextCompat.checkSelfPermission(
-            context,
-            Manifest.permission.RECORD_AUDIO
-        ) == PackageManager.PERMISSION_GRANTED
+        get() = context?.let {
+            ContextCompat.checkSelfPermission(
+                it,
+                Manifest.permission.RECORD_AUDIO
+            ) == PackageManager.PERMISSION_GRANTED
+        } ?: false
 
     private val _inputFlow = MutableStateFlow(BreathInputEvent())
     override val inputFlow: StateFlow<BreathInputEvent> = _inputFlow.asStateFlow()
@@ -79,8 +86,33 @@ class AcousticBreathSensorProvider(
     private var recordingJob: Job? = null
     private var activeConfig: BreathCounterConfig? = null
 
+    /** Hardware acoustic echo cancellation effect handle attached to [audioRecord]. */
+    private var echoCanceler: AcousticEchoCanceler? = null
+
+    /** Hardware noise suppression effect handle attached to [audioRecord]. */
+    private var noiseSuppressor: NoiseSuppressor? = null
+
+    /** Lambda checking whether background ambient music is actively playing through local device speakers. */
+    var isAmbientMusicPlaying: (() -> Boolean)? = null
+
+    /** Lambda retrieving current normalized volume gain (0.0f..1.0f) of local background music. */
+    var ambientMusicVolume: (() -> Float)? = null
+
     /** User-adjustable sensitivity multiplier (0.5f to 2.5f, default 1.0f). */
     private var activeSensitivity: Float = 1.0f
+
+    /**
+     * Computes the ambient music safety margin in RMS amplitude to prevent loudspeaker bleed
+     * from crossing breath detection thresholds when background music is active.
+     *
+     * @return Additional RMS threshold margin (0.0f when music is off, up to 0.025f when active at max volume).
+     */
+    fun getAmbientMusicSafetyMargin(): Float {
+        val isMusicActive = isAmbientMusicPlaying?.invoke() == true
+        if (!isMusicActive) return 0f
+        val gain = (ambientMusicVolume?.invoke() ?: 1.0f).coerceIn(0f, 1f)
+        return 0.010f + (gain * 0.015f)
+    }
 
     /** Timestamp in milliseconds until which acoustic stroke detection is suppressed. */
     @Volatile
@@ -204,6 +236,7 @@ class AcousticBreathSensorProvider(
         } catch (e: Exception) {
             Log.w(TAG, "Exception pausing AudioRecord: ${e.message}")
         }
+        releaseAudioEffects()
     }
 
     override fun resume() {
@@ -228,8 +261,28 @@ class AcousticBreathSensorProvider(
             Log.w(TAG, "Exception releasing AudioRecord: ${e.message}")
         }
         audioRecord = null
+        releaseAudioEffects()
         reset()
         activeConfig = null
+    }
+
+    /**
+     * Safely disengages and releases hardware audio effects ([AcousticEchoCanceler] and [NoiseSuppressor]).
+     */
+    private fun releaseAudioEffects() {
+        try {
+            echoCanceler?.release()
+        } catch (e: Exception) {
+            Log.w(TAG, "Exception releasing AcousticEchoCanceler: ${e.message}")
+        }
+        echoCanceler = null
+
+        try {
+            noiseSuppressor?.release()
+        } catch (e: Exception) {
+            Log.w(TAG, "Exception releasing NoiseSuppressor: ${e.message}")
+        }
+        noiseSuppressor = null
     }
 
     override fun reset() {
@@ -304,6 +357,31 @@ class AcousticBreathSensorProvider(
                 if (record.state == AudioRecord.STATE_INITIALIZED) {
                     audioRecord = record
                     initialized = true
+
+                    // Attach Android Hardware Acoustic Echo Cancellation (AEC) and Noise Suppression (NS)
+                    val sessionId = record.audioSessionId
+                    if (sessionId != -1) {
+                        if (AcousticEchoCanceler.isAvailable()) {
+                            try {
+                                echoCanceler = AcousticEchoCanceler.create(sessionId)?.apply {
+                                    enabled = true
+                                }
+                                Log.i(TAG, "🔊 AcousticEchoCanceler attached to session $sessionId (Hardware AEC active)")
+                            } catch (e: Exception) {
+                                Log.w(TAG, "Failed to attach AcousticEchoCanceler: ${e.message}")
+                            }
+                        }
+                        if (NoiseSuppressor.isAvailable()) {
+                            try {
+                                noiseSuppressor = NoiseSuppressor.create(sessionId)?.apply {
+                                    enabled = true
+                                }
+                                Log.i(TAG, "🔇 NoiseSuppressor attached to session $sessionId")
+                            } catch (e: Exception) {
+                                Log.w(TAG, "Failed to attach NoiseSuppressor: ${e.message}")
+                            }
+                        }
+                    }
                     break
                 } else {
                     record.release()
@@ -347,20 +425,21 @@ class AcousticBreathSensorProvider(
                 // 2. Ambient Noise Calibration Window (Silent profiling pause: ~2.88s / 90 frames)
                 if (calibrationFramesRemaining > 0) {
                     val totalFrames = CALIBRATION_TOTAL_FRAMES
-                    // Outlier rejection: ignore transient handling thuds/coughs (> 0.15 bandpass RMS or > 0.25 raw RMS)
-                    if (bandpassRms <= 0.15f && rawRms <= 0.25f) {
+                    // Outlier rejection: ignore transient handling thuds/coughs (> 0.20 bandpass RMS or > 0.30 raw RMS)
+                    if (bandpassRms <= 0.20f && rawRms <= 0.30f) {
                         calibrationRmsSum += bandpassRms
                         calibrationValidFramesCount++
                         calibrationPeakRms = max(calibrationPeakRms, bandpassRms)
                         // Running smooth update of noise floor
-                        dynamicNoiseFloorRms = (calibrationRmsSum / calibrationValidFramesCount).toFloat().coerceIn(0.0005f, 0.05f)
+                        dynamicNoiseFloorRms = (calibrationRmsSum / calibrationValidFramesCount).toFloat().coerceIn(0.0005f, 0.15f)
                     }
 
                     calibrationFramesRemaining--
                     val progress = 1.0f - (calibrationFramesRemaining.toFloat() / totalFrames.toFloat()).coerceIn(0f, 1f)
 
+                    val musicMargin = getAmbientMusicSafetyMargin()
                     val sensitivity = activeSensitivity.coerceIn(0.5f, 2.5f)
-                    val dynamicThreshold = (dynamicNoiseFloorRms * (2.2f / sensitivity) + (0.0016f / sensitivity)).coerceIn(0.0016f, 0.15f)
+                    val dynamicThreshold = (dynamicNoiseFloorRms * (2.2f / sensitivity) + musicMargin + (0.0016f / sensitivity)).coerceIn(0.0016f + musicMargin, 0.25f)
                     val normalizedAmplitude = (rawRms * 12.0f).coerceIn(0f, 1f)
                     val normalizedThreshold = (dynamicThreshold * 12.0f).coerceIn(0.05f, 0.95f)
 
@@ -417,6 +496,7 @@ class AcousticBreathSensorProvider(
         } catch (e: Exception) {
             Log.e(TAG, "Audio recording exception", e)
         } finally {
+            releaseAudioEffects()
             try {
                 audioRecord?.stop()
                 audioRecord?.release()
@@ -451,13 +531,14 @@ class AcousticBreathSensorProvider(
         bandpassRms: Float,
         now: Long
     ) {
+        val musicMargin = getAmbientMusicSafetyMargin()
         val sensitivity = activeSensitivity.coerceIn(0.5f, 2.5f)
 
         // Dynamic threshold calibrated for natural airborne breath acoustics at distance (30cm - 1 meter):
         // Scaled inversely by sensitivity (0.7 = Low, 1.0 = Med, 1.5 = High)
         val thresholdMultiplier = 2.2f / sensitivity
         val minFloor = 0.0016f / sensitivity
-        val dynamicThreshold = (dynamicNoiseFloorRms * thresholdMultiplier + minFloor).coerceIn(0.0016f, 0.15f)
+        val dynamicThreshold = (dynamicNoiseFloorRms * thresholdMultiplier + minFloor + musicMargin).coerceIn(0.0016f + musicMargin, 0.25f)
 
         // Continuous ambient noise floor tracking (only update when in calm idle state)
         if (kapalabhatiState == KapalabhatiState.IDLE_LISTENING) {
@@ -468,7 +549,7 @@ class AcousticBreathSensorProvider(
                 // Gentle upward adaptation to quiet room ambience
                 dynamicNoiseFloorRms = (dynamicNoiseFloorRms * 0.98f) + (bandpassRms * 0.02f)
             }
-            dynamicNoiseFloorRms = dynamicNoiseFloorRms.coerceIn(0.0005f, 0.05f)
+            dynamicNoiseFloorRms = dynamicNoiseFloorRms.coerceIn(0.0005f, 0.15f)
         }
 
         val normalizedAmplitude = (rawRms * 12.0f).coerceIn(0f, 1f)
@@ -596,10 +677,11 @@ class AcousticBreathSensorProvider(
         bandpassRms: Float,
         now: Long
     ) {
+        val musicMargin = getAmbientMusicSafetyMargin()
         val sensitivity = activeSensitivity.coerceIn(0.5f, 2.5f)
         val thresholdMultiplier = 2.0f / sensitivity
         val minFloor = 0.0016f / sensitivity
-        val dynamicThreshold = (dynamicNoiseFloorRms * thresholdMultiplier + minFloor).coerceIn(0.0016f, 0.15f)
+        val dynamicThreshold = (dynamicNoiseFloorRms * thresholdMultiplier + minFloor + musicMargin).coerceIn(0.0016f + musicMargin, 0.25f)
         val normalizedAmplitude = (rawRms * 3.5f).coerceIn(0f, 1f)
         val normalizedThreshold = (dynamicThreshold * 3.5f).coerceIn(0.05f, 0.95f)
 
@@ -610,7 +692,7 @@ class AcousticBreathSensorProvider(
             } else {
                 dynamicNoiseFloorRms = (dynamicNoiseFloorRms * 0.98f) + (bandpassRms * 0.02f)
             }
-            dynamicNoiseFloorRms = dynamicNoiseFloorRms.coerceIn(0.0005f, 0.05f)
+            dynamicNoiseFloorRms = dynamicNoiseFloorRms.coerceIn(0.0005f, 0.15f)
         }
 
         val energyRise = bandpassRms - previousBandpassRms

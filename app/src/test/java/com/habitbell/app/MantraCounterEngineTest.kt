@@ -405,4 +405,50 @@ class MantraCounterEngineTest {
         // In manual tap mode (no mic hardware in unit test), isCalibrating is false
         assertFalse(manager.mantraFlow.value.isCalibrating)
     }
+
+    /**
+     * Verifies that [AcousticMantraSensorProvider.getAmbientMusicSafetyMargin] accurately computes
+     * dynamic RMS safety margins based on background music active state and volume gain.
+     */
+    @Test
+    fun testAmbientMusicSafetyMarginCalculation() {
+        val provider = AcousticMantraSensorProvider()
+
+        // 1. When background music is not playing -> 0.0f margin
+        provider.isAmbientMusicPlaying = { false }
+        provider.ambientMusicVolume = { 1.0f }
+        assertEquals(0.0f, provider.getAmbientMusicSafetyMargin(), 0.0001f)
+
+        // 2. When background music is active at unity gain (1.0f) -> 0.045f margin (0.020 + 0.025)
+        provider.isAmbientMusicPlaying = { true }
+        provider.ambientMusicVolume = { 1.0f }
+        assertEquals(0.045f, provider.getAmbientMusicSafetyMargin(), 0.001f)
+
+        // 3. When background music is active at half gain (0.5f) -> 0.0325f margin (0.020 + 0.0125)
+        provider.ambientMusicVolume = { 0.5f }
+        assertEquals(0.0325f, provider.getAmbientMusicSafetyMargin(), 0.001f)
+
+        // 4. When background music is active at minimum volume (0.0f) -> 0.020f baseline margin
+        provider.ambientMusicVolume = { 0.0f }
+        assertEquals(0.020f, provider.getAmbientMusicSafetyMargin(), 0.001f)
+    }
+
+    /**
+     * Verifies that [com.habitbell.app.breath.AcousticBreathSensorProvider.getAmbientMusicSafetyMargin]
+     * computes safety margins to prevent breath stroke false positives during ambient music playback.
+     */
+    @Test
+    fun testAcousticBreathSensorProviderAmbientMarginCalculation() {
+        val provider = com.habitbell.app.breath.AcousticBreathSensorProvider()
+
+        // 1. Music inactive -> 0.0f
+        provider.isAmbientMusicPlaying = { false }
+        provider.ambientMusicVolume = { 1.0f }
+        assertEquals(0.0f, provider.getAmbientMusicSafetyMargin(), 0.0001f)
+
+        // 2. Music active at unity gain (1.0f) -> 0.025f margin (0.010 + 0.015)
+        provider.isAmbientMusicPlaying = { true }
+        provider.ambientMusicVolume = { 1.0f }
+        assertEquals(0.025f, provider.getAmbientMusicSafetyMargin(), 0.001f)
+    }
 }

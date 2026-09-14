@@ -61,6 +61,21 @@ class BackgroundMusicManager(private val context: Context) {
     /** State flag to prevent redundant restart loops. */
     private var isPlaying: Boolean = false
 
+    /**
+     * Whether background music is actively playing through local or remote audio outputs.
+     * Evaluates true only when master toggle is enabled, media player / webview playback
+     * is in running state, and sound type is not [BackgroundSoundType.NONE].
+     */
+    val isActivelyPlaying: Boolean
+        get() = isPlaying && isEnabled && soundType != BackgroundSoundType.NONE
+
+    /**
+     * Effective normalized volume gain (0.0f..1.0f) currently applied to audio output streams,
+     * accounting for dynamic voice guidance ducking attenuation.
+     */
+    val activeVolume: Float
+        get() = if (isDucked) (volume * 0.20f).coerceIn(0.04f, 0.25f) else volume
+
     /** Tracks whether ambient volume is temporarily ducked for voice guidance. */
     private var isDucked: Boolean = false
 

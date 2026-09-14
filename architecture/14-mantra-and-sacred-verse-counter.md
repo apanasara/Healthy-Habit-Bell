@@ -171,3 +171,40 @@ Embedded directly inside `SettingsDrawer.kt` when `profile.mantraConfig != null`
 4. **Home Screen Intent Categorization & Badging**:
    In `ModernHomeScreenSample.kt`, the "Meditation" intent category includes `isMantraCountingEnabled`. Profiles resolve the dedicated Phosphor sparkle icon, `"SACRED JAPA"` subtitle, and bead badge (`"${targetBeads}b"`).
 
+---
+
+## 12. Ambient Background Music Isolation & Hardware Acoustic Echo Cancellation (AEC)
+
+To eliminate false bead and breath counting triggered by device ambient background music (Aumkar drone, Tanpura, custom SAF audio, or YouTube streams) outputting through the phone's loudspeakers, the acoustic telemetry providers employ a multi-layered defense-in-depth architecture:
+
+1. **Hardware Acoustic Echo Cancellation (AEC) & Noise Suppression (NS)**:
+   - Android's `android.media.audiofx.AcousticEchoCanceler` and `android.media.audiofx.NoiseSuppressor` are instantiated and attached directly to `audioRecord.audioSessionId`.
+   - Commands the device's hardware DSP (e.g. Qualcomm Fluence on Snapdragon platforms) to monitor the audio output stream (`STREAM_MUSIC`) and subtract loudspeaker bleed by 15–25 dB before PCM samples enter the microphone analysis buffer.
+   - Captures via `MediaRecorder.AudioSource.VOICE_RECOGNITION` to activate speech-tuned OEM microphone beamforming.
+2. **Ambient Background Music Level Awareness & Dynamic Safety Margin**:
+   - `CentralSessionHandler` dynamically wires the active playback state and volume of `BackgroundMusicManager` to both `AcousticMantraSensorProvider` and `AcousticBreathSensorProvider`:
+     ```kotlin
+     acousticProvider.isAmbientMusicPlaying = {
+         bgMusicManager.isActivelyPlaying && !castManager.isCasting.value
+     }
+     acousticProvider.ambientMusicVolume = {
+         bgMusicManager.activeVolume
+     }
+     ```
+   - When ambient music is active on the device's local speakers, an extra dynamic safety margin is computed:
+     $$\text{MusicMargin} = 0.020f + (\text{ActiveVolume} \times 0.025f)$$
+   - This margin is added to `dynamicThreshold` across Short Japa, Extended Verse, and Aumkar Drone detection, ensuring speaker residual audio cannot cross trigger thresholds.
+3. **Dynamic Noise Floor Adaptation & Ceiling Expansion**:
+   - The upper clamp on `dynamicNoiseFloorRms` is expanded from $0.05f$ to $0.20f$ in Mantra DSP and to $0.15f$ in Breath DSP.
+   - Continuous asymmetric smoothing adapts the baseline floor upwards during stationary background music, preventing the threshold from freezing below the ambient audio level.
+4. **Syllabic Onset Attack Slope Detection**:
+   - In `SHORT_JAPA`, transitioning from `IDLE_LISTENING` to `ATTACK_DETECTED` strictly mandates an explosive vocal energy rise:
+     $$\Delta \text{RMS} > \text{Threshold} \times 0.15f \quad \text{OR} \quad \text{RMS} > \text{Threshold} \times 1.35f$$
+   - Stationary or slowly modulating ambient music (Tanpura, drone, singing bowl) produces low first-differences ($\Delta \text{RMS}$) and is automatically rejected.
+5. **Mandatory Cooldown Valley Lockout**:
+   - In `SHORT_JAPA`, returning from `COOLDOWN_VALLEY` to `IDLE_LISTENING` mandates an actual acoustic valley drop-off ($\text{RMS} < \text{Threshold} \times 0.85f$).
+   - The unconditional 300ms cooldown escape was removed, guaranteeing that continuous loud music cannot cycle into repeated false bead triggers.
+6. **Sustained Continuous Audio Timeout (35-Second Cutoff)**:
+   - In `EXTENDED_VERSE`, if continuous audio exceeds 35 seconds without any inter-verse pause, it is identified as background environmental music or TV audio and aborted without advancing bead counts.
+
+
