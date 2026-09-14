@@ -92,4 +92,5 @@ Whenever an autonomous AI agent or engineer modifies, refactors, or extends a su
 - **Manual Play Commencement**: Navigating from the Home dashboard to a timer session loads the profile in `SessionStatus.IDLE` ("Ready") state without auto-running countdown; practice execution begins strictly when the user triggers the Play control.
 - **Constant Ambient Volume Law (Requirement E2)**: Interval bells and session completion gongs layer additively over background music without requesting transient ducking audio focus.
 - **Hardware Volume Law (Requirement E7)**: The in-app volume slider directly governs active hardware volume (`STREAM_MUSIC` on mobile, `CastSession` on TV).
+- **Living Room Audio Handover**: When streaming to a Google Cast display or Custom Web Receiver, mobile background music is paused to eliminate acoustic echo while the TV receiver streams the user's configured ambient YouTube soundscape directly; upon Cast disconnection, mobile audio seamlessly resumes.
 - **Zero-Internet Guarantee**: Offline operation is guaranteed across timer execution, acoustic procedural synthesis, and local screen mirroring.

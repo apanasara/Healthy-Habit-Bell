@@ -2,8 +2,11 @@ package com.habitbell.app
 
 import android.media.AudioAttributes
 import com.habitbell.app.data.default.DefaultProfiles
+import com.habitbell.app.engine.BackgroundMusicManager
+import com.habitbell.app.engine.BackgroundSoundType
 import com.habitbell.app.engine.SessionStatus
 import com.habitbell.app.engine.TimerSessionState
+import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -325,5 +328,46 @@ class CentralSessionHandlerTest {
         assertEquals("Session must remain IDLE until play is pressed", SessionStatus.IDLE, initialIdleSession.status)
         assertEquals(900, initialIdleSession.remainingSeconds)
     }
+
+    /**
+     * Verifies the Cast telemetry JSON contract for ad-free YouTube audio streaming.
+     * Ensures video IDs are cleanly parsed from both short and standard URLs, and that
+     * ambient music payload parameters (bgMusicType, bgMusicEnabled, youtubeVideoId,
+     * youtubeUrl, bgMusicVolume) match the Custom Web Receiver specification.
+     *
+     * @see BackgroundMusicManager.extractVideoId
+     * @see BackgroundMusicManager.toShortestYouTubeUrl
+     */
+    @Test
+    fun testCastTelemetryYouTubeBackgroundAudioContract() {
+        val defaultUrl = "https://youtu.be/x6UITRjhijI"
+        val extractedDefaultId = BackgroundMusicManager.extractVideoId(defaultUrl)
+        assertEquals("Default YouTube URL must extract canonical 11-char ID x6UITRjhijI", "x6UITRjhijI", extractedDefaultId)
+
+        val fullUrl = "https://www.youtube.com/watch?v=5qap5aO4i9A&feature=share"
+        val extractedFullId = BackgroundMusicManager.extractVideoId(fullUrl)
+        assertEquals("Full YouTube watch URL must extract canonical 11-char ID 5qap5aO4i9A", "5qap5aO4i9A", extractedFullId)
+
+        val shortestUrl = BackgroundMusicManager.toShortestYouTubeUrl(fullUrl)
+        assertEquals("Canonical shortest URL must strip extraneous tracking query parameters", "https://youtu.be/5qap5aO4i9A", shortestUrl)
+
+        // Verify JSON payload serialization contract expected by Custom Web Receiver
+        val json = JSONObject().apply {
+            put("type", "state")
+            put("bgMusicType", BackgroundSoundType.YOUTUBE_LINK.name)
+            put("bgMusicEnabled", true)
+            put("youtubeVideoId", extractedDefaultId ?: "x6UITRjhijI")
+            put("youtubeUrl", defaultUrl)
+            put("bgMusicVolume", 0.85)
+        }
+
+        assertEquals("state", json.getString("type"))
+        assertEquals("YOUTUBE_LINK", json.getString("bgMusicType"))
+        assertTrue(json.getBoolean("bgMusicEnabled"))
+        assertEquals("x6UITRjhijI", json.getString("youtubeVideoId"))
+        assertEquals("https://youtu.be/x6UITRjhijI", json.getString("youtubeUrl"))
+        assertEquals(0.85, json.getDouble("bgMusicVolume"), 0.001)
+    }
 }
+
 

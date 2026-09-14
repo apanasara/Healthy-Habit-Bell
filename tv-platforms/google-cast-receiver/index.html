@@ -33,6 +33,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <!-- Google Cast Application Framework (CAF v3) Receiver SDK -->
   <script src="//www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
+  <!-- YouTube IFrame Player API for Ambient Meditation Audio -->
+  <script src="https://www.youtube.com/iframe_api"></script>
 
   <style>
     /* -------------------------------------------------------------------------
@@ -817,6 +819,11 @@
   <!-- CAF v3 Headless Media Player -->
   <cast-media-player></cast-media-player>
 
+  <!-- Hidden Sandboxed YouTube Ambient Audio Player Container -->
+  <div id="ytAudioPlayerContainer" style="position: absolute; top: -9999px; left: -9999px; width: 1px; height: 1px; overflow: hidden; pointer-events: none; opacity: 0.001;" aria-hidden="true">
+    <div id="ytAudioPlayer"></div>
+  </div>
+
   <!-- =======================================================================
        SCREEN 1: SPLASH & STANDBY VIEW
        ======================================================================= -->
@@ -1206,6 +1213,162 @@
     }
 
     // -------------------------------------------------------------------------
+    // YOUTUBE AD-FREE AMBIENT AUDIO STREAMING ENGINE
+    // -------------------------------------------------------------------------
+    let ytPlayer = null;
+    let isYtApiReady = false;
+    let currentYtVideoId = 'x6UITRjhijI';
+    let targetYtVideoId = 'x6UITRjhijI';
+    let isYtPlaying = false;
+    let currentSessionVolume = 1.0;
+    let currentSessionIsRunning = false;
+
+    // YouTube IFrame API callback invoked when script completes loading
+    window.onYouTubeIframeAPIReady = function() {
+      console.log('[HabitBellCast] YouTube IFrame API is ready');
+      isYtApiReady = true;
+      initYouTubePlayer(targetYtVideoId);
+    };
+
+    /**
+     * Initializes the sandboxed headless YouTube Player for ambient background audio.
+     * @param {string} videoId 11-character YouTube video ID.
+     */
+    function initYouTubePlayer(videoId) {
+      if (!isYtApiReady || ytPlayer) return;
+      currentYtVideoId = videoId;
+      try {
+        ytPlayer = new YT.Player('ytAudioPlayer', {
+          width: '1',
+          height: '1',
+          videoId: videoId,
+          playerVars: {
+            autoplay: 0,
+            controls: 0,
+            playsinline: 1,
+            loop: 1,
+            playlist: videoId,
+            enablejsapi: 1,
+            origin: window.location.origin,
+            rel: 0,
+            fs: 0,
+            modestbranding: 1,
+            disablekb: 1,
+            iv_load_policy: 3
+          },
+          events: {
+            onReady: (event) => {
+              console.log('[HabitBellCast] YouTube Player onReady for video:', videoId);
+              try {
+                event.target.unMute();
+                event.target.setVolume(Math.round(currentSessionVolume * 100));
+                if (currentSessionIsRunning) {
+                  event.target.playVideo();
+                  isYtPlaying = true;
+                }
+              } catch (e) {
+                console.warn('[HabitBellCast] Error in onReady:', e);
+              }
+            },
+            onStateChange: (event) => {
+              // Loop seamlessly when ended (0 = YT.PlayerState.ENDED)
+              if (event.data === 0) {
+                console.log('[HabitBellCast] YouTube ambient track completed cycle, looping back to 0s');
+                try {
+                  event.target.seekTo(0);
+                  event.target.playVideo();
+                } catch (e) {}
+              } else if (event.data === 1) {
+                isYtPlaying = true;
+              } else if (event.data === 2) {
+                isYtPlaying = false;
+              }
+            },
+            onError: (event) => {
+              console.warn('[HabitBellCast] YouTube Player error code:', event.data);
+            }
+          }
+        });
+      } catch (err) {
+        console.error('[HabitBellCast] Failed to initialize YT.Player:', err);
+      }
+    }
+
+    /**
+     * Synchronizes the YouTube ambient audio player with current telemetry state from mobile sender.
+     * @param {string} videoId 11-character YouTube video identifier.
+     * @param {boolean} shouldPlay True if session is actively RUNNING or PREPARING.
+     * @param {number} volumeRatio Normalized volume gain (0.0 to 1.0).
+     * @param {string} soundType Sound source strategy (e.g., 'YOUTUBE_LINK').
+     * @param {boolean} isEnabled Whether ambient music is globally enabled.
+     */
+    function syncYouTubeAudio(videoId, shouldPlay, volumeRatio, soundType, isEnabled) {
+      const activeVideoId = videoId || 'x6UITRjhijI';
+      targetYtVideoId = activeVideoId;
+      currentSessionIsRunning = shouldPlay;
+      if (volumeRatio !== undefined && volumeRatio !== null) {
+        currentSessionVolume = Math.max(0, Math.min(1, volumeRatio));
+      }
+
+      const isYouTubeActive = (soundType === undefined || soundType === 'YOUTUBE_LINK') && isEnabled !== false;
+
+      if (!isYouTubeActive) {
+        if (ytPlayer && typeof ytPlayer.pauseVideo === 'function' && isYtPlaying) {
+          ytPlayer.pauseVideo();
+          isYtPlaying = false;
+        }
+        return;
+      }
+
+      if (!ytPlayer) {
+        if (isYtApiReady) {
+          initYouTubePlayer(activeVideoId);
+        }
+        return;
+      }
+
+      // If active video changed, load the new video
+      if (currentYtVideoId !== activeVideoId && typeof ytPlayer.loadVideoById === 'function') {
+        currentYtVideoId = activeVideoId;
+        console.log(`[HabitBellCast] Switching YouTube ambient track to: ${activeVideoId}`);
+        ytPlayer.loadVideoById({
+          videoId: activeVideoId,
+          suggestedQuality: 'small'
+        });
+      }
+
+      // Synchronize output gain
+      if (typeof ytPlayer.setVolume === 'function') {
+        ytPlayer.setVolume(Math.round(currentSessionVolume * 100));
+      }
+
+      // Synchronize playback state
+      if (shouldPlay) {
+        if (typeof ytPlayer.playVideo === 'function') {
+          ytPlayer.playVideo();
+          isYtPlaying = true;
+        }
+      } else {
+        if (typeof ytPlayer.pauseVideo === 'function') {
+          ytPlayer.pauseVideo();
+          isYtPlaying = false;
+        }
+      }
+    }
+
+    // Auto-skip ad banner overlay barrier (runs every 500ms)
+    setInterval(() => {
+      try {
+        const skipBtn = document.querySelector('.ytp-ad-skip-button, .ytp-ad-skip-button-modern, .ytp-ad-overlay-close-button');
+        if (skipBtn) skipBtn.click();
+        const vid = document.querySelector('#ytAudioPlayerContainer video');
+        if (document.querySelector('.ad-showing') && vid) {
+          vid.currentTime = vid.duration || 9999;
+        }
+      } catch (_) {}
+    }, 500);
+
+    // -------------------------------------------------------------------------
     // WEB AUDIO ZERO-BANDWIDTH CHIME SYNTHESIS (Tibetan Singing Bowl)
     // -------------------------------------------------------------------------
     let audioCtx = null;
@@ -1528,9 +1691,17 @@
         playTibetanBowlChime();
       }
 
+      // Synchronize YouTube background ambient audio
+      const status = data.status || 'IDLE';
+      const isRunning = status === 'RUNNING' || status === 'PREPARING';
+      const ytId = data.youtubeVideoId || 'x6UITRjhijI';
+      const vol = data.bgMusicVolume !== undefined ? data.bgMusicVolume : 1.0;
+      const soundType = data.bgMusicType || 'YOUTUBE_LINK';
+      const isEnabled = data.bgMusicEnabled !== undefined ? data.bgMusicEnabled : true;
+      syncYouTubeAudio(ytId, isRunning, vol, soundType, isEnabled);
+
       // Determine active screen mode
       let mode = data.screenMode || 'GENERAL';
-      const status = data.status || 'IDLE';
 
       if (status === 'IDLE') {
         mode = 'SPLASH';
@@ -1728,6 +1899,25 @@
     // -------------------------------------------------------------------------
     function sendRemoteAction(actionType) {
       try {
+        if (actionType === 'toggle') {
+          if (isYtPlaying && ytPlayer && typeof ytPlayer.pauseVideo === 'function') {
+            ytPlayer.pauseVideo();
+            isYtPlaying = false;
+          } else if (!isYtPlaying && ytPlayer && typeof ytPlayer.playVideo === 'function') {
+            ytPlayer.playVideo();
+            isYtPlaying = true;
+          }
+        } else if (actionType === 'pause') {
+          if (ytPlayer && typeof ytPlayer.pauseVideo === 'function') {
+            ytPlayer.pauseVideo();
+            isYtPlaying = false;
+          }
+        } else if (actionType === 'play') {
+          if (ytPlayer && typeof ytPlayer.playVideo === 'function') {
+            ytPlayer.playVideo();
+            isYtPlaying = true;
+          }
+        }
         const castContext = cast.framework.CastReceiverContext.getInstance();
         if (castContext) {
           console.log(`[HabitBellCast] Dispatching remote action: ${actionType}`);
@@ -1758,9 +1948,28 @@
       context.addCustomMessageListener(CAST_NAMESPACE, (event) => {
         try {
           const msg = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+          if (msg.type === 'volume') {
+            const vol = msg.volume !== undefined ? msg.volume : 1.0;
+            currentSessionVolume = vol;
+            if (ytPlayer && typeof ytPlayer.setVolume === 'function') {
+              ytPlayer.setVolume(Math.round(vol * 100));
+            }
+            return;
+          }
           updateSessionState(msg);
         } catch (e) {
           console.error('[HabitBellCast] Message parse error:', e);
+        }
+      });
+
+      // Physical TV remote keydown listener (Play/Pause/Media keys)
+      window.addEventListener('keydown', (e) => {
+        if (e.keyCode === 179 || e.key === 'MediaPlayPause') {
+          sendRemoteAction('toggle');
+        } else if (e.keyCode === 19 || e.key === 'MediaPause') {
+          sendRemoteAction('pause');
+        } else if (e.key === 'MediaPlay') {
+          sendRemoteAction('play');
         }
       });
 
