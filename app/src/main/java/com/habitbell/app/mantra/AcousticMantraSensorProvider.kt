@@ -129,6 +129,9 @@ class AcousticMantraSensorProvider(
     /** Continuous moving average ambient noise floor estimate. */
     private var dynamicNoiseFloorRms: Float = 0.012f
 
+    /** Baseline ambient room noise floor locked during the calibration window. */
+    private var calibratedNoiseFloorRms: Float = 0.012f
+
     /** Previous chunk RMS for first-difference onset tracking. */
     private var previousBandpassRms: Float = 0.012f
 
@@ -273,6 +276,7 @@ class AcousticMantraSensorProvider(
         blankUntilMillis = 0L
         beadIntervals.clear()
         dynamicNoiseFloorRms = 0.012f
+        calibratedNoiseFloorRms = 0.012f
         previousBandpassRms = 0.012f
         calibrationFramesRemaining = CALIBRATION_TOTAL_FRAMES
         calibrationRmsSum = 0.0
@@ -408,7 +412,7 @@ class AcousticMantraSensorProvider(
 
                     val musicMargin = getAmbientMusicSafetyMargin()
                     val sensitivity = activeSensitivity.coerceIn(0.5f, 2.5f)
-                    val dynamicThreshold = (dynamicNoiseFloorRms * (1.45f / sensitivity) + musicMargin + (0.005f / sensitivity)).coerceIn(0.006f + musicMargin, 0.12f)
+                    val dynamicThreshold = (dynamicNoiseFloorRms * (1.45f / sensitivity) + musicMargin + (0.008f / sensitivity)).coerceIn(0.015f + musicMargin, 0.12f)
                     val normalizedAmplitude = (rawRms * 3.5f).coerceIn(0f, 1f)
                     val normalizedThreshold = (dynamicThreshold * 3.5f).coerceIn(0.05f, 0.95f)
 
@@ -426,6 +430,7 @@ class AcousticMantraSensorProvider(
 
                     if (calibrationFramesRemaining == 0) {
                         isCalibrated = true
+                        calibratedNoiseFloorRms = dynamicNoiseFloorRms
                         Log.i(TAG, "🎯 MANTRA AMBIENT CALIBRATION COMPLETE! baselineFloor=%.5f, peakAmbient=%.5f, validFrames=$calibrationValidFramesCount, musicMargin=%.4f".format(
                             dynamicNoiseFloorRms, calibrationPeakRms, musicMargin
                         ))
@@ -501,16 +506,17 @@ class AcousticMantraSensorProvider(
     ) {
         val musicMargin = getAmbientMusicSafetyMargin()
         val sensitivity = activeSensitivity.coerceIn(0.5f, 2.5f)
-        val dynamicThreshold = (dynamicNoiseFloorRms * (1.40f / sensitivity) + musicMargin + (0.005f / sensitivity)).coerceIn(0.006f + musicMargin, 0.12f)
+        val floorLimit = max(0.008f, calibratedNoiseFloorRms * 0.70f)
+        val dynamicThreshold = (dynamicNoiseFloorRms * (1.45f / sensitivity) + musicMargin + (0.008f / sensitivity)).coerceIn(0.015f + musicMargin, 0.12f)
 
         // Continuous ambient noise floor tracking (only when not actively reciting)
         if (!isVerseRecitationActive) {
             if (bandpassRms < dynamicNoiseFloorRms) {
-                dynamicNoiseFloorRms = (dynamicNoiseFloorRms * 0.88f) + (bandpassRms * 0.12f)
+                dynamicNoiseFloorRms = (dynamicNoiseFloorRms * 0.96f) + (bandpassRms * 0.04f)
             } else if (bandpassRms < dynamicThreshold * 0.70f) {
                 dynamicNoiseFloorRms = (dynamicNoiseFloorRms * 0.98f) + (bandpassRms * 0.02f)
             }
-            dynamicNoiseFloorRms = dynamicNoiseFloorRms.coerceIn(0.001f, 0.08f)
+            dynamicNoiseFloorRms = dynamicNoiseFloorRms.coerceIn(floorLimit, 0.08f)
         }
 
         val normalizedAmplitude = (rawRms * 3.5f).coerceIn(0f, 1f)
@@ -616,16 +622,17 @@ class AcousticMantraSensorProvider(
     ) {
         val musicMargin = getAmbientMusicSafetyMargin()
         val sensitivity = activeSensitivity.coerceIn(0.5f, 2.5f)
-        val dynamicThreshold = (dynamicNoiseFloorRms * (1.40f / sensitivity) + musicMargin + (0.005f / sensitivity)).coerceIn(0.006f + musicMargin, 0.12f)
+        val floorLimit = max(0.008f, calibratedNoiseFloorRms * 0.70f)
+        val dynamicThreshold = (dynamicNoiseFloorRms * (1.45f / sensitivity) + musicMargin + (0.008f / sensitivity)).coerceIn(0.015f + musicMargin, 0.12f)
 
         // Continuous ambient noise floor tracking
         if (japaState == JapaState.IDLE_LISTENING) {
             if (bandpassRms < dynamicNoiseFloorRms) {
-                dynamicNoiseFloorRms = (dynamicNoiseFloorRms * 0.88f) + (bandpassRms * 0.12f)
+                dynamicNoiseFloorRms = (dynamicNoiseFloorRms * 0.96f) + (bandpassRms * 0.04f)
             } else if (bandpassRms < dynamicThreshold * 0.70f) {
                 dynamicNoiseFloorRms = (dynamicNoiseFloorRms * 0.98f) + (bandpassRms * 0.02f)
             }
-            dynamicNoiseFloorRms = dynamicNoiseFloorRms.coerceIn(0.001f, 0.08f)
+            dynamicNoiseFloorRms = dynamicNoiseFloorRms.coerceIn(floorLimit, 0.08f)
         }
 
         val normalizedAmplitude = (rawRms * 3.5f).coerceIn(0f, 1f)
@@ -725,7 +732,7 @@ class AcousticMantraSensorProvider(
         val musicMargin = getAmbientMusicSafetyMargin()
         val sensitivity = activeSensitivity.coerceIn(0.5f, 2.5f)
         val normalizedAmplitude = (rawRms * 3.5f).coerceIn(0f, 1f)
-        val droneThreshold = (dynamicNoiseFloorRms * (1.35f / sensitivity) + musicMargin + (0.005f / sensitivity)).coerceIn(0.010f + musicMargin, 0.12f)
+        val droneThreshold = (dynamicNoiseFloorRms * (1.35f / sensitivity) + musicMargin + (0.008f / sensitivity)).coerceIn(0.015f + musicMargin, 0.12f)
         val normalizedThreshold = (droneThreshold * 3.5f).coerceIn(0.05f, 0.95f)
 
         // Autocorrelation pitch test at pitch lags for 80 Hz - 250 Hz (lag 64 to 200 samples at 16 kHz)
