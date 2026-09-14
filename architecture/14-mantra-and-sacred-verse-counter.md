@@ -196,18 +196,23 @@ To eliminate false bead and breath counting triggered by device ambient backgrou
      $$\text{MusicMargin}_{\text{Mantra}} = \text{ActiveVolume} \times 0.008f$$
      $$\text{MusicMargin}_{\text{Breath}} = \text{ActiveVolume} \times 0.005f$$
    - This subtle margin prevents residual loudspeaker bleed from triggering false counts without suppressing natural devotional chanting (~0.040–0.080 RMS at 30–60 cm).
-3. **Dynamic Noise Floor Adaptation & Ceiling Clamping**:
-   - The upper clamp on `dynamicNoiseFloorRms` is bounded to $[0.001f, 0.08f]$ in Mantra DSP (and $[0.0005f, 0.08f]$ in Breath DSP).
-   - Dynamic threshold calculation is balanced for human speech:
-     $$\text{Threshold} = \left(\text{NoiseFloor} \times \frac{1.40}{\text{Sensitivity}} + \text{MusicMargin} + \frac{0.005}{\text{Sensitivity}}\right).\text{coerceIn}(0.006f + \text{MusicMargin}, 0.12f)$$
-4. **Syllabic Onset Attack & Burst Duration**:
+3. **Dynamic Noise Floor Adaptation & Calibrated Baseline Anchoring**:
+   - The baseline noise floor is anchored to the calibrated room measurement:
+     $$\text{NoiseFloor}_{\text{min}} = \max(0.008f, \text{CalibratedFloor} \times 0.70f)$$
+   - The upper clamp on `dynamicNoiseFloorRms` is bounded to $[0.008f, 0.08f]$ in Mantra DSP (and $[0.0005f, 0.08f]$ in Breath DSP).
+   - Dynamic threshold calculation enforces a clean quiet-room separation floor ($0.015f$):
+     $$\text{Threshold} = \left(\text{NoiseFloor} \times \frac{1.45}{\text{Sensitivity}} + \text{MusicMargin} + \frac{0.008}{\text{Sensitivity}}\right).\text{coerceIn}(0.015f + \text{MusicMargin}, 0.12f)$$
+   - This prevents the threshold from collapsing below ambient room silence, ensuring concluding breath pauses are cleanly recognized.
+4. **Canonical Verse Duration & Concluding Pause Calibration**:
+   - `GAYATRI_MANTRA` and `MAHA_MRITYUNJAYA` are canonically calibrated with a minimum cumulative vocal duration of $4.0\text{s}$ (down from 7.5s/6.5s) and an inter-verse concluding breath pause of $1.2\text{s}$ (down from 1.7s/1.6s). This matches real-world human recitation cadence (typically 4.5s – 6.5s per sloka).
+5. **Syllabic Onset Attack & Burst Duration**:
    - In `SHORT_JAPA`, transitioning from `IDLE_LISTENING` to `ATTACK_DETECTED` requires a natural vocal attack rise:
      $$\Delta \text{RMS} > \text{Threshold} \times 0.04f \quad \text{OR} \quad \text{RMS} > \text{Threshold} \times 1.15f$$
    - Enforces a burst duration window of $80\text{ms} - 800\text{ms}$ with minimum refractory period $\ge 220\text{ms}$ (~270 CPM).
-5. **Valley Lockout with 800ms Safety Recovery Timeout**:
+6. **Valley Lockout with 800ms Safety Recovery Timeout**:
    - In `SHORT_JAPA`, returning from `COOLDOWN_VALLEY` to `IDLE_LISTENING` mandates an acoustic valley drop-off ($\text{RMS} < \text{Threshold} \times 0.85f$) OR an 800ms safety timeout ($75\text{ CPM}$ natural cadence ceiling).
    - This timeout guarantees that the counter never gets permanently trapped in cooldown valley in acoustically active rooms.
-6. **Sustained Continuous Audio Timeout (35-Second Cutoff)**:
+7. **Sustained Continuous Audio Timeout (35-Second Cutoff)**:
    - In `EXTENDED_VERSE`, if continuous audio exceeds 35 seconds without any inter-verse pause, it is identified as background environmental music or TV audio and aborted without advancing bead counts.
 
 

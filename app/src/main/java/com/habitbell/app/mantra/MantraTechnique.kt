@@ -44,8 +44,8 @@ enum class MantraTechnique(
         scriptText = "ॐ भूर्भुवः स्वः तत्सवितुर्वरेण्यं भर्गो देवस्य धीमहि धियो यो नः प्रचोदयात्",
         defaultMode = MantraMode.EXTENDED_VERSE,
         defaultBeads = 108,
-        defaultMinDurationSec = 6.5f,
-        defaultInterPauseSec = 1.6f,
+        defaultMinDurationSec = 4.0f,
+        defaultInterPauseSec = 1.2f,
         description = "Sacred Vedic hymn of spiritual illumination and wisdom across 108 Mala beads."
     ),
 
@@ -60,8 +60,8 @@ enum class MantraTechnique(
         scriptText = "ॐ त्र्यम्बकं यजामहे सुगन्धिं पुष्टिवर्धनम् उर्वारुकमिव बन्धनान् मृत्योर्मुक्षीय मामृतात्",
         defaultMode = MantraMode.EXTENDED_VERSE,
         defaultBeads = 108,
-        defaultMinDurationSec = 7.5f,
-        defaultInterPauseSec = 1.7f,
+        defaultMinDurationSec = 4.0f,
+        defaultInterPauseSec = 1.2f,
         description = "The Great Death-Conquering Mantra for health, longevity, and liberation."
     ),
 
@@ -140,8 +140,8 @@ enum class MantraTechnique(
         scriptText = "Sacred Verse & Scripture",
         defaultMode = MantraMode.EXTENDED_VERSE,
         defaultBeads = 108,
-        defaultMinDurationSec = 5.0f,
-        defaultInterPauseSec = 1.5f,
+        defaultMinDurationSec = 3.5f,
+        defaultInterPauseSec = 1.2f,
         description = "Customizable verse and scripture recitation counter supporting any spiritual tradition."
     )
 }

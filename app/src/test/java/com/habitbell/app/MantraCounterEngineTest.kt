@@ -46,16 +46,16 @@ class MantraCounterEngineTest {
         assertEquals(108, mConfig.targetBeads)
         assertEquals(1, mConfig.targetMalas)
         assertEquals(108, mConfig.totalTargetChants)
-        assertEquals(6.5f, mConfig.minVerseDurationSec, 0.01f)
-        assertEquals(1.6f, mConfig.interVersePauseThresholdSec, 0.01f)
+        assertEquals(4.0f, mConfig.minVerseDurationSec, 0.01f)
+        assertEquals(1.2f, mConfig.interVersePauseThresholdSec, 0.01f)
         assertEquals(MantraMode.EXTENDED_VERSE, mConfig.technique.defaultMode)
 
         // 2. Canonical technique parameter resolution via withTechnique()
         val mrityunjaya = mConfig.withTechnique(MantraTechnique.MAHA_MRITYUNJAYA)
         assertEquals(MantraTechnique.MAHA_MRITYUNJAYA, mrityunjaya.technique)
         assertEquals(108, mrityunjaya.targetBeads)
-        assertEquals(7.5f, mrityunjaya.minVerseDurationSec, 0.01f)
-        assertEquals(1.7f, mrityunjaya.interVersePauseThresholdSec, 0.01f)
+        assertEquals(4.0f, mrityunjaya.minVerseDurationSec, 0.01f)
+        assertEquals(1.2f, mrityunjaya.interVersePauseThresholdSec, 0.01f)
         assertEquals(MantraMode.EXTENDED_VERSE, mrityunjaya.technique.defaultMode)
 
         val aumkar = mConfig.withTechnique(MantraTechnique.AUMKAR)
@@ -89,8 +89,8 @@ class MantraCounterEngineTest {
         val universal = mConfig.withTechnique(MantraTechnique.UNIVERSAL_VERSE)
         assertEquals(MantraTechnique.UNIVERSAL_VERSE, universal.technique)
         assertEquals(108, universal.targetBeads)
-        assertEquals(5.0f, universal.minVerseDurationSec, 0.01f)
-        assertEquals(1.5f, universal.interVersePauseThresholdSec, 0.01f)
+        assertEquals(3.5f, universal.minVerseDurationSec, 0.01f)
+        assertEquals(1.2f, universal.interVersePauseThresholdSec, 0.01f)
 
         // 3. User hardware preferences preservation across technique changes
         val customConfig = mConfig.copy(

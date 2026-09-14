@@ -461,19 +461,21 @@ fun MantraCounterContent(
                     // Live active verse recitation progress for Extended Verse
                     if (technique.defaultMode == MantraMode.EXTENDED_VERSE && mantraUpdate.activeVerseDurationSeconds > 0.5f) {
                         Spacer(modifier = Modifier.height(4.dp))
+                        val isThresholdMet = mantraUpdate.activeVerseDurationSeconds >= technique.defaultMinDurationSec
                         Text(
-                            text = "🎙️ Reciting: ${mantraUpdate.formattedVerseTimer}",
+                            text = if (isThresholdMet) "✓ Recited: ${mantraUpdate.formattedVerseTimer} (Pause to count)" else "🎙️ Reciting: ${mantraUpdate.formattedVerseTimer}",
                             style = MaterialTheme.typography.labelSmall,
-                            color = sacredColor.copy(alpha = 0.85f),
-                            fontWeight = FontWeight.Medium
+                            color = if (isThresholdMet) sacredColor else sacredColor.copy(alpha = 0.85f),
+                            fontWeight = if (isThresholdMet) FontWeight.Bold else FontWeight.Medium
                         )
                     } else if (technique.defaultMode == MantraMode.AUMKAR_DRONE && mantraUpdate.activeVerseDurationSeconds > 0.5f) {
                         Spacer(modifier = Modifier.height(4.dp))
+                        val isThresholdMet = mantraUpdate.activeVerseDurationSeconds >= technique.defaultMinDurationSec
                         Text(
-                            text = "ॐ Drone: ${mantraUpdate.formattedVerseTimer}",
+                            text = if (isThresholdMet) "✓ Done: ${mantraUpdate.formattedVerseTimer} (Exhale to count)" else "ॐ Drone: ${mantraUpdate.formattedVerseTimer}",
                             style = MaterialTheme.typography.labelSmall,
-                            color = sacredColor.copy(alpha = 0.85f),
-                            fontWeight = FontWeight.Medium
+                            color = if (isThresholdMet) sacredColor else sacredColor.copy(alpha = 0.85f),
+                            fontWeight = if (isThresholdMet) FontWeight.Bold else FontWeight.Medium
                         )
                     }
                 }

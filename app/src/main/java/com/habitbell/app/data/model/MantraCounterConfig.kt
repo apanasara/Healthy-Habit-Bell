@@ -81,26 +81,26 @@ data class MantraCounterConfig(
             }
         }
 
-        /** Default Gayatri Mantra configuration: 108 beads, 6.5s minimum verse duration, 1.6s pause. */
+        /** Default Gayatri Mantra configuration: 108 beads, 4.0s minimum verse duration, 1.2s pause. */
         val DEFAULT_GAYATRI = MantraCounterConfig(
             technique = MantraTechnique.GAYATRI_MANTRA,
             targetBeads = 108,
             targetMalas = 1,
-            minVerseDurationSec = 6.5f,
-            interVersePauseThresholdSec = 1.6f,
+            minVerseDurationSec = 4.0f,
+            interVersePauseThresholdSec = 1.2f,
             defaultInputMode = MantraInputSourceType.ACOUSTIC_MIC,
             isBeadHapticEnabled = true,
             isMilestoneChimeEnabled = true,
             micSensitivity = 1.0f
         )
 
-        /** Default Maha Mrityunjaya configuration: 108 beads, 7.5s minimum verse duration, 1.7s pause. */
+        /** Default Maha Mrityunjaya configuration: 108 beads, 4.0s minimum verse duration, 1.2s pause. */
         val DEFAULT_MAHA_MRITYUNJAYA = MantraCounterConfig(
             technique = MantraTechnique.MAHA_MRITYUNJAYA,
             targetBeads = 108,
             targetMalas = 1,
-            minVerseDurationSec = 7.5f,
-            interVersePauseThresholdSec = 1.7f,
+            minVerseDurationSec = 4.0f,
+            interVersePauseThresholdSec = 1.2f,
             defaultInputMode = MantraInputSourceType.ACOUSTIC_MIC,
             isBeadHapticEnabled = true,
             isMilestoneChimeEnabled = true,
@@ -159,13 +159,13 @@ data class MantraCounterConfig(
             micSensitivity = 1.0f
         )
 
-        /** Default Universal Scripture configuration: 108 beads, 5.0s duration, 1.5s pause. */
+        /** Default Universal Scripture configuration: 108 beads, 3.5s duration, 1.2s pause. */
         val DEFAULT_UNIVERSAL = MantraCounterConfig(
             technique = MantraTechnique.UNIVERSAL_VERSE,
             targetBeads = 108,
             targetMalas = 1,
-            minVerseDurationSec = 5.0f,
-            interVersePauseThresholdSec = 1.5f,
+            minVerseDurationSec = 3.5f,
+            interVersePauseThresholdSec = 1.2f,
             defaultInputMode = MantraInputSourceType.ACOUSTIC_MIC,
             isBeadHapticEnabled = true,
             isMilestoneChimeEnabled = true,
