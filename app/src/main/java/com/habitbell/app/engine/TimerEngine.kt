@@ -442,7 +442,7 @@ class TimerEngine(
         sessionStartRealtime = SystemClock.elapsedRealtime()
 
         // Ring opening bell for linear timers to mark the commencement of mindful practice
-        if (wasIdle && _state.value.profile.type == TimerType.LINEAR) {
+        if (wasIdle && _state.value.profile.type == TimerType.LINEAR && !_state.value.profile.isBreathCountingEnabled && !_state.value.profile.isMantraCountingEnabled) {
             audioManager?.playIntervalBell()
         }
 

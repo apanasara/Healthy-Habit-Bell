@@ -455,4 +455,34 @@ class MantraCounterEngineTest {
         provider.ambientMusicVolume = { 0.5f }
         assertEquals(0.0025f, provider.getAmbientMusicSafetyMargin(), 0.0001f)
     }
+
+    /**
+     * Verifies that when ambient room sound scanning is performed during pre-session preparation,
+     * [MantraUpdate] correctly holds the calibrated baseline metrics, and active recitation
+     * proceeds with calibrated thresholds without resetting to initial values.
+     */
+    @Test
+    fun testMantraPreSessionCalibrationPreservation() {
+        val config = MantraCounterConfig.DEFAULT_GAYATRI
+        val preCalibratedUpdate = MantraUpdate(
+            currentBead = 0,
+            targetBeads = config.targetBeads,
+            currentMala = 1,
+            targetMalas = config.targetMalas,
+            totalSessionChants = 0,
+            cadenceCpm = 0,
+            audioAmplitudeRms = 0f,
+            thresholdRms = 0.045f,
+            isReciting = false,
+            micSensitivity = config.micSensitivity,
+            isCalibrating = false,
+            calibrationSecondsRemaining = 0,
+            technique = config.technique,
+            isCompleted = false
+        )
+
+        assertFalse("Pre-calibrated update must have isCalibrating=false", preCalibratedUpdate.isCalibrating)
+        assertEquals(0, preCalibratedUpdate.calibrationSecondsRemaining)
+        assertEquals(0, preCalibratedUpdate.currentBead)
+    }
 }

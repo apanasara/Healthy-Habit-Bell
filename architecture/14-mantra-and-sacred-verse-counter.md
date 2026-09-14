@@ -215,4 +215,19 @@ To eliminate false bead and breath counting triggered by device ambient backgrou
 7. **Sustained Continuous Audio Timeout (35-Second Cutoff)**:
    - In `EXTENDED_VERSE`, if continuous audio exceeds 35 seconds without any inter-verse pause, it is identified as background environmental music or TV audio and aborted without advancing bead counts.
 
+---
+
+## 13. Pre-Timer Room Sound Scanning & Strict Silence Protocol
+
+To ensure 100% accurate acoustic calibration without self-acoustic speaker feedback or threshold distortion:
+
+1. **Pre-Session Preparation Integration (`startPreparationCalibration`)**:
+   - In sessions with pre-session preparation countdown enabled, the 3-second ambient room acoustic calibration window executes during the final 3 seconds of pre-session preparation ($T=3\text{s} \dots 1\text{s}$), right after the initial *"Take your position"* prompt.
+   - At $T=0\text{s}$, the session transitions to `SessionStatus.RUNNING` and begins active recitation tracking immediately at `00:00` without any secondary post-start calibration lag.
+2. **Strict Acoustic Silence Law**:
+   - During this 3-second room scanning window, all countdown chime strikes (Option C strikes 3, 2, 1) and spoken numeric cues (*"Three"*, *"Two"*, *"One"*) are strictly suppressed in `PreparationVoiceGuide` via `isAcousticCalibrationActive`.
+   - This guarantees absolute silence from the phone's loudspeakers, allowing the microphone to measure pure ambient environmental noise without speaker self-feedback or ringing resonance.
+3. **Pre-Calibrated Baseline Preservation**:
+   - When transitioning from `PREPARING` to `RUNNING`, `MantraCountManager.startSession` recognizes that calibration was already completed during the preparation countdown, preserving the calibrated baseline and threshold without double calibration or chime interference.
+
 

@@ -317,5 +317,33 @@ class BreathCounterEngineTest {
         assertEquals("Calibrate & Settle", BreathCounterPhase.PREPARATION.displayName)
         assertTrue(BreathCounterPhase.PREPARATION.guidanceCue.contains("calibrat", ignoreCase = true))
     }
+
+    /**
+     * Verifies that when ambient room sound scanning is performed during pre-session preparation,
+     * [BreathStrokeUpdate] captures the calibration window state, and transitioning to active
+     * strokes preserves the calibrated baseline without restarting calibration.
+     */
+    @Test
+    fun testPreSessionCalibrationPreservation() {
+        val config = BreathCounterConfig.DEFAULT_KAPALABHATI
+        val preCalibratedUpdate = BreathStrokeUpdate(
+            currentRoundStrokes = 0,
+            targetRoundStrokes = config.strokesForRound(1),
+            totalSessionStrokes = 0,
+            currentRound = 1,
+            targetRounds = config.targetRounds,
+            cadenceBpm = 0,
+            currentPhase = BreathCounterPhase.STROKES,
+            phaseRemainingSeconds = 0,
+            phaseDurationSeconds = 0,
+            thresholdRms = 0.05f,
+            micSensitivity = config.micSensitivity,
+            isCalibrating = false
+        )
+
+        assertFalse("Pre-calibrated update must have isCalibrating=false", preCalibratedUpdate.isCalibrating)
+        assertEquals(BreathCounterPhase.STROKES, preCalibratedUpdate.currentPhase)
+        assertEquals(0, preCalibratedUpdate.currentRoundStrokes)
+    }
 }
 

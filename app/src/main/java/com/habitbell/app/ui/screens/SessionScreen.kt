@@ -636,7 +636,10 @@ private fun LandscapeSessionLayout(
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
                         text = when (sessionState.status) {
-                            SessionStatus.PREPARING -> "● Get Ready • Take Position"
+                            SessionStatus.PREPARING -> {
+                                val isCalibrating = sessionState.breathUpdate?.isCalibrating == true || sessionState.mantraUpdate?.isCalibrating == true
+                                if (isCalibrating) "● Calibrating Room • Measuring Silence" else "● Get Ready • Take Position"
+                            }
                             SessionStatus.RUNNING -> "● Active Mindful Session"
                             SessionStatus.PAUSED -> "Paused"
                             SessionStatus.COMPLETED -> "Session Completed 🙏"
@@ -1181,7 +1184,10 @@ private fun PortraitSessionLayout(
 
             Text(
                 text = when (sessionState.status) {
-                    SessionStatus.PREPARING -> "● Get Ready • Take Position"
+                    SessionStatus.PREPARING -> {
+                        val isCalibrating = sessionState.breathUpdate?.isCalibrating == true || sessionState.mantraUpdate?.isCalibrating == true
+                        if (isCalibrating) "● Calibrating Room • Measuring Silence" else "● Get Ready • Take Position"
+                    }
                     SessionStatus.RUNNING -> if (isEating) "● Mindful Chewing Rhythm" else "● Active Mindful Session"
                     SessionStatus.PAUSED -> "Paused"
                     SessionStatus.COMPLETED -> "Session Completed 🙏"

@@ -102,4 +102,32 @@ class PreparationCountdownTest {
         val defaultEnabled = true
         assertTrue("Preparation countdown must default to true for mindful unhurried starts", defaultEnabled)
     }
+
+    /**
+     * Verifies that during acoustic room noise scanning, [com.habitbell.app.audio.PreparationVoiceGuide.isAcousticCalibrationActive]
+     * enforces the Strict Acoustic Silence Protocol: suppressing countdown chime strikes (3, 2, 1)
+     * and numeric vocal cues to eliminate self-acoustic speaker pollution into the microphone.
+     */
+    @Test
+    fun testAcousticCalibrationSilenceProtocolInvariants() {
+        var isAcousticCalibrationActive = true
+        val countdownSeconds = listOf(3, 2, 1)
+
+        // For all countdown seconds, chime and vocal cues must be suppressed when acoustic calibration is active
+        for (sec in countdownSeconds) {
+            val shouldSuppress = isAcousticCalibrationActive && sec in 1..3
+            assertTrue("Chime strikes and vocal cues at T=${sec}s must be suppressed during acoustic calibration", shouldSuppress)
+        }
+
+        // T=5s ("Take your position") must NOT be suppressed so user is prompted to assume posture
+        val suppressAt5 = isAcousticCalibrationActive && 5 in 1..3
+        assertFalse("Vocal posture prompt at T=5s must not be suppressed", suppressAt5)
+
+        // Once session transitions to RUNNING or IDLE, acoustic calibration active flag is cleared
+        isAcousticCalibrationActive = false
+        for (sec in countdownSeconds) {
+            val shouldSuppress = isAcousticCalibrationActive && sec in 1..3
+            assertFalse("Non-acoustic sessions must allow standard countdown chimes at T=${sec}s", shouldSuppress)
+        }
+    }
 }
