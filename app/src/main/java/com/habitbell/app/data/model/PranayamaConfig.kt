@@ -44,15 +44,15 @@ enum class PranayamaPhase(
 
     /**
      * Antar Kumbhaka: Internal breath retention awakening Sushumna Nadi with full lungs.
-     * Accompanied by classical Tri-Bandha (Mūla Bandha, Madhyama Uḍḍīyāna Bandha, and Kūpa/Jālandhara Bandha).
+     * Accompanied by classical Tri-Bandha (Mūla Bandha, Madhyama Uḍḍīyāna Bandha, and Jālandhara Bandha).
      */
     HOLD_IN(
         displayName = "Hold In",
         cue = "Hold breath with Tri-Bandha",
         sanskritName = "Kumbhak",
         sanskritScript = "अभ्यन्तर कुम्भक",
-        bandhaScript = "त्रिबन्ध (मूलबन्ध • उड्डीयान बन्ध • कूपबन्ध)",
-        bandhaEnglish = "Tri-Bandha: Mūla • Uḍḍīyāna • Kūpa"
+        bandhaScript = "त्रिबंध (मूल बंध • उड्डीयान बंध • जालंधर बंध)",
+        bandhaEnglish = "Tri-Bandha: Mūla • Uḍḍīyāna • Jālandhara"
     ),
 
     /** Rechaka: Slow, continuous exhalation releasing Apana and mental tension. */
@@ -60,15 +60,15 @@ enum class PranayamaPhase(
 
     /**
      * Bahya Kumbhaka: External breath retention resting in Shunya (the primordial void).
-     * Accompanied by classical Tri-Bandha (Mūla Bandha, Pūrṇa Uḍḍīyāna Bandha, and Kūpa/Jālandhara Bandha).
+     * Accompanied by classical Tri-Bandha (Mūla Bandha, Pūrṇa Uḍḍīyāna Bandha, and Jālandhara Bandha).
      */
     HOLD_OUT(
         displayName = "Hold Out",
         cue = "Rest in emptiness with Tri-Bandha",
         sanskritName = "Kumbhak",
         sanskritScript = "बाह्य कुम्भक",
-        bandhaScript = "त्रिबन्ध (मूलबन्ध • उड्डीयान बन्ध • कूपबन्ध)",
-        bandhaEnglish = "Tri-Bandha: Mūla • Uḍḍīyāna • Kūpa"
+        bandhaScript = "त्रिबंध (मूल बंध • उड्डीयान बंध • जालंधर बंध)",
+        bandhaEnglish = "Tri-Bandha: Mūla • Uḍḍīyāna • Jālandhara"
     )
 }
 

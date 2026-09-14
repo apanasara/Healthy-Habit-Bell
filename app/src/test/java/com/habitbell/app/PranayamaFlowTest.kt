@@ -73,16 +73,16 @@ class PranayamaFlowTest {
 
         assertEquals("Kumbhak", PranayamaPhase.HOLD_IN.sanskritName)
         assertEquals("अभ्यन्तर कुम्भक", PranayamaPhase.HOLD_IN.sanskritScript)
-        assertEquals("त्रिबन्ध (मूलबन्ध • उड्डीयान बन्ध • कूपबन्ध)", PranayamaPhase.HOLD_IN.bandhaScript)
-        assertEquals("Tri-Bandha: Mūla • Uḍḍīyāna • Kūpa", PranayamaPhase.HOLD_IN.bandhaEnglish)
+        assertEquals("त्रिबंध (मूल बंध • उड्डीयान बंध • जालंधर बंध)", PranayamaPhase.HOLD_IN.bandhaScript)
+        assertEquals("Tri-Bandha: Mūla • Uḍḍīyāna • Jālandhara", PranayamaPhase.HOLD_IN.bandhaEnglish)
 
         assertEquals("Rechak", PranayamaPhase.EXHALE.sanskritName)
         assertEquals("रेचक", PranayamaPhase.EXHALE.sanskritScript)
 
         assertEquals("Kumbhak", PranayamaPhase.HOLD_OUT.sanskritName)
         assertEquals("बाह्य कुम्भक", PranayamaPhase.HOLD_OUT.sanskritScript)
-        assertEquals("त्रिबन्ध (मूलबन्ध • उड्डीयान बन्ध • कूपबन्ध)", PranayamaPhase.HOLD_OUT.bandhaScript)
-        assertEquals("Tri-Bandha: Mūla • Uḍḍīyāna • Kūpa", PranayamaPhase.HOLD_OUT.bandhaEnglish)
+        assertEquals("त्रिबंध (मूल बंध • उड्डीयान बंध • जालंधर बंध)", PranayamaPhase.HOLD_OUT.bandhaScript)
+        assertEquals("Tri-Bandha: Mūla • Uḍḍīyāna • Jālandhara", PranayamaPhase.HOLD_OUT.bandhaEnglish)
     }
 
     /**
