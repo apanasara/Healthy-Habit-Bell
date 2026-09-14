@@ -279,6 +279,25 @@ class TimerEngine(
             return
         }
 
+        if (profile.isMantraCountingEnabled) {
+            val mConfig = profile.mantraConfig ?: return
+            val total = profile.totalDurationSeconds
+            _state.value = TimerSessionState(
+                status = SessionStatus.IDLE,
+                profile = profile,
+                remainingSeconds = total,
+                totalSeconds = total,
+                currentRound = 1,
+                totalRounds = mConfig.targetMalas,
+                mantraUpdate = com.habitbell.app.mantra.MantraUpdate(
+                    technique = mConfig.technique,
+                    targetBeads = mConfig.targetBeads,
+                    targetMalas = mConfig.targetMalas
+                )
+            )
+            return
+        }
+
         when (profile.type) {
             TimerType.LINEAR -> {
                 // Initialize linear countdown parameters
@@ -594,7 +613,6 @@ class TimerEngine(
      * @param update Authoritative mantra update containing live bead count, cadence, and completion status.
      */
     fun onMantraUpdated(update: com.habitbell.app.mantra.MantraUpdate) {
-        if (_state.value.status != SessionStatus.RUNNING) return
         if (!_state.value.profile.isMantraCountingEnabled) return
 
         _state.update {
@@ -605,7 +623,7 @@ class TimerEngine(
             )
         }
 
-        if (update.isCompleted) {
+        if (update.isCompleted && _state.value.status == SessionStatus.RUNNING) {
             onSessionCompleted()
         }
     }
@@ -627,6 +645,14 @@ class TimerEngine(
 
         // If breath counter profile is active, progression is managed by BreathCountManager
         if (current.profile.isBreathCountingEnabled) {
+            if (current.totalSeconds > 0 && current.remainingSeconds <= 0) {
+                onSessionCompleted()
+            }
+            return
+        }
+
+        // If mantra counter profile is active, progression is managed by MantraCountManager
+        if (current.profile.isMantraCountingEnabled) {
             if (current.totalSeconds > 0 && current.remainingSeconds <= 0) {
                 onSessionCompleted()
             }

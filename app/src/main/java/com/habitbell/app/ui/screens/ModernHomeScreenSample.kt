@@ -62,7 +62,7 @@ private data class IntentCategory(
  * @param favorites User-marked favorite profiles.
  * @param reminders Scheduled routine reminders.
  * @param isZenMode Whether Zen focus mode is active.
- * @param onSelectProfile Callback when a profile is selected to start a session.
+ * @param onSelectProfile Callback when a profile is selected to load into the timer screen in ready state.
  * @param onToggleZenMode Callback to toggle Zen focus mode.
  * @param onCycleTheme Callback to cycle active theme variants.
  * @param onCreateNewClick Callback to launch custom profile creation.
@@ -113,7 +113,11 @@ fun ModernHomeScreenSample(
         if (selectedCategory == "All") {
             profiles
         } else {
-            profiles.filter { it.category.contains(selectedCategory, ignoreCase = true) }
+            profiles.filter {
+                it.category.contains(selectedCategory, ignoreCase = true) ||
+                (selectedCategory == "Meditation" && (it.isMantraCountingEnabled || it.category.contains("Recitation", ignoreCase = true))) ||
+                (selectedCategory == "Breathwork" && (it.isBreathCountingEnabled || it.category.contains("Kriya", ignoreCase = true)))
+            }
         }
     }
 
@@ -259,6 +263,7 @@ fun ModernHomeScreenSample(
  */
 private fun resolvePhosphorIcon(profile: TimerProfile): Int {
     return when {
+        profile.isMantraCountingEnabled || profile.category.contains("Recitation", ignoreCase = true) -> R.drawable.ic_ph_sparkle
         profile.category.contains("Eating", ignoreCase = true) -> R.drawable.ic_ph_bowl
         profile.category.contains("Healing", ignoreCase = true) || profile.category.contains("Reiki", ignoreCase = true) -> R.drawable.ic_ph_sparkle
         profile.category.contains("Breath", ignoreCase = true) || profile.type == TimerType.MULTI_INTERVAL -> R.drawable.ic_ph_wind
@@ -357,10 +362,13 @@ private fun HeroFocusCard(
                             color = onSurfaceColor
                         )
                         Spacer(modifier = Modifier.height(4.dp))
-                        val durationText = when (profile.type) {
-                            TimerType.LINEAR -> "${profile.totalDurationSeconds / 60}m • Tibetan Bell"
-                            TimerType.MULTI_INTERVAL -> "Breathwork • ${profile.pranayamaConfig?.targetRounds ?: 20} rounds"
-                            TimerType.COMPOUND -> "Movement • 12 Poses"
+                        val durationText = when {
+                            profile.isMantraCountingEnabled -> "Sacred Recitation • ${profile.mantraConfig?.targetBeads ?: 108} beads"
+                            profile.isBreathCountingEnabled -> "Breathwork • ${profile.breathCounterConfig?.targetRounds ?: 3} rounds"
+                            profile.type == TimerType.LINEAR -> "${profile.totalDurationSeconds / 60}m • Tibetan Bell"
+                            profile.type == TimerType.MULTI_INTERVAL -> "Breathwork • ${profile.pranayamaConfig?.targetRounds ?: 20} rounds"
+                            profile.type == TimerType.COMPOUND -> "Movement • 12 Poses"
+                            else -> "Mindful Practice"
                         }
                         Text(
                             text = durationText,
@@ -459,8 +467,10 @@ private fun ModernProfileRow(
                         color = onSurfaceColor
                     )
                     Spacer(modifier = Modifier.height(2.dp))
-                    val subtitle = when (profile.type) {
-                        TimerType.LINEAR -> {
+                    val subtitle = when {
+                        profile.isMantraCountingEnabled -> "SACRED JAPA"
+                        profile.isBreathCountingEnabled -> "KRIYA BREATH"
+                        profile.type == TimerType.LINEAR -> {
                             val intervalM = profile.intervalDurationSeconds / 60
                             if (intervalM > 0 && profile.intervalDurationSeconds < profile.totalDurationSeconds) {
                                 "${intervalM}m BELL INTERVAL"
@@ -468,8 +478,9 @@ private fun ModernProfileRow(
                                 profile.category.uppercase()
                             }
                         }
-                        TimerType.MULTI_INTERVAL -> "EQUALIZED BREATH"
-                        TimerType.COMPOUND -> "ASANA FLOW"
+                        profile.type == TimerType.MULTI_INTERVAL -> "EQUALIZED BREATH"
+                        profile.type == TimerType.COMPOUND -> "ASANA FLOW"
+                        else -> profile.category.uppercase()
                     }
                     Text(
                         text = subtitle,
@@ -481,10 +492,13 @@ private fun ModernProfileRow(
             }
 
             // Compact duration badge
-            val badgeText = when (profile.type) {
-                TimerType.LINEAR -> "${profile.totalDurationSeconds / 60}m"
-                TimerType.MULTI_INTERVAL -> "${profile.pranayamaConfig?.targetRounds ?: 20}r"
-                TimerType.COMPOUND -> "${profile.compoundConfig?.targetRounds ?: 12}p"
+            val badgeText = when {
+                profile.isMantraCountingEnabled -> "${profile.mantraConfig?.targetBeads ?: 108}b"
+                profile.isBreathCountingEnabled -> "${profile.breathCounterConfig?.targetRounds ?: 3}r"
+                profile.type == TimerType.LINEAR -> "${profile.totalDurationSeconds / 60}m"
+                profile.type == TimerType.MULTI_INTERVAL -> "${profile.pranayamaConfig?.targetRounds ?: 20}r"
+                profile.type == TimerType.COMPOUND -> "${profile.compoundConfig?.targetRounds ?: 12}p"
+                else -> "${profile.totalDurationSeconds / 60}m"
             }
 
             Surface(

@@ -289,7 +289,7 @@ class CentralSessionHandler(private val application: Application) {
     private fun setupMantraCountListener() {
         scope.launch {
             mantraCountManager.mantraFlow.collect { mantraUpdate ->
-                if (engine.state.value.status == SessionStatus.RUNNING) {
+                if (engine.state.value.profile.isMantraCountingEnabled) {
                     engine.onMantraUpdated(mantraUpdate)
                 }
             }
@@ -740,20 +740,49 @@ class CentralSessionHandler(private val application: Application) {
     }
 
     /**
+     * Loads a target [TimerProfile] into the engine and synchronizes metadata
+     * without commencing countdown or audio, leaving the session in [SessionStatus.IDLE].
+     *
+     * @param profile Profile configuration governing duration, intervals, and bell timbre.
+     */
+    fun loadProfile(profile: TimerProfile) {
+        _currentMediaId.value = profile.id
+        engine.loadProfile(profile)
+        updateMetadata(profile)
+        updatePlaybackState(PlaybackStateCompat.STATE_PAUSED, 0L)
+    }
+
+    /**
+     * Resolves a timer profile by identifier and loads it into the engine in [SessionStatus.IDLE] state.
+     * Matches known automotive keys ("eating", "posture", "breathing") or repository profile IDs.
+     *
+     * @param mediaId Unique profile identifier string.
+     */
+    fun loadProfileById(mediaId: String) {
+        val targetProfile = when (mediaId) {
+            "eating", "eating-mindful-20" -> repository.getProfileById("eating-mindful-20") ?: DefaultProfiles.EATING
+            "posture" -> repository.getProfileById("posture") ?: repository.profiles.value.find { it.category.contains("Movement", ignoreCase = true) } ?: DefaultProfiles.EATING
+            "breathing" -> repository.getProfileById("pranayama-hatha-classical") ?: DefaultProfiles.PRANAYAMA_HATHA
+            "breath-counter", "kriya", "kapalabhati", "bhastrika", "bhramari" -> repository.getProfileById("kriya-breath-counter") ?: DefaultProfiles.BREATH_COUNTER
+            "mantra", "japa", "gayatri", "aumkar", "tasbih", "mantra-counter" -> repository.getProfileById("mantra-japa-counter") ?: DefaultProfiles.MANTRA_COUNTER
+            else -> repository.getProfileById(mediaId) ?: repository.profiles.value.firstOrNull() ?: DefaultProfiles.EATING
+        }
+        loadProfile(targetProfile)
+    }
+
+    /**
      * Loads a target [TimerProfile] and immediately commences countdown and background audio.
      *
      * @param profile Profile configuration governing duration, intervals, and bell timbre.
      * @param skipPreparation If true, starts the session immediately without the 5-second preparation countdown.
      */
     fun startProfile(profile: TimerProfile, skipPreparation: Boolean = false) {
-        _currentMediaId.value = profile.id
-        engine.loadProfile(profile)
-        updateMetadata(profile)
+        loadProfile(profile)
         engine.startOrResume(skipPreparation = skipPreparation)
     }
 
     /**
-     * Resolves a timer profile by identifier and launches it.
+     * Resolves a timer profile by identifier and launches it immediately.
      * Matches known automotive keys ("eating", "posture", "breathing") or repository profile IDs.
      *
      * @param mediaId Unique profile identifier string.

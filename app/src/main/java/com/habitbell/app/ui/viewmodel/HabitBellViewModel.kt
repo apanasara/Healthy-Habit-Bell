@@ -347,11 +347,19 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
 
     /**
      * Loads a profile into the engine and transitions the UI to the session view.
+     * By default, the profile is loaded in [SessionStatus.IDLE] ("Ready") state without
+     * automatically commencing countdown, allowing the user to begin by tapping Play on the timer screen.
+     * If [autoStart] is set to true, countdown and ambient audio commence immediately.
      *
-     * @param profile The target [TimerProfile] to execute.
+     * @param profile The target [TimerProfile] to load into the session.
+     * @param autoStart Whether to commence countdown immediately upon navigating. Defaults to false.
      */
-    fun startProfileSession(profile: TimerProfile) {
-        sessionHandler.startProfile(profile)
+    fun startProfileSession(profile: TimerProfile, autoStart: Boolean = false) {
+        if (autoStart) {
+            sessionHandler.startProfile(profile)
+        } else {
+            sessionHandler.loadProfile(profile)
+        }
         _uiState.update {
             it.copy(
                 currentScreen = AppScreen.SESSION,
@@ -359,6 +367,17 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
                 isPocketModeManual = profile.pocketMode
             )
         }
+    }
+
+    /**
+     * Prepares and loads a profile into the engine, updates session metadata, and transitions
+     * the UI to the session view in an IDLE (Ready) state without commencing countdown.
+     * The countdown will commence only when the user taps the play button on the timer screen.
+     *
+     * @param profile The target [TimerProfile] to load into the timer screen.
+     */
+    fun selectProfileSession(profile: TimerProfile) {
+        startProfileSession(profile, autoStart = false)
     }
 
     /**
@@ -605,7 +624,7 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
             intervalDurationSeconds = 5
         )
         openSettingsDrawer(false)
-        startProfileSession(demoProfile)
+        startProfileSession(demoProfile, autoStart = true)
     }
 
     /**

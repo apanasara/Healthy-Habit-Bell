@@ -37,7 +37,7 @@ import com.habitbell.app.ui.theme.EyeComfortAmber
  * @param reminders Scheduled daily routine reminders (e.g. hydration, mindful lunch).
  * @param currentTheme Currently applied visual theme mode ([ThemeMode]).
  * @param isZenMode Whether Zen mode is enabled to suppress non-critical dashboard clutter.
- * @param onSelectProfile Callback invoked when a profile card or row is tapped to start a session.
+ * @param onSelectProfile Callback invoked when a profile card or row is tapped to load into the timer screen in ready state.
  * @param onConfigureProfile Callback invoked to open the profile customization bottom sheet.
  * @param onToggleFavorite Callback invoked when the star favorite toggle button is clicked.
  * @param onToggleZenMode Callback to toggle the distraction-free Zen mode.
@@ -415,13 +415,16 @@ private fun FavoriteCard(
                     maxLines = 1
                 )
                 Text(
-                    text = when (profile.type) {
-                        TimerType.LINEAR -> {
+                    text = when {
+                        profile.isMantraCountingEnabled -> "Sacred Japa • ${profile.mantraConfig?.targetBeads ?: 108} beads"
+                        profile.isBreathCountingEnabled -> "Kriya • ${profile.breathCounterConfig?.targetRounds ?: 3} rounds"
+                        profile.type == TimerType.LINEAR -> {
                             val intervalStr = if (profile.intervalDurationSeconds >= 60) "${profile.intervalDurationSeconds / 60}m" else "${profile.intervalDurationSeconds}s"
                             "${profile.totalDurationSeconds / 60}m • $intervalStr bells"
                         }
-                        TimerType.MULTI_INTERVAL -> "${profile.pranayamaConfig?.targetRounds ?: 0} rounds"
-                        TimerType.COMPOUND -> "${profile.compoundConfig?.targetRounds ?: 0} rounds"
+                        profile.type == TimerType.MULTI_INTERVAL -> "${profile.pranayamaConfig?.targetRounds ?: 0} rounds"
+                        profile.type == TimerType.COMPOUND -> "${profile.compoundConfig?.targetRounds ?: 0} rounds"
+                        else -> ""
                     },
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -532,13 +535,16 @@ private fun TimerProfileListItem(
                         color = MaterialTheme.colorScheme.onBackground
                     )
                     Text(
-                        text = when (profile.type) {
-                            TimerType.LINEAR -> {
+                        text = when {
+                            profile.isMantraCountingEnabled -> "Sacred Japa • ${profile.mantraConfig?.targetBeads ?: 108} beads"
+                            profile.isBreathCountingEnabled -> "Kriya Breath • ${profile.breathCounterConfig?.targetRounds ?: 3} rounds"
+                            profile.type == TimerType.LINEAR -> {
                                 val intervalStr = if (profile.intervalDurationSeconds >= 60) "${profile.intervalDurationSeconds / 60}m" else "${profile.intervalDurationSeconds}s"
                                 "${profile.totalDurationSeconds / 60} min • $intervalStr interval bells"
                             }
-                            TimerType.MULTI_INTERVAL -> "Breathwork • ${profile.pranayamaConfig?.targetRounds} rounds"
-                            TimerType.COMPOUND -> "Yoga • 12 Poses • ${profile.compoundConfig?.targetRounds} rounds"
+                            profile.type == TimerType.MULTI_INTERVAL -> "Breathwork • ${profile.pranayamaConfig?.targetRounds} rounds"
+                            profile.type == TimerType.COMPOUND -> "Yoga • 12 Poses • ${profile.compoundConfig?.targetRounds} rounds"
+                            else -> ""
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant

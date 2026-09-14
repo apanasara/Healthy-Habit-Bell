@@ -225,7 +225,7 @@ class MainActivity : FragmentActivity() {
                                 reminders = reminders,
                                 isZenMode = uiState.isZenMode,
                                 onSelectProfile = { profile ->
-                                    viewModel.startProfileSession(profile)
+                                    viewModel.selectProfileSession(profile)
                                 },
                                 onToggleZenMode = {
                                     viewModel.setZenMode(!uiState.isZenMode)

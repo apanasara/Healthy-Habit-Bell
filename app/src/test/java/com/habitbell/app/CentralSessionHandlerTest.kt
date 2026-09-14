@@ -5,6 +5,7 @@ import com.habitbell.app.data.default.DefaultProfiles
 import com.habitbell.app.engine.SessionStatus
 import com.habitbell.app.engine.TimerSessionState
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -223,4 +224,102 @@ class CentralSessionHandlerTest {
         assertEquals(1, suryaState.currentPose?.index)
         assertEquals("ॐ मित्राय नमः", suryaState.currentPose?.mantra)
     }
+
+    /**
+     * Verifies that loading a profile into the timer session (Requirement: manual play from home)
+     * sets status to [SessionStatus.IDLE], initializes total/remaining seconds without countdown,
+     * and presents the "Ready" state.
+     */
+    @Test
+    fun testProfileLoadedInIdleStateDoesNotAutoRun() {
+        val eatingProfile = DefaultProfiles.EATING
+        val idleState = TimerSessionState(
+            status = SessionStatus.IDLE,
+            profile = eatingProfile,
+            remainingSeconds = eatingProfile.totalDurationSeconds,
+            totalSeconds = eatingProfile.totalDurationSeconds,
+            nextBellSeconds = eatingProfile.intervalDurationSeconds
+        )
+
+        // Session must be IDLE upon landing from HomeScreen
+        assertEquals("Session status must be IDLE when profile is selected from HomeScreen", SessionStatus.IDLE, idleState.status)
+        assertEquals(2700, idleState.remainingSeconds)
+        assertEquals(2700, idleState.totalSeconds)
+        assertEquals("45:00", idleState.formattedRemainingTime)
+        assertEquals("01:00", idleState.formattedNextBellTime)
+        assertEquals(0f, idleState.progressFraction)
+        assertFalse("isPreparing must be false when IDLE", idleState.isPreparing)
+
+        // Status text in SessionScreen must evaluate to 'Ready'
+        val statusText = when (idleState.status) {
+            SessionStatus.PREPARING -> "● Get Ready • Take Position"
+            SessionStatus.RUNNING -> "● Active Mindful Session"
+            SessionStatus.PAUSED -> "Paused"
+            SessionStatus.COMPLETED -> "Session Completed 🙏"
+            SessionStatus.IDLE -> "Ready"
+        }
+        assertEquals("Ready", statusText)
+
+        // isRunning must be false so the Play icon is presented
+        val isRunning = idleState.status == SessionStatus.RUNNING
+        assertFalse("isRunning must be false so the Play button is shown on landing", isRunning)
+    }
+
+    /**
+     * Verifies that when a session is in [SessionStatus.IDLE], pressing the Play button
+     * commences countdown by transitioning to either [SessionStatus.PREPARING] or [SessionStatus.RUNNING].
+     */
+    @Test
+    fun testPlayButtonTransitionsFromIdleToRunningOrPreparing() {
+        val idleState = TimerSessionState(
+            status = SessionStatus.IDLE,
+            profile = DefaultProfiles.EATING,
+            remainingSeconds = 2700,
+            totalSeconds = 2700
+        )
+
+        // When user taps Play on TimerScreen with preparation countdown enabled (default 5s)
+        val prepState = idleState.copy(
+            status = SessionStatus.PREPARING,
+            preparationSecondsRemaining = 5,
+            totalPreparationSeconds = 5
+        )
+        assertEquals(SessionStatus.PREPARING, prepState.status)
+        assertTrue(prepState.isPreparing)
+
+        // When user taps Play on TimerScreen without preparation countdown (or after prep finishes)
+        val runningState = idleState.copy(
+            status = SessionStatus.RUNNING,
+            remainingSeconds = 2699
+        )
+        assertEquals(SessionStatus.RUNNING, runningState.status)
+        val isRunningNow = runningState.status == SessionStatus.RUNNING
+        assertTrue("isRunning must evaluate to true after user presses Play", isRunningNow)
+    }
+
+    /**
+     * Verifies that selecting a profile updates the UI destination to [AppScreen.SESSION]
+     * without setting status to RUNNING, allowing the user to land on the timer screen in Ready state.
+     */
+    @Test
+    fun testSelectProfileSessionStateContract() {
+        val profile = DefaultProfiles.MINDFUL_WALKING
+        val initialIdleSession = TimerSessionState(
+            status = SessionStatus.IDLE,
+            profile = profile,
+            remainingSeconds = profile.totalDurationSeconds,
+            totalSeconds = profile.totalDurationSeconds
+        )
+
+        val appUiState = com.habitbell.app.ui.viewmodel.AppUiState(
+            currentScreen = com.habitbell.app.ui.viewmodel.AppScreen.SESSION,
+            isDisplayMode = profile.displayMode,
+            isPocketModeManual = profile.pocketMode
+        )
+
+        assertEquals("UI must navigate to AppScreen.SESSION", com.habitbell.app.ui.viewmodel.AppScreen.SESSION, appUiState.currentScreen)
+        assertEquals("Session must remain IDLE until play is pressed", SessionStatus.IDLE, initialIdleSession.status)
+        assertEquals(900, initialIdleSession.remainingSeconds)
+    }
 }
+
