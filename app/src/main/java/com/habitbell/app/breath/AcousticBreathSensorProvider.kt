@@ -7,7 +7,6 @@ import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.media.audiofx.AcousticEchoCanceler
-import android.media.audiofx.NoiseSuppressor
 import android.util.Log
 import androidx.core.content.ContextCompat
 import com.habitbell.app.data.model.BreathCounterConfig
@@ -36,8 +35,9 @@ import kotlin.math.sqrt
  *      desk rumble (-28 dB at 100 Hz) and high-frequency thermal hiss (-26 dB at 7500 Hz).
  *   2. **Continuous Adaptive Noise Floor**: Continuously adapts to ambient background sound level
  *      using asymmetric attack/decay smoothing, preventing calibration freeze and drift.
- *   3. **Hardware Acoustic Echo Cancellation (AEC) & Noise Suppression (NS)**: Attaches Android
- *      [AcousticEchoCanceler] and [NoiseSuppressor] to cancel phone loudspeaker bleed at the hardware DSP layer.
+ *   3. **Hardware Acoustic Echo Cancellation (AEC)**: Attaches Android [AcousticEchoCanceler]
+ *      to cancel phone loudspeaker bleed at the hardware DSP layer. Note: [android.media.audiofx.NoiseSuppressor]
+ *      is excluded to avoid attenuating soft breath exhalations and humming vibrations.
  *   4. **Ambient Background Music Isolation**: Dynamically elevates detection thresholds with an
  *      active safety margin when local background music is actively outputting from phone speakers.
  *   5. **Stateful Hysteresis Peak-Valley Detector**: Detects rapid energy onset (Attack),
@@ -89,9 +89,6 @@ class AcousticBreathSensorProvider(
     /** Hardware acoustic echo cancellation effect handle attached to [audioRecord]. */
     private var echoCanceler: AcousticEchoCanceler? = null
 
-    /** Hardware noise suppression effect handle attached to [audioRecord]. */
-    private var noiseSuppressor: NoiseSuppressor? = null
-
     /** Lambda checking whether background ambient music is actively playing through local device speakers. */
     var isAmbientMusicPlaying: (() -> Boolean)? = null
 
@@ -105,13 +102,13 @@ class AcousticBreathSensorProvider(
      * Computes the ambient music safety margin in RMS amplitude to prevent loudspeaker bleed
      * from crossing breath detection thresholds when background music is active.
      *
-     * @return Additional RMS threshold margin (0.0f when music is off, up to 0.025f when active at max volume).
+     * @return Additional RMS threshold margin (0.0f when music is off, up to 0.005f when active at max volume).
      */
     fun getAmbientMusicSafetyMargin(): Float {
         val isMusicActive = isAmbientMusicPlaying?.invoke() == true
         if (!isMusicActive) return 0f
         val gain = (ambientMusicVolume?.invoke() ?: 1.0f).coerceIn(0f, 1f)
-        return 0.010f + (gain * 0.015f)
+        return (gain * 0.005f)
     }
 
     /** Timestamp in milliseconds until which acoustic stroke detection is suppressed. */
@@ -267,7 +264,7 @@ class AcousticBreathSensorProvider(
     }
 
     /**
-     * Safely disengages and releases hardware audio effects ([AcousticEchoCanceler] and [NoiseSuppressor]).
+     * Safely disengages and releases hardware audio effects ([AcousticEchoCanceler]).
      */
     private fun releaseAudioEffects() {
         try {
@@ -276,13 +273,6 @@ class AcousticBreathSensorProvider(
             Log.w(TAG, "Exception releasing AcousticEchoCanceler: ${e.message}")
         }
         echoCanceler = null
-
-        try {
-            noiseSuppressor?.release()
-        } catch (e: Exception) {
-            Log.w(TAG, "Exception releasing NoiseSuppressor: ${e.message}")
-        }
-        noiseSuppressor = null
     }
 
     override fun reset() {
@@ -358,7 +348,7 @@ class AcousticBreathSensorProvider(
                     audioRecord = record
                     initialized = true
 
-                    // Attach Android Hardware Acoustic Echo Cancellation (AEC) and Noise Suppression (NS)
+                    // Attach Android Hardware Acoustic Echo Cancellation (AEC)
                     val sessionId = record.audioSessionId
                     if (sessionId != -1) {
                         if (AcousticEchoCanceler.isAvailable()) {
@@ -369,16 +359,6 @@ class AcousticBreathSensorProvider(
                                 Log.i(TAG, "🔊 AcousticEchoCanceler attached to session $sessionId (Hardware AEC active)")
                             } catch (e: Exception) {
                                 Log.w(TAG, "Failed to attach AcousticEchoCanceler: ${e.message}")
-                            }
-                        }
-                        if (NoiseSuppressor.isAvailable()) {
-                            try {
-                                noiseSuppressor = NoiseSuppressor.create(sessionId)?.apply {
-                                    enabled = true
-                                }
-                                Log.i(TAG, "🔇 NoiseSuppressor attached to session $sessionId")
-                            } catch (e: Exception) {
-                                Log.w(TAG, "Failed to attach NoiseSuppressor: ${e.message}")
                             }
                         }
                     }
@@ -431,7 +411,7 @@ class AcousticBreathSensorProvider(
                         calibrationValidFramesCount++
                         calibrationPeakRms = max(calibrationPeakRms, bandpassRms)
                         // Running smooth update of noise floor
-                        dynamicNoiseFloorRms = (calibrationRmsSum / calibrationValidFramesCount).toFloat().coerceIn(0.0005f, 0.15f)
+                        dynamicNoiseFloorRms = (calibrationRmsSum / calibrationValidFramesCount).toFloat().coerceIn(0.0005f, 0.08f)
                     }
 
                     calibrationFramesRemaining--
@@ -549,7 +529,7 @@ class AcousticBreathSensorProvider(
                 // Gentle upward adaptation to quiet room ambience
                 dynamicNoiseFloorRms = (dynamicNoiseFloorRms * 0.98f) + (bandpassRms * 0.02f)
             }
-            dynamicNoiseFloorRms = dynamicNoiseFloorRms.coerceIn(0.0005f, 0.15f)
+            dynamicNoiseFloorRms = dynamicNoiseFloorRms.coerceIn(0.0005f, 0.08f)
         }
 
         val normalizedAmplitude = (rawRms * 12.0f).coerceIn(0f, 1f)
@@ -692,7 +672,7 @@ class AcousticBreathSensorProvider(
             } else {
                 dynamicNoiseFloorRms = (dynamicNoiseFloorRms * 0.98f) + (bandpassRms * 0.02f)
             }
-            dynamicNoiseFloorRms = dynamicNoiseFloorRms.coerceIn(0.0005f, 0.15f)
+            dynamicNoiseFloorRms = dynamicNoiseFloorRms.coerceIn(0.0005f, 0.08f)
         }
 
         val energyRise = bandpassRms - previousBandpassRms

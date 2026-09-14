@@ -7,7 +7,6 @@ import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.media.audiofx.AcousticEchoCanceler
-import android.media.audiofx.NoiseSuppressor
 import android.util.Log
 import androidx.core.content.ContextCompat
 import com.habitbell.app.data.model.MantraCounterConfig
@@ -41,14 +40,16 @@ import kotlin.math.sqrt
  *      bridging natural breathing pauses (< 1.2s) without resetting, and confirming exactly 1
  *      count when cumulative duration >= minimum threshold followed by a concluding pause (>= 1.5s).
  *   3. **Short Japa Hysteresis Detector**: 3-stage state machine tracking vocal burst attack,
- *      peak decay, and valley drop-off with refractory lockout (>= 250ms) for rapid "Ram" or Tasbih chants.
+ *      peak decay, and valley drop-off with refractory lockout (>= 220ms) for rapid "Ram" or Tasbih chants.
  *   4. **Autocorrelation Pitch Tracker**: Identifies sustained periodic vocal resonance across
  *      80 Hz - 250 Hz for prolonged Aumkar chanting, counting upon exhalation drop-off.
- *   5. **Hardware Acoustic Echo Cancellation (AEC) & Noise Suppression (NS)**: Attaches Android
- *      [AcousticEchoCanceler] and [NoiseSuppressor] directly to the [AudioRecord] session, commanding
- *      OEM DSP hardware (e.g. Qualcomm Fluence) to cancel loudspeaker output from the microphone stream.
+ *   5. **Hardware Acoustic Echo Cancellation (AEC)**: Attaches Android [AcousticEchoCanceler]
+ *      directly to the [AudioRecord] session to cancel device loudspeaker output from the microphone stream.
+ *      NOTE: Android [android.media.audiofx.NoiseSuppressor] is deliberately excluded because OEM DSPs
+ *      (e.g., Qualcomm Fluence) classify steady human vocal chanting, harmonic vowel formants, and Aumkar
+ *      resonance as stationary noise and aggressively attenuate them by 12-20 dB.
  *   6. **Ambient Background Music Isolation**: Dynamically elevates speech detection thresholds with
- *      an active safety margin whenever device-played ambient music (Aumkar drone, Tanpura, YouTube)
+ *      a subtle active safety margin whenever device-played ambient music (Aumkar drone, Tanpura, YouTube)
  *      is actively outputting from local loudspeakers, preventing music playback from triggering bead counts.
  *   7. **Acoustic Self-Feedback Blanking**: Disables stroke evaluation during internal speaker playback
  *      (e.g. interval bells, gongs) to eliminate runaway speaker-to-mic acoustic feedback loops.
@@ -93,9 +94,6 @@ class AcousticMantraSensorProvider(
     /** Hardware acoustic echo cancellation effect handle attached to [audioRecord]. */
     private var echoCanceler: AcousticEchoCanceler? = null
 
-    /** Hardware noise suppression effect handle attached to [audioRecord]. */
-    private var noiseSuppressor: NoiseSuppressor? = null
-
     /** Lambda checking whether background ambient music is actively playing through local device speakers. */
     var isAmbientMusicPlaying: (() -> Boolean)? = null
 
@@ -109,13 +107,13 @@ class AcousticMantraSensorProvider(
      * Computes the ambient music safety margin in RMS amplitude to prevent loudspeaker bleed
      * from crossing speech detection thresholds when background music is active.
      *
-     * @return Additional RMS threshold margin (0.0f when music is off, up to 0.045f when active at max volume).
+     * @return Additional RMS threshold margin (0.0f when music is off, up to 0.008f when active at max volume).
      */
     fun getAmbientMusicSafetyMargin(): Float {
         val isMusicActive = isAmbientMusicPlaying?.invoke() == true
         if (!isMusicActive) return 0f
         val gain = (ambientMusicVolume?.invoke() ?: 1.0f).coerceIn(0f, 1f)
-        return 0.020f + (gain * 0.025f)
+        return (gain * 0.008f)
     }
 
     /** Timestamp in milliseconds until which acoustic stroke detection is suppressed. */
@@ -259,7 +257,7 @@ class AcousticMantraSensorProvider(
     }
 
     /**
-     * Safely disengages and releases hardware audio effects ([AcousticEchoCanceler] and [NoiseSuppressor]).
+     * Safely disengages and releases hardware audio effects ([AcousticEchoCanceler]).
      */
     private fun releaseAudioEffects() {
         try {
@@ -268,13 +266,6 @@ class AcousticMantraSensorProvider(
             Log.w(TAG, "Exception releasing AcousticEchoCanceler: ${e.message}")
         }
         echoCanceler = null
-
-        try {
-            noiseSuppressor?.release()
-        } catch (e: Exception) {
-            Log.w(TAG, "Exception releasing NoiseSuppressor: ${e.message}")
-        }
-        noiseSuppressor = null
     }
 
     override fun reset() {
@@ -347,7 +338,7 @@ class AcousticMantraSensorProvider(
                     audioRecord = record
                     initialized = true
 
-                    // Attach Android Hardware Acoustic Echo Cancellation (AEC) and Noise Suppression (NS)
+                    // Attach Android Hardware Acoustic Echo Cancellation (AEC)
                     val sessionId = record.audioSessionId
                     if (sessionId != -1) {
                         if (AcousticEchoCanceler.isAvailable()) {
@@ -358,16 +349,6 @@ class AcousticMantraSensorProvider(
                                 Log.i(TAG, "🔊 AcousticEchoCanceler attached to session $sessionId (Hardware AEC active)")
                             } catch (e: Exception) {
                                 Log.w(TAG, "Failed to attach AcousticEchoCanceler: ${e.message}")
-                            }
-                        }
-                        if (NoiseSuppressor.isAvailable()) {
-                            try {
-                                noiseSuppressor = NoiseSuppressor.create(sessionId)?.apply {
-                                    enabled = true
-                                }
-                                Log.i(TAG, "🔇 NoiseSuppressor attached to session $sessionId")
-                            } catch (e: Exception) {
-                                Log.w(TAG, "Failed to attach NoiseSuppressor: ${e.message}")
                             }
                         }
                     }
@@ -419,7 +400,7 @@ class AcousticMantraSensorProvider(
                         calibrationRmsSum += bandpassRms
                         calibrationValidFramesCount++
                         calibrationPeakRms = max(calibrationPeakRms, bandpassRms)
-                        dynamicNoiseFloorRms = (calibrationRmsSum / calibrationValidFramesCount).toFloat().coerceIn(0.001f, 0.20f)
+                        dynamicNoiseFloorRms = (calibrationRmsSum / calibrationValidFramesCount).toFloat().coerceIn(0.001f, 0.08f)
                     }
 
                     calibrationFramesRemaining--
@@ -427,7 +408,7 @@ class AcousticMantraSensorProvider(
 
                     val musicMargin = getAmbientMusicSafetyMargin()
                     val sensitivity = activeSensitivity.coerceIn(0.5f, 2.5f)
-                    val dynamicThreshold = (dynamicNoiseFloorRms * (2.4f / sensitivity) + musicMargin + (0.008f / sensitivity)).coerceIn(0.008f + musicMargin, 0.35f)
+                    val dynamicThreshold = (dynamicNoiseFloorRms * (1.45f / sensitivity) + musicMargin + (0.005f / sensitivity)).coerceIn(0.006f + musicMargin, 0.12f)
                     val normalizedAmplitude = (rawRms * 3.5f).coerceIn(0f, 1f)
                     val normalizedThreshold = (dynamicThreshold * 3.5f).coerceIn(0.05f, 0.95f)
 
@@ -520,16 +501,16 @@ class AcousticMantraSensorProvider(
     ) {
         val musicMargin = getAmbientMusicSafetyMargin()
         val sensitivity = activeSensitivity.coerceIn(0.5f, 2.5f)
-        val dynamicThreshold = (dynamicNoiseFloorRms * (1.8f / sensitivity) + musicMargin + (0.008f / sensitivity)).coerceIn(0.008f + musicMargin, 0.35f)
+        val dynamicThreshold = (dynamicNoiseFloorRms * (1.40f / sensitivity) + musicMargin + (0.005f / sensitivity)).coerceIn(0.006f + musicMargin, 0.12f)
 
         // Continuous ambient noise floor tracking (only when not actively reciting)
         if (!isVerseRecitationActive) {
             if (bandpassRms < dynamicNoiseFloorRms) {
                 dynamicNoiseFloorRms = (dynamicNoiseFloorRms * 0.88f) + (bandpassRms * 0.12f)
-            } else if (bandpassRms < dynamicThreshold * 0.75f) {
+            } else if (bandpassRms < dynamicThreshold * 0.70f) {
                 dynamicNoiseFloorRms = (dynamicNoiseFloorRms * 0.98f) + (bandpassRms * 0.02f)
             }
-            dynamicNoiseFloorRms = dynamicNoiseFloorRms.coerceIn(0.001f, 0.20f)
+            dynamicNoiseFloorRms = dynamicNoiseFloorRms.coerceIn(0.001f, 0.08f)
         }
 
         val normalizedAmplitude = (rawRms * 3.5f).coerceIn(0f, 1f)
@@ -635,16 +616,16 @@ class AcousticMantraSensorProvider(
     ) {
         val musicMargin = getAmbientMusicSafetyMargin()
         val sensitivity = activeSensitivity.coerceIn(0.5f, 2.5f)
-        val dynamicThreshold = (dynamicNoiseFloorRms * (1.8f / sensitivity) + musicMargin + (0.008f / sensitivity)).coerceIn(0.008f + musicMargin, 0.35f)
+        val dynamicThreshold = (dynamicNoiseFloorRms * (1.40f / sensitivity) + musicMargin + (0.005f / sensitivity)).coerceIn(0.006f + musicMargin, 0.12f)
 
         // Continuous ambient noise floor tracking
         if (japaState == JapaState.IDLE_LISTENING) {
             if (bandpassRms < dynamicNoiseFloorRms) {
                 dynamicNoiseFloorRms = (dynamicNoiseFloorRms * 0.88f) + (bandpassRms * 0.12f)
-            } else if (bandpassRms < dynamicThreshold * 0.75f) {
+            } else if (bandpassRms < dynamicThreshold * 0.70f) {
                 dynamicNoiseFloorRms = (dynamicNoiseFloorRms * 0.98f) + (bandpassRms * 0.02f)
             }
-            dynamicNoiseFloorRms = dynamicNoiseFloorRms.coerceIn(0.001f, 0.20f)
+            dynamicNoiseFloorRms = dynamicNoiseFloorRms.coerceIn(0.001f, 0.08f)
         }
 
         val normalizedAmplitude = (rawRms * 3.5f).coerceIn(0f, 1f)
@@ -656,10 +637,10 @@ class AcousticMantraSensorProvider(
         when (japaState) {
             JapaState.IDLE_LISTENING -> {
                 val energyRise = bandpassRms - previousBandpassRms
-                val isAttackOnset = energyRise > (dynamicThreshold * 0.15f) || bandpassRms > (dynamicThreshold * 1.35f)
+                val isAttackOnset = energyRise > (dynamicThreshold * 0.04f) || bandpassRms > (dynamicThreshold * 1.15f)
 
-                // Minimum refractory interval (260ms = max ~230 CPM) and explicit vocal syllabic attack onset
-                if (bandpassRms > dynamicThreshold && isAttackOnset && timeSinceLastBead >= 260L) {
+                // Minimum refractory interval (220ms = max ~270 CPM) and vocal syllabic attack onset
+                if (bandpassRms > dynamicThreshold && isAttackOnset && timeSinceLastBead >= 220L) {
                     japaState = JapaState.ATTACK_DETECTED
                     japaStartTimeMillis = now
                     japaPeakRms = bandpassRms
@@ -680,7 +661,7 @@ class AcousticMantraSensorProvider(
                     lastBeadTimeMillis = now
                 } else if (bandpassRms < japaPeakRms * 0.72f) {
                     // Peak decay confirmed!
-                    val minBurst = (config.minVerseDurationSec * 1000f).toLong().coerceIn(120L, 800L)
+                    val minBurst = (config.minVerseDurationSec * 1000f).toLong().coerceIn(80L, 800L)
                     val isValidBurstDuration = burstDuration >= minBurst
 
                     if (isValidBurstDuration && japaPeakRms >= dynamicThreshold) {
@@ -698,11 +679,10 @@ class AcousticMantraSensorProvider(
                 val elapsedSinceBead = now - lastBeadTimeMillis
                 val isMinRefractoryPassed = elapsedSinceBead >= 180L
                 val isInValley = bandpassRms < (dynamicThreshold * 0.85f)
+                val isCooldownTimeout = elapsedSinceBead >= 800L // Safety timeout: prevent getting permanently locked in valley state
 
-                // Require actual valley drop-off before returning to IDLE_LISTENING.
-                // If sound continuously hovers above valley threshold, it is background ambient audio;
-                // do NOT cycle back and re-trigger!
-                if (isMinRefractoryPassed && isInValley) {
+                // Return to IDLE_LISTENING on quiet valley drop-off or timeout
+                if (isMinRefractoryPassed && (isInValley || isCooldownTimeout)) {
                     japaState = JapaState.IDLE_LISTENING
                 }
             }
@@ -745,7 +725,7 @@ class AcousticMantraSensorProvider(
         val musicMargin = getAmbientMusicSafetyMargin()
         val sensitivity = activeSensitivity.coerceIn(0.5f, 2.5f)
         val normalizedAmplitude = (rawRms * 3.5f).coerceIn(0f, 1f)
-        val droneThreshold = (dynamicNoiseFloorRms * (1.8f / sensitivity) + musicMargin + (0.010f / sensitivity)).coerceAtLeast(0.018f + musicMargin)
+        val droneThreshold = (dynamicNoiseFloorRms * (1.35f / sensitivity) + musicMargin + (0.005f / sensitivity)).coerceIn(0.010f + musicMargin, 0.12f)
         val normalizedThreshold = (droneThreshold * 3.5f).coerceIn(0.05f, 0.95f)
 
         // Autocorrelation pitch test at pitch lags for 80 Hz - 250 Hz (lag 64 to 200 samples at 16 kHz)
