@@ -157,3 +157,17 @@ Embedded directly inside `SettingsDrawer.kt` when `profile.mantraConfig != null`
 1. **Zero Battery Waste**: AudioRecord captures at 16 kHz mono only while the session is actively running; completely paused/released in background or IDLE states.
 2. **100% Offline Edge Execution**: Zero external cloud dependencies; all DSP bandpass filtering, noise floor tracking, and autocorrelation run entirely on-device on `Dispatchers.IO`.
 3. **Strict Zero-Regression Guarantee**: Classical guided Pranayama and Fast-Paced Breath Counter remain completely unchanged and untangled.
+
+---
+
+## 11. Profile Initialization & Lifecycle Routing Invariants
+
+1. **Explicit Engine State Hydration**:
+   In `TimerEngine.loadProfile(profile)`, `if (profile.isMantraCountingEnabled)` is evaluated before timer typology branching. The engine immediately initializes `TimerSessionState` with `status = SessionStatus.IDLE`, `currentRound = 1`, `totalRounds = targetMalas`, and a non-null default `mantraUpdate = MantraUpdate(...)`. This eliminates stale profile retention (preventing Mindful Eating or Pranayama fallback when launching Mantra Counter).
+2. **Progression Tick Decoupling**:
+   In `TimerEngine.tickOneSecond()`, sessions with `profile.isMantraCountingEnabled` are intercepted immediately after `isBreathCountingEnabled`. Countdown and round progression are governed autonomously by `MantraCountManager`, preventing accidental dispatch into `tickPranayama()`.
+3. **Defensive Presentation Routing**:
+   In `SessionScreen.kt` (both Portrait and Landscape layouts), multi-interval dispatch checks `sessionState.isMantraCountingActive` directly, provisioning an instant non-null fallback `MantraUpdate` if the reactive flow hasn't emitted its first event. This strictly prevents the UI from falling through to `PranayamaPortraitContent`.
+4. **Home Screen Intent Categorization & Badging**:
+   In `ModernHomeScreenSample.kt`, the "Meditation" intent category includes `isMantraCountingEnabled`. Profiles resolve the dedicated Phosphor sparkle icon, `"SACRED JAPA"` subtitle, and bead badge (`"${targetBeads}b"`).
+
