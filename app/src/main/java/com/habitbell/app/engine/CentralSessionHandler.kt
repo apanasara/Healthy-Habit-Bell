@@ -102,6 +102,12 @@ class CentralSessionHandler(private val application: Application) {
 
     /** Breath stroke tracking orchestrator for Kapalabhati, Bhastrika, and Bhramari counting sessions. */
     val breathCountManager: com.habitbell.app.breath.BreathCountManager = com.habitbell.app.breath.BreathCountManager(application).apply {
+        acousticProvider.isAmbientMusicPlaying = {
+            bgMusicManager.isActivelyPlaying && !castManager.isCasting.value
+        }
+        acousticProvider.ambientMusicVolume = {
+            bgMusicManager.activeVolume
+        }
         onStrokeRegistered = { _, _ ->
             val profile = engine.state.value.profile
             val config = profile.breathCounterConfig
@@ -158,6 +164,12 @@ class CentralSessionHandler(private val application: Application) {
 
     /** Mantra and sacred verse recitation tracking orchestrator. */
     val mantraCountManager: com.habitbell.app.mantra.MantraCountManager = com.habitbell.app.mantra.MantraCountManager(application).apply {
+        acousticProvider.isAmbientMusicPlaying = {
+            bgMusicManager.isActivelyPlaying && !castManager.isCasting.value
+        }
+        acousticProvider.ambientMusicVolume = {
+            bgMusicManager.activeVolume
+        }
         onBeadRegistered = { bead, targetBeads, mala, cadenceCpm ->
             val profile = engine.state.value.profile
             val config = profile.mantraConfig
