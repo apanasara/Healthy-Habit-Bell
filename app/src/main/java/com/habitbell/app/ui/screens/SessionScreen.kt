@@ -19,7 +19,12 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -165,11 +170,31 @@ fun SessionScreen(
             )
         }
 
+        // TV Screen Mirroring Floating Orientation Action Pill auto-hide state.
+        // Ephemeral visibility flag controlling the floating orientation banner.
+        // Automatically fades out after 4 seconds (4000ms) or upon tapping close, preventing it from persistently
+        // obscuring the top action bar, menu controls, and session titles.
+        var isOrientationPillVisible by remember { mutableStateOf(false) }
+
+        // Automatically present the orientation pill when mirroring is active or when screen orientation changes,
+        // then cleanly fade it out after 4 seconds matching standard notification / toast lifecycle.
+        LaunchedEffect(isScreenMirroringActive, isLandscape) {
+            if (isScreenMirroringActive) {
+                isOrientationPillVisible = true
+                delay(4000L)
+                isOrientationPillVisible = false
+            } else {
+                isOrientationPillVisible = false
+            }
+        }
+
         // TV Screen Mirroring Floating Orientation Action Pill
         androidx.compose.animation.AnimatedVisibility(
-            visible = isScreenMirroringActive,
-            enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.slideInVertically { -it / 2 },
-            exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.slideOutVertically { -it / 2 },
+            visible = isScreenMirroringActive && isOrientationPillVisible,
+            enter = androidx.compose.animation.fadeIn(animationSpec = tween(durationMillis = 350)) +
+                androidx.compose.animation.slideInVertically(animationSpec = tween(durationMillis = 350)) { -it / 2 },
+            exit = androidx.compose.animation.fadeOut(animationSpec = tween(durationMillis = 500)) +
+                androidx.compose.animation.slideOutVertically(animationSpec = tween(durationMillis = 500)) { -it / 2 },
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .statusBarsPadding()
@@ -177,13 +202,13 @@ fun SessionScreen(
         ) {
             Surface(
                 shape = RoundedCornerShape(20.dp),
-                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.92f),
+                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.95f),
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.45f)),
                 shadowElevation = 6.dp,
                 modifier = Modifier.clickable { onToggleOrientation() }
             ) {
                 Row(
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+                    modifier = Modifier.padding(start = 14.dp, top = 6.dp, bottom = 6.dp, end = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
@@ -205,6 +230,18 @@ fun SessionScreen(
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(14.dp)
                     )
+                    // Quick-dismiss action button allowing the user to dismiss the pill immediately before the 4-second timeout
+                    IconButton(
+                        onClick = { isOrientationPillVisible = false },
+                        modifier = Modifier.size(20.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.Close,
+                            contentDescription = "Dismiss notification",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                            modifier = Modifier.size(13.dp)
+                        )
+                    }
                 }
             }
         }
@@ -287,20 +324,29 @@ private fun LandscapeSessionLayout(
                 )
             } else when (sessionState.profile.type) {
                 TimerType.MULTI_INTERVAL -> {
-                    if (sessionState.isMantraCountingActive && sessionState.mantraUpdate != null) {
+                    if (sessionState.isMantraCountingActive) {
+                        val activeMantra = sessionState.mantraUpdate ?: com.habitbell.app.mantra.MantraUpdate(
+                            technique = sessionState.profile.mantraConfig?.technique ?: com.habitbell.app.mantra.MantraTechnique.GAYATRI_MANTRA,
+                            targetBeads = sessionState.profile.mantraConfig?.targetBeads ?: 108,
+                            targetMalas = sessionState.profile.mantraConfig?.targetMalas ?: 1
+                        )
                         com.habitbell.app.ui.components.MantraCounterContent(
                             sessionState = sessionState,
-                            mantraUpdate = sessionState.mantraUpdate,
+                            mantraUpdate = activeMantra,
                             selectedInputSource = selectedMantraInputSource,
                             onSelectInputSource = onSelectMantraInputSource,
                             onSelectSensitivity = onSelectMantraMicSensitivity,
                             onSelectTechnique = onSelectMantraTechnique,
                             onManualBeadTap = onManualMantraBeadTap
                         )
-                    } else if (sessionState.isBreathCountingActive && sessionState.breathUpdate != null) {
+                    } else if (sessionState.isBreathCountingActive) {
+                        val activeBreath = sessionState.breathUpdate ?: com.habitbell.app.breath.BreathStrokeUpdate(
+                            targetRoundStrokes = sessionState.profile.breathCounterConfig?.strokesForRound(sessionState.currentRound) ?: 30,
+                            targetRounds = sessionState.profile.breathCounterConfig?.targetRounds ?: 3
+                        )
                         com.habitbell.app.ui.components.BreathCounterContent(
                             sessionState = sessionState,
-                            breathUpdate = sessionState.breathUpdate,
+                            breathUpdate = activeBreath,
                             selectedInputSource = selectedBreathInputSource,
                             onSelectInputSource = onSelectBreathInputSource,
                             onSelectSensitivity = onSelectBreathMicSensitivity,
@@ -578,7 +624,7 @@ private fun LandscapeSessionLayout(
                                 modifier = Modifier.size(13.dp)
                             )
                             Text(
-                                text = "Bite in ${sessionState.formattedNextBellTime}",
+                                text = if (sessionState.status == SessionStatus.IDLE) "Interval ${sessionState.formattedNextBellTime}" else "Bite in ${sessionState.formattedNextBellTime}",
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.primary
@@ -608,7 +654,7 @@ private fun LandscapeSessionLayout(
                         )
                     } else if (sessionState.profile.intervalDurationSeconds > 0) {
                         Text(
-                            text = "Bell in ${sessionState.formattedNextBellTime}",
+                            text = if (sessionState.status == SessionStatus.IDLE) "Interval ${sessionState.formattedNextBellTime}" else "Bell in ${sessionState.formattedNextBellTime}",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.primary
                         )
@@ -1009,20 +1055,29 @@ private fun PortraitSessionLayout(
                 }
 
                 TimerType.MULTI_INTERVAL -> {
-                    if (sessionState.isMantraCountingActive && sessionState.mantraUpdate != null) {
+                    if (sessionState.isMantraCountingActive) {
+                        val activeMantra = sessionState.mantraUpdate ?: com.habitbell.app.mantra.MantraUpdate(
+                            technique = sessionState.profile.mantraConfig?.technique ?: com.habitbell.app.mantra.MantraTechnique.GAYATRI_MANTRA,
+                            targetBeads = sessionState.profile.mantraConfig?.targetBeads ?: 108,
+                            targetMalas = sessionState.profile.mantraConfig?.targetMalas ?: 1
+                        )
                         com.habitbell.app.ui.components.MantraCounterContent(
                             sessionState = sessionState,
-                            mantraUpdate = sessionState.mantraUpdate,
+                            mantraUpdate = activeMantra,
                             selectedInputSource = selectedMantraInputSource,
                             onSelectInputSource = onSelectMantraInputSource,
                             onSelectSensitivity = onSelectMantraMicSensitivity,
                             onSelectTechnique = onSelectMantraTechnique,
                             onManualBeadTap = onManualMantraBeadTap
                         )
-                    } else if (sessionState.isBreathCountingActive && sessionState.breathUpdate != null) {
+                    } else if (sessionState.isBreathCountingActive) {
+                        val activeBreath = sessionState.breathUpdate ?: com.habitbell.app.breath.BreathStrokeUpdate(
+                            targetRoundStrokes = sessionState.profile.breathCounterConfig?.strokesForRound(sessionState.currentRound) ?: 30,
+                            targetRounds = sessionState.profile.breathCounterConfig?.targetRounds ?: 3
+                        )
                         com.habitbell.app.ui.components.BreathCounterContent(
                             sessionState = sessionState,
-                            breathUpdate = sessionState.breathUpdate,
+                            breathUpdate = activeBreath,
                             selectedInputSource = selectedBreathInputSource,
                             onSelectInputSource = onSelectBreathInputSource,
                             onSelectSensitivity = onSelectBreathMicSensitivity,
@@ -1275,7 +1330,7 @@ private fun MindfulEatingContent(
                             color = primaryColor
                         )
                         Text(
-                            text = "• CHEW & SAVOR",
+                            text = if (sessionState.status == SessionStatus.IDLE) "• READY TO EAT" else "• CHEW & SAVOR",
                             fontSize = 10.sp,
                             letterSpacing = 1.sp,
                             fontWeight = FontWeight.Medium,

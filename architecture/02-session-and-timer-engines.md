@@ -17,6 +17,12 @@ The central session coordinates transport controls and metadata across **6 disti
 5. **Google Cast TV Receivers**: Cast receiver streaming session state, animated countdowns, and progress rings via the native Google Cast Framework.
 6. **Smart TV Web Browsers**: Zero-cloud LAN web broadcast served by `LocalCastWebServer` on port `8888`.
 
+### Profile Preparation vs. Active Commencement
+`CentralSessionHandler` decouples session initialization from automatic execution:
+- **`loadProfile(profile: TimerProfile)`**: Initializes `TimerEngine` with profile duration, intervals, and postures in `SessionStatus.IDLE` ("Ready") state and updates `MediaSessionCompat` metadata without starting the countdown ticker or audio. Invoked when landing on the timer screen from the Home screen.
+- **`startProfile(profile: TimerProfile, skipPreparation: Boolean)`**: Invokes `loadProfile` and immediately calls `engine.startOrResume()`. Reserved for hands-free contexts such as Google Assistant voice actions and Android Auto direct selection.
+- **`togglePlayPause()`**: When called from `SessionStatus.IDLE`, seamlessly resumes execution, triggering the 5-second preparation countdown (if enabled) or entering active countdown.
+
 ---
 
 ## 2. Timer Engine & State Machine (`TimerEngine.kt`)

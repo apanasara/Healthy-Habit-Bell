@@ -89,6 +89,7 @@ Whenever an autonomous AI agent or engineer modifies, refactors, or extends a su
 ## 4. Cross-Cutting Architectural Guarantees
 
 - **Single Source of Truth**: `CentralSessionHandler` manages the lifecycle of the active session. All UI and automotive templates observe this state reactively.
+- **Manual Play Commencement**: Navigating from the Home dashboard to a timer session loads the profile in `SessionStatus.IDLE` ("Ready") state without auto-running countdown; practice execution begins strictly when the user triggers the Play control.
 - **Constant Ambient Volume Law (Requirement E2)**: Interval bells and session completion gongs layer additively over background music without requesting transient ducking audio focus.
 - **Hardware Volume Law (Requirement E7)**: The in-app volume slider directly governs active hardware volume (`STREAM_MUSIC` on mobile, `CastSession` on TV).
 - **Zero-Internet Guarantee**: Offline operation is guaranteed across timer execution, acoustic procedural synthesis, and local screen mirroring.

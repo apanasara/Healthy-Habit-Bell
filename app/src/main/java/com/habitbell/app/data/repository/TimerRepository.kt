@@ -270,6 +270,9 @@ class TimerRepository(private val context: Context) {
                     profile.copy(breathCounterConfig = com.habitbell.app.data.model.BreathCounterConfig.DEFAULT_BHRAMARI)
                 } ?: DefaultProfiles.BHRAMARI_COUNTER
             }
+            "mantra", "mantra-counter", "mantra-japa", "japa" -> {
+                _profiles.value.find { it.id == "mantra-japa-counter" } ?: DefaultProfiles.MANTRA_COUNTER
+            }
             else -> null
         }
     }
