@@ -304,6 +304,69 @@ class BreathCountManager(private val context: Context) {
     }
 
     /**
+     * Initiates the 3-second ambient room acoustic noise calibration window during pre-session preparation.
+     * Profiles stationary environmental noise (AC blower, wind, fan, leaves) in absolute silence
+     * while the user settles into posture, ensuring trigger thresholds are locked before active counting begins.
+     *
+     * @param config Active configuration determining target rounds, strokes, and sensitivity.
+     * @param durationSec Duration of the silent room profiling window in seconds (default 3s).
+     */
+    fun startPreparationCalibration(config: BreathCounterConfig, durationSec: Int = 3) {
+        activeConfig = config
+        countdownJob?.cancel()
+
+        if (config.defaultInputMode == BreathInputSourceType.ACOUSTIC_MIC && acousticProvider.isAvailable) {
+            selectInputSource(BreathInputSourceType.ACOUSTIC_MIC)
+        } else if (config.defaultInputMode == BreathInputSourceType.MANUAL_TAP) {
+            selectInputSource(BreathInputSourceType.MANUAL_TAP)
+        }
+
+        val initialTarget = config.strokesForRound(1)
+        val isAcoustic = _selectedInputSource.value == BreathInputSourceType.ACOUSTIC_MIC && acousticProvider.isAvailable
+
+        if (isAcoustic) {
+            _strokeFlow.value = BreathStrokeUpdate(
+                currentRoundStrokes = 0,
+                targetRoundStrokes = initialTarget,
+                totalSessionStrokes = 0,
+                currentRound = 1,
+                targetRounds = config.targetRounds,
+                cadenceBpm = 0,
+                currentPhase = BreathCounterPhase.PREPARATION,
+                phaseRemainingSeconds = durationSec,
+                phaseDurationSeconds = durationSec,
+                thresholdRms = 0.05f,
+                micSensitivity = config.micSensitivity,
+                isCalibrating = true
+            )
+            onPhaseChanged?.invoke(BreathCounterPhase.PREPARATION)
+
+            getSourceForType(BreathInputSourceType.ACOUSTIC_MIC).start(config)
+
+            countdownJob = scope.launch {
+                var remaining = durationSec
+                while (remaining > 0 && isActive) {
+                    delay(1000L)
+                    remaining--
+                    _strokeFlow.update { it.copy(phaseRemainingSeconds = remaining) }
+                }
+                if (isActive) {
+                    blankAcousticDetection(500L)
+                    _strokeFlow.update {
+                        it.copy(
+                            currentPhase = BreathCounterPhase.STROKES,
+                            phaseRemainingSeconds = 0,
+                            phaseDurationSeconds = 0,
+                            isCalibrating = false
+                        )
+                    }
+                    onPhaseChanged?.invoke(BreathCounterPhase.STROKES)
+                }
+            }
+        }
+    }
+
+    /**
      * Initializes and starts a new breath counting session.
      *
      * When using [BreathInputSourceType.ACOUSTIC_MIC], executes an initial 3-second
@@ -315,7 +378,6 @@ class BreathCountManager(private val context: Context) {
      */
     fun startSession(config: BreathCounterConfig) {
         activeConfig = config
-        countdownJob?.cancel()
 
         // Apply config's preferred input mode if available
         if (config.defaultInputMode == BreathInputSourceType.ACOUSTIC_MIC && acousticProvider.isAvailable) {
@@ -326,6 +388,18 @@ class BreathCountManager(private val context: Context) {
 
         val initialTarget = config.strokesForRound(1)
         val isAcoustic = _selectedInputSource.value == BreathInputSourceType.ACOUSTIC_MIC && acousticProvider.isAvailable
+
+        // If already calibrated during pre-session preparation, transition directly into STROKES
+        if (isAcoustic && !_strokeFlow.value.isCalibrating && _strokeFlow.value.currentPhase == BreathCounterPhase.STROKES) {
+            Log.i("BreathCountManager", "Session commencing: already pre-calibrated during preparation countdown")
+            return
+        }
+        if (isAcoustic && _strokeFlow.value.isCalibrating) {
+            Log.i("BreathCountManager", "Session commencing: room calibration in progress (${_strokeFlow.value.phaseRemainingSeconds}s remaining)")
+            return
+        }
+
+        countdownJob?.cancel()
 
         if (isAcoustic) {
             val calibrationDurationSec = 3

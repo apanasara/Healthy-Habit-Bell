@@ -80,6 +80,15 @@ class PreparationVoiceGuide(
     /** Master gain factor for preparation voice cue playback (normalized 0.15f..1.0f). Default 0.52f. */
     var voiceVolume: Float = 0.52f
 
+    /**
+     * Master toggle indicating whether room acoustic noise calibration is active during preparation.
+     * When true, all countdown chime strikes (3, 2, 1) and spoken numeric cues ("Three", "Two", "One")
+     * are strictly silenced during seconds 1..3 to prevent loudspeaker self-feedback from corrupting
+     * the ambient microphone noise floor measurement. The initial vocal cue at T=5s ("Take your position")
+     * is preserved.
+     */
+    var isAcousticCalibrationActive: Boolean = false
+
     init {
         try {
             tts = TextToSpeech(context.applicationContext, this)
@@ -194,6 +203,15 @@ class PreparationVoiceGuide(
      */
     fun playPreparationCue(secondsRemaining: Int) {
         if (!isVoiceEnabled) return
+
+        // Strict Acoustic Silence Protocol: If acoustic room noise calibration is active during preparation,
+        // suppress all countdown chime strikes (3, 2, 1) and spoken numeric cues ("Three", "Two", "One")
+        // to maintain 100% acoustic silence so the microphone can accurately sample room noise floor
+        // without loudspeaker self-feedback.
+        if (isAcousticCalibrationActive && secondsRemaining in 1..3) {
+            Log.d(TAG, "Suppressed preparation cue & chime at T=${secondsRemaining}s to preserve acoustic silence for room scanning")
+            return
+        }
 
         playbackJob?.cancel()
         playbackJob = scope.launch {
@@ -329,6 +347,7 @@ class PreparationVoiceGuide(
     fun stop() {
         playbackJob?.cancel()
         playbackJob = null
+        isAcousticCalibrationActive = false
         stopActiveMediaPlayer()
         try {
             if (tts?.isSpeaking == true) {

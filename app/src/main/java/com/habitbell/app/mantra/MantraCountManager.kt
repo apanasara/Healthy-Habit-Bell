@@ -217,14 +217,14 @@ class MantraCountManager(
     }
 
     /**
-     * Initializes and starts a new mantra recitation session.
-     * When using [MantraInputSourceType.ACOUSTIC_MIC], executes an initial 3-second
-     * ambient calibration silent pause to profile room noise (AC, fan, wind) and establish
-     * dynamic speech formant thresholds before bead counting starts.
+     * Initiates the 3-second ambient room acoustic noise calibration window during pre-session preparation.
+     * Profiles stationary environmental noise (AC, fan, wind) in absolute silence while establishing
+     * speech formant trigger thresholds before active recitation counting begins.
      *
      * @param config Active configuration determining target Malas, beads, and sensitivity.
+     * @param durationSec Duration of the silent room profiling window in seconds (default 3s).
      */
-    fun startSession(config: MantraCounterConfig) {
+    fun startPreparationCalibration(config: MantraCounterConfig, durationSec: Int = 3) {
         activeConfig = config
         countdownJob?.cancel()
 
@@ -235,6 +235,78 @@ class MantraCountManager(
         }
 
         val isAcoustic = _selectedInputSource.value == MantraInputSourceType.ACOUSTIC_MIC && acousticProvider.isAvailable
+
+        if (isAcoustic) {
+            _mantraFlow.value = MantraUpdate(
+                currentBead = 0,
+                targetBeads = config.targetBeads,
+                currentMala = 1,
+                targetMalas = config.targetMalas,
+                totalSessionChants = 0,
+                cadenceCpm = 0,
+                audioAmplitudeRms = 0f,
+                thresholdRms = 0.05f,
+                isReciting = false,
+                activeVerseDurationSeconds = 0f,
+                micSensitivity = config.micSensitivity,
+                isCalibrating = true,
+                calibrationSecondsRemaining = durationSec,
+                technique = config.technique,
+                isCompleted = false
+            )
+
+            getSourceForType(_selectedInputSource.value).start(config)
+
+            countdownJob = scope.launch {
+                var remaining = durationSec
+                while (remaining > 0 && isActive) {
+                    delay(1000L)
+                    remaining--
+                    _mantraFlow.update { it.copy(calibrationSecondsRemaining = remaining) }
+                }
+                if (isActive) {
+                    blankAcousticDetection(500L)
+                    _mantraFlow.update {
+                        it.copy(
+                            isCalibrating = false,
+                            calibrationSecondsRemaining = 0
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Initializes and starts a new mantra recitation session.
+     * When using [MantraInputSourceType.ACOUSTIC_MIC], executes an initial 3-second
+     * ambient calibration silent pause to profile room noise (AC, fan, wind) and establish
+     * dynamic speech formant thresholds before bead counting starts.
+     *
+     * @param config Active configuration determining target Malas, beads, and sensitivity.
+     */
+    fun startSession(config: MantraCounterConfig) {
+        activeConfig = config
+
+        if (config.defaultInputMode == MantraInputSourceType.ACOUSTIC_MIC && acousticProvider.isAvailable) {
+            selectInputSource(MantraInputSourceType.ACOUSTIC_MIC)
+        } else if (config.defaultInputMode == MantraInputSourceType.MANUAL_BEAD_TAP) {
+            selectInputSource(MantraInputSourceType.MANUAL_BEAD_TAP)
+        }
+
+        val isAcoustic = _selectedInputSource.value == MantraInputSourceType.ACOUSTIC_MIC && acousticProvider.isAvailable
+
+        // If already calibrated during preparation countdown, continue directly into recitation
+        if (isAcoustic && !_mantraFlow.value.isCalibrating && _mantraFlow.value.currentMala == 1 && _mantraFlow.value.currentBead == 0 && _mantraFlow.value.calibrationSecondsRemaining == 0 && _mantraFlow.value.targetBeads == config.targetBeads) {
+            Log.i("MantraCountManager", "Session commencing: already pre-calibrated during preparation countdown")
+            return
+        }
+        if (isAcoustic && _mantraFlow.value.isCalibrating) {
+            Log.i("MantraCountManager", "Session commencing: room calibration in progress (${_mantraFlow.value.calibrationSecondsRemaining}s remaining)")
+            return
+        }
+
+        countdownJob?.cancel()
 
         if (isAcoustic) {
             val calibrationDurationSec = 3

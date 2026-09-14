@@ -288,7 +288,7 @@ class CentralSessionHandler(private val application: Application) {
     private fun setupBreathCountListener() {
         scope.launch {
             breathCountManager.strokeFlow.collect { strokeUpdate ->
-                if (engine.state.value.status == SessionStatus.RUNNING) {
+                if (engine.state.value.status == SessionStatus.RUNNING || engine.state.value.status == SessionStatus.PREPARING) {
                     engine.onBreathStrokeUpdated(strokeUpdate)
                 }
             }
@@ -423,6 +423,30 @@ class CentralSessionHandler(private val application: Application) {
                 val statusChanged = state.status != lastStatus
                 val elapsedMs = ((state.totalSeconds - state.remainingSeconds) * 1000L).coerceAtLeast(0L)
 
+                // 1. Coordinate pre-session acoustic room noise calibration during PREPARING
+                if (state.status == SessionStatus.PREPARING) {
+                    val isBreathAcoustic = state.profile.isBreathCountingEnabled &&
+                        (breathCountManager.selectedInputSource.value == com.habitbell.app.breath.BreathInputSourceType.ACOUSTIC_MIC && breathCountManager.acousticProvider.isAvailable)
+                    val isMantraAcoustic = state.profile.isMantraCountingEnabled &&
+                        (mantraCountManager.selectedInputSource.value == com.habitbell.app.mantra.MantraInputSourceType.ACOUSTIC_MIC && mantraCountManager.acousticProvider.isAvailable)
+
+                    preparationVoiceGuide.isAcousticCalibrationActive = isBreathAcoustic || isMantraAcoustic
+
+                    // Initiate the 3-second silent room sound scanning window during T=3s..1s of preparation
+                    if (state.preparationSecondsRemaining in 1..3) {
+                        if (isBreathAcoustic && !breathCountManager.strokeFlow.value.isCalibrating && breathCountManager.strokeFlow.value.currentPhase != com.habitbell.app.breath.BreathCounterPhase.STROKES) {
+                            state.profile.breathCounterConfig?.let { bConfig ->
+                                breathCountManager.startPreparationCalibration(bConfig, durationSec = state.preparationSecondsRemaining)
+                            }
+                        }
+                        if (isMantraAcoustic && !mantraCountManager.mantraFlow.value.isCalibrating) {
+                            state.profile.mantraConfig?.let { mConfig ->
+                                mantraCountManager.startPreparationCalibration(mConfig, durationSec = state.preparationSecondsRemaining)
+                            }
+                        }
+                    }
+                }
+
                 if (statusChanged) {
                     lastStatus = state.status
                     when (state.status) {
@@ -435,6 +459,7 @@ class CentralSessionHandler(private val application: Application) {
                             startMediaService()
                         }
                         SessionStatus.RUNNING -> {
+                            preparationVoiceGuide.isAcousticCalibrationActive = false
                             updatePlaybackState(PlaybackStateCompat.STATE_PLAYING, elapsedMs)
                             updateMetadata(state.profile)
                             batteryOptimizer.acquireWakeLock()
@@ -532,6 +557,7 @@ class CentralSessionHandler(private val application: Application) {
                             }
                         }
                         SessionStatus.IDLE -> {
+                            preparationVoiceGuide.isAcousticCalibrationActive = false
                             updatePlaybackState(PlaybackStateCompat.STATE_STOPPED, 0L)
                             batteryOptimizer.releaseWakeLock()
                             displayAutomationManager.stopMonitoring()
