@@ -126,4 +126,51 @@ class TimerEngineTest {
         org.junit.Assert.assertFalse(alertState.isDimmed)
         assertTrue(alertState.isVisualAlertActive)
     }
+
+    /**
+     * Verifies that [com.habitbell.app.engine.TimerEngine.loadProfile] correctly transitions from Mindful Eating
+     * or Pranayama to the Mantra & Sacred Verse Counter without stale state fallback.
+     */
+    @Test
+    fun testTimerEngineLoadProfileMantraTransitions() {
+        val engine = com.habitbell.app.engine.TimerEngine()
+
+        // 1. Initial load with Eating profile (default cold start state)
+        engine.loadProfile(DefaultProfiles.EATING)
+        assertEquals("eating-mindful-20", engine.state.value.profile.id)
+        org.junit.Assert.assertFalse(engine.state.value.isMantraCountingActive)
+
+        // 2. Transition to Mantra Counter - MUST replace eating profile with mantra profile!
+        engine.loadProfile(DefaultProfiles.MANTRA_COUNTER)
+        assertEquals("mantra-japa-counter", engine.state.value.profile.id)
+        assertTrue(engine.state.value.isMantraCountingActive)
+        assertNotNull(engine.state.value.mantraUpdate)
+        assertEquals(108, engine.state.value.mantraUpdate?.targetBeads)
+        assertEquals(com.habitbell.app.mantra.MantraTechnique.GAYATRI_MANTRA, engine.state.value.mantraUpdate?.technique)
+
+        // 3. Transition to Pranayama, then back to Mantra Counter
+        engine.loadProfile(DefaultProfiles.PRANAYAMA_HATHA)
+        assertEquals("pranayama-hatha-classical", engine.state.value.profile.id)
+        org.junit.Assert.assertFalse(engine.state.value.isMantraCountingActive)
+
+        engine.loadProfile(DefaultProfiles.MANTRA_COUNTER)
+        assertEquals("mantra-japa-counter", engine.state.value.profile.id)
+        assertTrue(engine.state.value.isMantraCountingActive)
+        assertNotNull(engine.state.value.mantraUpdate)
+    }
+
+    /**
+     * Verifies that [com.habitbell.app.engine.TimerEngine.tickOneSecond] executes safely during an active mantra session
+     * without delegating to Pranayama phase transitions.
+     */
+    @Test
+    fun testTimerEngineTickOneSecondWithMantraProfile() {
+        val engine = com.habitbell.app.engine.TimerEngine()
+        engine.loadProfile(DefaultProfiles.MANTRA_COUNTER)
+        engine.tickOneSecond()
+
+        assertEquals("mantra-japa-counter", engine.state.value.profile.id)
+        assertTrue(engine.state.value.isMantraCountingActive)
+        assertEquals(SessionStatus.IDLE, engine.state.value.status)
+    }
 }

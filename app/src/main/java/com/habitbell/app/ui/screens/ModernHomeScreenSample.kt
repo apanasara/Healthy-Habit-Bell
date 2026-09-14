@@ -480,7 +480,7 @@ private fun ModernProfileRow(
                         }
                         profile.type == TimerType.MULTI_INTERVAL -> "EQUALIZED BREATH"
                         profile.type == TimerType.COMPOUND -> "ASANA FLOW"
-                        else -> profile.category.uppercase()
+                        else -> "MINDFULNESS"
                     }
                     Text(
                         text = subtitle,

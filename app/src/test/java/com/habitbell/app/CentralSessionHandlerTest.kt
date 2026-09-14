@@ -98,7 +98,8 @@ class CentralSessionHandlerTest {
                 (lower.contains("pranayam") && it.id.contains("pranayama")) ||
                 (lower.contains("breath") && it.id.contains("breath-counter")) ||
                 (lower.contains("kriya") && it.id.contains("breath-counter")) ||
-                (lower.contains("kapalabhati") && it.id.contains("breath-counter"))
+                (lower.contains("kapalabhati") && it.id.contains("breath-counter")) ||
+                ((lower.contains("mantra") || lower.contains("japa") || lower.contains("gayatri")) && it.id.contains("mantra"))
             )
         }
 
@@ -113,6 +114,9 @@ class CentralSessionHandlerTest {
 
         val breathMatch = matchVoice("start breathwork counter")
         assertEquals(DefaultProfiles.BREATH_COUNTER, breathMatch)
+
+        val mantraMatch = matchVoice("start gayatri mantra japa")
+        assertEquals(DefaultProfiles.MANTRA_COUNTER, mantraMatch)
     }
 
     /**
