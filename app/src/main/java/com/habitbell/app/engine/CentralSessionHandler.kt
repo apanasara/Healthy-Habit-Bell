@@ -323,6 +323,8 @@ class CentralSessionHandler(private val application: Application) {
                 if (isCasting) {
                     val state = engine.state.value
                     if (state.status == SessionStatus.RUNNING) {
+                        // Hand off ambient music to TV receiver, pausing mobile phone output to prevent acoustic echo
+                        bgMusicManager.pause()
                         lastCastProfileId = state.profile.id
                         val subtitle = buildSessionSubtitle(state)
                         val artwork = resolveArtworkForProfile(state.profile)
@@ -336,6 +338,12 @@ class CentralSessionHandler(private val application: Application) {
                     // Always push initial telemetry snapshot immediately to TV receiver
                     val initialTelemetry = buildCastTelemetryJson(state)
                     castManager.sendCustomMessage(initialTelemetry)
+                } else {
+                    // Reclaim ambient audio onto mobile phone if session is running and TV disconnects
+                    val state = engine.state.value
+                    if (state.status == SessionStatus.RUNNING && !state.isPreparing) {
+                        bgMusicManager.start()
+                    }
                 }
             }
         }
@@ -421,7 +429,11 @@ class CentralSessionHandler(private val application: Application) {
                             batteryOptimizer.acquireWifiLock()
                             displayAutomationManager.startMonitoring()
                             bluetoothDisconnectionManager.startMonitoring()
-                            bgMusicManager.start()
+                            if (!castManager.isCasting.value) {
+                                bgMusicManager.start()
+                            } else {
+                                bgMusicManager.pause()
+                            }
                             startMediaService()
 
                             if (state.profile.isStepTrackingEnabled) {
@@ -683,6 +695,14 @@ class CentralSessionHandler(private val application: Application) {
         json.put("formattedStepCount", state.formattedStepCount)
         json.put("formattedCadence", state.formattedCadence)
         json.put("nextStepBellSteps", state.nextStepBellSteps ?: 0)
+
+        // Ambient background music telemetry (ad-free YouTube streaming, sound source, and volume)
+        json.put("bgMusicType", bgMusicManager.soundType.name)
+        json.put("bgMusicEnabled", bgMusicManager.isEnabled)
+        val ytVideoId = bgMusicManager.extractVideoId(bgMusicManager.youtubeUrl) ?: "x6UITRjhijI"
+        json.put("youtubeVideoId", ytVideoId)
+        json.put("youtubeUrl", bgMusicManager.youtubeUrl)
+        json.put("bgMusicVolume", bgMusicManager.volume.toDouble())
 
         json.put("triggerBell", triggerBell)
         json.put("bellFrequency", bellFrequency)

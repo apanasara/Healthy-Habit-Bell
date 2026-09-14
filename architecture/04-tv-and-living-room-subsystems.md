@@ -25,9 +25,15 @@ Habit Bell treats the living room as a primary sanctuary for mindfulness, medita
   - Decouples Cast player state from false pause events: In `RemoteMediaClient.Callback`, transient states (`PLAYER_STATE_BUFFERING`, `PLAYER_STATE_LOADING`, `PLAYER_STATE_IDLE`, `PLAYER_STATE_UNKNOWN`) are explicitly ignored. Only genuine user transitions (`PLAYER_STATE_PLAYING` and `PLAYER_STATE_PAUSED`) dispatch to `onRemotePlaybackAction`.
   - Implements `isDispatchingLocally` volatile re-entrancy flags on `loadSession`, `play()`, `pause()`, and `stop()` to eliminate echo feedback loops between mobile commands and Cast listener callbacks.
   - Implements `lastCastProfileId` tracking in `CentralSessionHandler` so resuming from pause calls `castManager.play()` rather than reloading the stream from zero, preventing continuous buffering cycles.
-- **Profile-Specific Mindful Artwork & LAN Audio Streaming (FLAW-1)**:
-  - Replaced external Pixabay CDN audio URLs with high-fidelity, zero-cloud LAN streaming of `tv/aum.mp3` served directly by `LocalCastWebServer` on port `8888`.
+- **Profile-Specific Mindful Artwork & Ad-Free Ambient YouTube Audio**:
+  - Replaced legacy external Pixabay fallback stream (`DEFAULT_FALLBACK_STREAM_URL`) with direct embedded YouTube audio playback in the Custom Web Receiver.
+  - When the Custom Web Receiver is active (`isCustomReceiver == true`), `HabitBellCastManager.loadSession()` bypasses CAF v3 `client.load(requestData)`, preventing the Google Cast Default Media Player from playing external dummy tracks or Pixabay MP3 overlays on top of the TV meditation visualizer.
   - Dynamically binds session-specific high-resolution artwork (Sacred Lotus for Pranayama, Golden Dawn for Surya Namaskar, Mindful Eating Bowl, Forest Walk Path) tailored to the active profile.
+- **Mobile-to-TV Anti-Echo Audio Handover Protocol**:
+  - To prevent acoustic phase interference and double-sound echo in the living room, `CentralSessionHandler` suspends mobile phone background music (`bgMusicManager.pause()`) when Google Cast is actively connected (`isCasting == true`).
+  - The TV receiver takes full ownership of the acoustic soundscape, streaming the user's configured YouTube meditation audio or procedural chimes through the living room sound system.
+  - If the Cast session disconnects while a session is running, `CentralSessionHandler` automatically resumes mobile phone background music (`bgMusicManager.start()`), providing continuous, uninterrupted practice.
+  - Real-time parameter changes (adjusting ambient volume, toggling background audio, or updating YouTube URL in the Settings drawer) are immediately synchronized to the TV over the Cast message bus without restarting the timer.
 - **`CastButton.kt`**: Jetpack Compose-native Cast button wrapping AndroidX MediaRouter's `MediaRouteButton` to display discovery states and trigger device selection dialogs.
 - **Host Activity Architecture**: `MainActivity` inherits from `androidx.fragment.app.FragmentActivity` to provide the `FragmentManager` required by `MediaRouteButton` to display native Google Cast route picker dialogs across all Android platforms without runtime crashes.
 - **`HabitBellChooserDialogFragment` & `HabitBellControllerDialogFragment`**: Public top-level subclasses of `MediaRouteChooserDialogFragment` and `MediaRouteControllerDialogFragment` implementing zero-arg public constructors and theme bundle arguments (`HabitBellMediaRouteTheme_Dark` / `Light`). This strictly complies with Android's `FragmentManager` contract and prevents `IllegalStateException: Fragment ... must be a public static class` crashes upon Cast icon taps.
@@ -128,6 +134,14 @@ Habit Bell treats the living room as a primary sanctuary for mindfulness, medita
   - Receiver emits `{ type: 'ready' }` upon startup and sender connection, triggering immediate session snapshot synchronization.
   - Binds telemetry push to `castManager.isCasting.collect` regardless of session running status, instantly updating the TV from standby to active profile preview.
   - Remote key events and web receiver clicks (`{ type: 'reset' }`, play/pause) route directly to `HabitBellCastManager` and `CentralSessionHandler`.
+  - **Extended Telemetry Schema**: Transmits `bgMusicType` (e.g. `YOUTUBE_LINK`), `bgMusicEnabled` (`boolean`), `youtubeVideoId` (extracted 11-char ID, defaults to `x6UITRjhijI`), `youtubeUrl`, and `bgMusicVolume` (`0.0f..1.0f`).
+- **Embedded Ad-Free Headless YouTube Audio Engine**:
+  - Embedded offscreen `#ytAudioPlayerContainer` hosting a sandboxed YouTube IFrame player (`https://www.youtube.com/iframe_api`).
+  - Streams the user's configured/default YouTube meditation track (`https://youtu.be/x6UITRjhijI`) directly through the TV receiver hardware.
+  - Automatic 500ms ad-skipping interval detects and clears preroll/midroll ad overlays.
+  - Automatic infinite looping triggers replay on track end (`YT.PlayerState.ENDED`), matching prolonged mindfulness sessions.
+  - Synchronous play/pause state mapping: Timer running states automatically play the audio; pause or idle transitions pause the player; volume level dynamically tracks mobile slider settings (0–100%).
+  - Immediate local response: Receiver play/pause buttons and physical TV remote keys (MediaPlay, MediaPause, MediaPlayPause) toggle playback immediately and send back control intents to the Android sender.
 - **Zero-Bandwidth In-Memory Web Audio Synthesis**:
   - Synthesizes authentic Tibetan singing bowl chimes directly inside TV browser hardware via HTML5 `AudioContext` (432 Hz fundamental sine wave with 2.76 overtone at 1192.3 Hz).
 - **Prolonged Session Anti-Sleep Guard**:

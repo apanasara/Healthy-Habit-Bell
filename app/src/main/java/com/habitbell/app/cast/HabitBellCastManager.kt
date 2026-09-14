@@ -61,9 +61,6 @@ class HabitBellCastManager private constructor(private val context: Context) {
         /** Custom Cast Message Bus namespace for Habit Bell live telemetry and control. */
         const val CUSTOM_NAMESPACE = "urn:x-cast:com.habitbell.cast"
 
-        /** Fallback online ambient stream if local server is unreachable. */
-        const val DEFAULT_FALLBACK_STREAM_URL = "https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3?filename=meditation-bowl-ambient-60s.mp3"
-
         @Volatile
         private var INSTANCE: HabitBellCastManager? = null
 
@@ -326,8 +323,13 @@ class HabitBellCastManager private constructor(private val context: Context) {
     /**
      * Loads a wellness session onto the TV's Google Cast receiver.
      *
-     * Configures title, subtitle, duration, and high-resolution mindful artwork
-     * for display on the TV receiver.
+     * In Custom Web Receiver mode ([CastOptionsProvider.customReceiverAppId] != null), all visual
+     * screens and audio playback (ad-free ambient YouTube audio streaming and Tibetan singing bowl
+     * chimes) are natively rendered and orchestrated directly on the web receiver via telemetry
+     * dispatches across [CUSTOM_NAMESPACE]. Calling [RemoteMediaClient.load] is intentionally bypassed
+     * to eliminate random external media or video playback.
+     *
+     * In Default Media Receiver mode fallback, loads the session metadata with LAN-hosted audio.
      *
      * @param profileName Name of the active mindfulness routine (e.g., "Pranayama (Hatha Yoga)").
      * @param subtitle Explanatory subtitle (e.g., "Round 1/12 • 4:16:8:16").
@@ -342,6 +344,16 @@ class HabitBellCastManager private constructor(private val context: Context) {
         streamUrl: String? = null,
         artworkUrl: String? = null
     ) {
+        val isCustomReceiver = CastOptionsProvider.customReceiverAppId != null
+        if (isCustomReceiver) {
+            // The Custom Web Receiver (docs/index.html) renders the full landscape UI
+            // and streams ambient YouTube audio directly via its embedded YouTube IFrame API engine.
+            // Do NOT call client.load() with dummy fallback audio which would cause CAF v3
+            // to play random audio tracks or display media player overlays on the TV.
+            Log.i(TAG, "Custom Web Receiver is active for '$profileName'. Audio and UI are managed directly via receiver telemetry.")
+            return
+        }
+
         val client = currentCastSession?.remoteMediaClient ?: return
 
         isDispatchingLocally = true
@@ -355,32 +367,31 @@ class HabitBellCastManager private constructor(private val context: Context) {
                 addImage(WebImage(Uri.parse(finalArtwork)))
             }
 
-            // Custom Web Receiver is hosted via HTTPS (GitHub Pages). Insecure HTTP media streams
-            // will be blocked by Chromium's mixed-content security policy.
-            val isCustomReceiver = CastOptionsProvider.customReceiverAppId != null
             val localServer = LocalCastWebServer(context)
             val localIp = localServer.getLocalIpAddress()
-            val mediaUrl = streamUrl ?: if (!isCustomReceiver && localIp != null) {
+            val mediaUrl = streamUrl ?: if (localIp != null) {
                 "http://$localIp:8888/media/aum.mp3"
             } else {
-                DEFAULT_FALLBACK_STREAM_URL
+                null
             }
 
-            val mediaInfo = MediaInfo.Builder(mediaUrl)
-                .setStreamType(MediaInfo.STREAM_TYPE_BUFFERED)
-                .setContentType("audio/mp3")
-                .setMetadata(movieMetadata)
-                .setStreamDuration(durationSeconds * 1000L)
-                .build()
+            if (mediaUrl != null) {
+                val mediaInfo = MediaInfo.Builder(mediaUrl)
+                    .setStreamType(MediaInfo.STREAM_TYPE_BUFFERED)
+                    .setContentType("audio/mp3")
+                    .setMetadata(movieMetadata)
+                    .setStreamDuration(durationSeconds * 1000L)
+                    .build()
 
-            val requestData = MediaLoadRequestData.Builder()
-                .setMediaInfo(mediaInfo)
-                .setAutoplay(true)
-                .setCurrentTime(0L)
-                .build()
+                val requestData = MediaLoadRequestData.Builder()
+                    .setMediaInfo(mediaInfo)
+                    .setAutoplay(true)
+                    .setCurrentTime(0L)
+                    .build()
 
-            client.load(requestData)
-            Log.i(TAG, "Loaded session '$profileName' onto Google Cast TV (mediaUrl=$mediaUrl)")
+                client.load(requestData)
+                Log.i(TAG, "Loaded session '$profileName' onto Google Default Media Receiver (mediaUrl=$mediaUrl)")
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to load session onto Google Cast TV", e)
         } finally {
@@ -393,10 +404,16 @@ class HabitBellCastManager private constructor(private val context: Context) {
 
     /**
      * Directs the connected TV receiver to resume playback.
+     * Propagates playback state both to [RemoteMediaClient] and across [CUSTOM_NAMESPACE]
+     * for immediate local response on the Custom Web Receiver's YouTube audio player.
      */
     fun play() {
         isDispatchingLocally = true
         currentCastSession?.remoteMediaClient?.play()
+        try {
+            val payload = JSONObject().apply { put("type", "play") }
+            sendCustomMessage(payload.toString())
+        } catch (_: Exception) {}
         scope.launch {
             delay(600)
             isDispatchingLocally = false
@@ -405,10 +422,16 @@ class HabitBellCastManager private constructor(private val context: Context) {
 
     /**
      * Directs the connected TV receiver to pause playback.
+     * Propagates paused state both to [RemoteMediaClient] and across [CUSTOM_NAMESPACE]
+     * for immediate local response on the Custom Web Receiver's YouTube audio player.
      */
     fun pause() {
         isDispatchingLocally = true
         currentCastSession?.remoteMediaClient?.pause()
+        try {
+            val payload = JSONObject().apply { put("type", "pause") }
+            sendCustomMessage(payload.toString())
+        } catch (_: Exception) {}
         scope.launch {
             delay(600)
             isDispatchingLocally = false

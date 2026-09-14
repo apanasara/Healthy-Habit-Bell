@@ -1124,8 +1124,12 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
         bgMusicManager.isEnabled = enabled
         if (!enabled) {
             bgMusicManager.stop()
-        } else if (sessionState.value.status == SessionStatus.RUNNING) {
+        } else if (sessionState.value.status == SessionStatus.RUNNING && !castManager.isCasting.value) {
             bgMusicManager.start()
+        }
+        if (castManager.isCasting.value) {
+            val telemetry = sessionHandler.buildCastTelemetryJson(sessionState.value)
+            castManager.sendCustomMessage(telemetry)
         }
         saveSettings()
     }
@@ -1138,8 +1142,12 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
     fun setBgMusicType(type: BackgroundSoundType) {
         _uiState.update { it.copy(bgMusicType = type) }
         bgMusicManager.soundType = type
-        if (sessionState.value.status == SessionStatus.RUNNING) {
+        if (sessionState.value.status == SessionStatus.RUNNING && !castManager.isCasting.value) {
             bgMusicManager.start()
+        }
+        if (castManager.isCasting.value) {
+            val telemetry = sessionHandler.buildCastTelemetryJson(sessionState.value)
+            castManager.sendCustomMessage(telemetry)
         }
         saveSettings()
     }
@@ -1160,8 +1168,12 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
         }
         bgMusicManager.customAudioUri = uriStr
         bgMusicManager.soundType = BackgroundSoundType.CUSTOM_FILE
-        if (sessionState.value.status == SessionStatus.RUNNING) {
+        if (sessionState.value.status == SessionStatus.RUNNING && !castManager.isCasting.value) {
             bgMusicManager.start()
+        }
+        if (castManager.isCasting.value) {
+            val telemetry = sessionHandler.buildCastTelemetryJson(sessionState.value)
+            castManager.sendCustomMessage(telemetry)
         }
         saveSettings()
     }
@@ -1189,6 +1201,9 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
      * Sets a YouTube meditation video link for ad-free background streaming, activating
      * ambient background music and persisting the selection.
      *
+     * In Chromecast mode, immediately broadcasts the updated YouTube stream identifier
+     * across the Google Cast telemetry bus for ad-free TV audio playback.
+     *
      * @param url Full YouTube video URL or ID (canonical shortest URL preferred).
      */
     fun setBgMusicYouTubeUrl(url: String) {
@@ -1202,8 +1217,12 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
         bgMusicManager.isEnabled = true
         bgMusicManager.youtubeUrl = url
         bgMusicManager.soundType = BackgroundSoundType.YOUTUBE_LINK
-        if (sessionState.value.status == SessionStatus.RUNNING) {
+        if (sessionState.value.status == SessionStatus.RUNNING && !castManager.isCasting.value) {
             bgMusicManager.start()
+        }
+        if (castManager.isCasting.value) {
+            val telemetry = sessionHandler.buildCastTelemetryJson(sessionState.value)
+            castManager.sendCustomMessage(telemetry)
         }
         saveSettings()
     }
