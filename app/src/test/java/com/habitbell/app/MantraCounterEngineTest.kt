@@ -419,18 +419,18 @@ class MantraCounterEngineTest {
         provider.ambientMusicVolume = { 1.0f }
         assertEquals(0.0f, provider.getAmbientMusicSafetyMargin(), 0.0001f)
 
-        // 2. When background music is active at unity gain (1.0f) -> 0.045f margin (0.020 + 0.025)
+        // 2. When background music is active at unity gain (1.0f) -> 0.008f margin (1.0 * 0.008)
         provider.isAmbientMusicPlaying = { true }
         provider.ambientMusicVolume = { 1.0f }
-        assertEquals(0.045f, provider.getAmbientMusicSafetyMargin(), 0.001f)
+        assertEquals(0.008f, provider.getAmbientMusicSafetyMargin(), 0.0001f)
 
-        // 3. When background music is active at half gain (0.5f) -> 0.0325f margin (0.020 + 0.0125)
+        // 3. When background music is active at half gain (0.5f) -> 0.004f margin (0.5 * 0.008)
         provider.ambientMusicVolume = { 0.5f }
-        assertEquals(0.0325f, provider.getAmbientMusicSafetyMargin(), 0.001f)
+        assertEquals(0.004f, provider.getAmbientMusicSafetyMargin(), 0.0001f)
 
-        // 4. When background music is active at minimum volume (0.0f) -> 0.020f baseline margin
+        // 4. When background music is active at minimum volume (0.0f) -> 0.0f
         provider.ambientMusicVolume = { 0.0f }
-        assertEquals(0.020f, provider.getAmbientMusicSafetyMargin(), 0.001f)
+        assertEquals(0.0f, provider.getAmbientMusicSafetyMargin(), 0.0001f)
     }
 
     /**
@@ -446,9 +446,13 @@ class MantraCounterEngineTest {
         provider.ambientMusicVolume = { 1.0f }
         assertEquals(0.0f, provider.getAmbientMusicSafetyMargin(), 0.0001f)
 
-        // 2. Music active at unity gain (1.0f) -> 0.025f margin (0.010 + 0.015)
+        // 2. Music active at unity gain (1.0f) -> 0.005f margin (1.0 * 0.005)
         provider.isAmbientMusicPlaying = { true }
         provider.ambientMusicVolume = { 1.0f }
-        assertEquals(0.025f, provider.getAmbientMusicSafetyMargin(), 0.001f)
+        assertEquals(0.005f, provider.getAmbientMusicSafetyMargin(), 0.0001f)
+
+        // 3. Music active at half gain (0.5f) -> 0.0025f margin (0.5 * 0.005)
+        provider.ambientMusicVolume = { 0.5f }
+        assertEquals(0.0025f, provider.getAmbientMusicSafetyMargin(), 0.0001f)
     }
 }

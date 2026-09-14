@@ -177,11 +177,12 @@ Embedded directly inside `SettingsDrawer.kt` when `profile.mantraConfig != null`
 
 To eliminate false bead and breath counting triggered by device ambient background music (Aumkar drone, Tanpura, custom SAF audio, or YouTube streams) outputting through the phone's loudspeakers, the acoustic telemetry providers employ a multi-layered defense-in-depth architecture:
 
-1. **Hardware Acoustic Echo Cancellation (AEC) & Noise Suppression (NS)**:
-   - Android's `android.media.audiofx.AcousticEchoCanceler` and `android.media.audiofx.NoiseSuppressor` are instantiated and attached directly to `audioRecord.audioSessionId`.
+1. **Hardware Acoustic Echo Cancellation (AEC) & Deliberate Noise Suppression (NS) Exclusion**:
+   - Android's `android.media.audiofx.AcousticEchoCanceler` is instantiated and attached directly to `audioRecord.audioSessionId`.
    - Commands the device's hardware DSP (e.g. Qualcomm Fluence on Snapdragon platforms) to monitor the audio output stream (`STREAM_MUSIC`) and subtract loudspeaker bleed by 15–25 dB before PCM samples enter the microphone analysis buffer.
    - Captures via `MediaRecorder.AudioSource.VOICE_RECOGNITION` to activate speech-tuned OEM microphone beamforming.
-2. **Ambient Background Music Level Awareness & Dynamic Safety Margin**:
+   - **Deliberate NS Exclusion**: `android.media.audiofx.NoiseSuppressor` is *deliberately omitted*. OEM DSP noise suppression algorithms treat steady human vocal chanting, harmonic vowel formants, and Aumkar resonance as stationary acoustic noise and aggressively attenuate them by 12–20 dB, causing false deafness. Retaining AEC alone eliminates speaker bleed without distorting vocal recitation.
+2. **Ambient Background Music Level Awareness & Scaled Safety Margin**:
    - `CentralSessionHandler` dynamically wires the active playback state and volume of `BackgroundMusicManager` to both `AcousticMantraSensorProvider` and `AcousticBreathSensorProvider`:
      ```kotlin
      acousticProvider.isAmbientMusicPlaying = {
@@ -191,19 +192,21 @@ To eliminate false bead and breath counting triggered by device ambient backgrou
          bgMusicManager.activeVolume
      }
      ```
-   - When ambient music is active on the device's local speakers, an extra dynamic safety margin is computed:
-     $$\text{MusicMargin} = 0.020f + (\text{ActiveVolume} \times 0.025f)$$
-   - This margin is added to `dynamicThreshold` across Short Japa, Extended Verse, and Aumkar Drone detection, ensuring speaker residual audio cannot cross trigger thresholds.
-3. **Dynamic Noise Floor Adaptation & Ceiling Expansion**:
-   - The upper clamp on `dynamicNoiseFloorRms` is expanded from $0.05f$ to $0.20f$ in Mantra DSP and to $0.15f$ in Breath DSP.
-   - Continuous asymmetric smoothing adapts the baseline floor upwards during stationary background music, preventing the threshold from freezing below the ambient audio level.
-4. **Syllabic Onset Attack Slope Detection**:
-   - In `SHORT_JAPA`, transitioning from `IDLE_LISTENING` to `ATTACK_DETECTED` strictly mandates an explosive vocal energy rise:
-     $$\Delta \text{RMS} > \text{Threshold} \times 0.15f \quad \text{OR} \quad \text{RMS} > \text{Threshold} \times 1.35f$$
-   - Stationary or slowly modulating ambient music (Tanpura, drone, singing bowl) produces low first-differences ($\Delta \text{RMS}$) and is automatically rejected.
-5. **Mandatory Cooldown Valley Lockout**:
-   - In `SHORT_JAPA`, returning from `COOLDOWN_VALLEY` to `IDLE_LISTENING` mandates an actual acoustic valley drop-off ($\text{RMS} < \text{Threshold} \times 0.85f$).
-   - The unconditional 300ms cooldown escape was removed, guaranteeing that continuous loud music cannot cycle into repeated false bead triggers.
+   - When ambient music is active on local device loudspeakers, an extra subtle dynamic safety margin is applied:
+     $$\text{MusicMargin}_{\text{Mantra}} = \text{ActiveVolume} \times 0.008f$$
+     $$\text{MusicMargin}_{\text{Breath}} = \text{ActiveVolume} \times 0.005f$$
+   - This subtle margin prevents residual loudspeaker bleed from triggering false counts without suppressing natural devotional chanting (~0.040–0.080 RMS at 30–60 cm).
+3. **Dynamic Noise Floor Adaptation & Ceiling Clamping**:
+   - The upper clamp on `dynamicNoiseFloorRms` is bounded to $[0.001f, 0.08f]$ in Mantra DSP (and $[0.0005f, 0.08f]$ in Breath DSP).
+   - Dynamic threshold calculation is balanced for human speech:
+     $$\text{Threshold} = \left(\text{NoiseFloor} \times \frac{1.40}{\text{Sensitivity}} + \text{MusicMargin} + \frac{0.005}{\text{Sensitivity}}\right).\text{coerceIn}(0.006f + \text{MusicMargin}, 0.12f)$$
+4. **Syllabic Onset Attack & Burst Duration**:
+   - In `SHORT_JAPA`, transitioning from `IDLE_LISTENING` to `ATTACK_DETECTED` requires a natural vocal attack rise:
+     $$\Delta \text{RMS} > \text{Threshold} \times 0.04f \quad \text{OR} \quad \text{RMS} > \text{Threshold} \times 1.15f$$
+   - Enforces a burst duration window of $80\text{ms} - 800\text{ms}$ with minimum refractory period $\ge 220\text{ms}$ (~270 CPM).
+5. **Valley Lockout with 800ms Safety Recovery Timeout**:
+   - In `SHORT_JAPA`, returning from `COOLDOWN_VALLEY` to `IDLE_LISTENING` mandates an acoustic valley drop-off ($\text{RMS} < \text{Threshold} \times 0.85f$) OR an 800ms safety timeout ($75\text{ CPM}$ natural cadence ceiling).
+   - This timeout guarantees that the counter never gets permanently trapped in cooldown valley in acoustically active rooms.
 6. **Sustained Continuous Audio Timeout (35-Second Cutoff)**:
    - In `EXTENDED_VERSE`, if continuous audio exceeds 35 seconds without any inter-verse pause, it is identified as background environmental music or TV audio and aborted without advancing bead counts.
 
