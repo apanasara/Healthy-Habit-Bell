@@ -36,7 +36,7 @@ data class HoldTimerConfig(
     val roundNames: List<String> = DEFAULT_ROUND_NAMES,
     val maxHoldSec: Int = 60,
     val ttsVoice: String = "en-US",
-    val ttsSpeed: Float = 1.0f,
+    val ttsSpeed: Float = 0.85f,
     val isCountAloudEnabled: Boolean = true,
     val isHapticTickEnabled: Boolean = true
 ) {
@@ -112,7 +112,7 @@ data class HoldTimerConfig(
             restDurationSec = 15,
             repeatCount = 4,
             maxHoldSec = 60,
-            ttsSpeed = 1.0f
+            ttsSpeed = 0.85f
         )
 
         /**
@@ -130,7 +130,7 @@ data class HoldTimerConfig(
             val repeats = json.optInt("repeatCount", 4)
             val maxHold = json.optInt("maxHoldSec", 60)
             val voice = json.optString("ttsVoice", "en-US")
-            val speed = json.optDouble("ttsSpeed", 1.0).toFloat()
+            val speed = json.optDouble("ttsSpeed", 0.85).toFloat()
             val countAloud = json.optBoolean("isCountAloudEnabled", true)
             val haptic = json.optBoolean("isHapticTickEnabled", true)
 

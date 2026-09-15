@@ -196,6 +196,7 @@ class CentralSessionHandler(private val application: Application) {
     /** Voice-driven yoga and physiotherapy hold timer orchestrator. */
     val holdTimerManager: com.habitbell.app.holdtimer.HoldTimerManager = com.habitbell.app.holdtimer.HoldTimerManager(
         context = application,
+        bgMusicManager = bgMusicManager,
         bellManager = audioManager
     )
 

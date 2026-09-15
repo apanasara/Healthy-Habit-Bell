@@ -203,6 +203,27 @@ class TimerRepository(private val context: Context) {
                 )
             }
 
+            // Restore any persistent Hold Timer customizations
+            val restoredHold = defaultProfile.holdTimerConfig?.let { baseConfig ->
+                val holdSec = prefs.getInt("profile_hold_sec_${defaultProfile.id}", baseConfig.holdDurationSec)
+                val restSec = prefs.getInt("profile_rest_sec_${defaultProfile.id}", baseConfig.restDurationSec)
+                val repeats = prefs.getInt("profile_hold_repeats_${defaultProfile.id}", baseConfig.repeatCount)
+                val maxHold = prefs.getInt("profile_max_hold_${defaultProfile.id}", baseConfig.maxHoldSec)
+                val speed = prefs.getFloat("profile_hold_speed_${defaultProfile.id}", baseConfig.ttsSpeed)
+                val countAloud = prefs.getBoolean("profile_hold_count_aloud_${defaultProfile.id}", baseConfig.isCountAloudEnabled)
+                val haptic = prefs.getBoolean("profile_hold_haptic_${defaultProfile.id}", baseConfig.isHapticTickEnabled)
+
+                baseConfig.copy(
+                    holdDurationSec = if (holdSec >= 1) holdSec else baseConfig.holdDurationSec,
+                    restDurationSec = if (restSec >= 0) restSec else baseConfig.restDurationSec,
+                    repeatCount = if (repeats >= 1) repeats else baseConfig.repeatCount,
+                    maxHoldSec = if (maxHold >= 1) maxHold else baseConfig.maxHoldSec,
+                    ttsSpeed = if (speed in 0.4f..2.5f) speed else baseConfig.ttsSpeed,
+                    isCountAloudEnabled = countAloud,
+                    isHapticTickEnabled = haptic
+                )
+            }
+
             val finalTotalDuration = if (restoredCompound != null) {
                 restoredCompound.poses.sumOf { it.durationSeconds } * restoredCompound.targetRounds
             } else {
@@ -215,7 +236,8 @@ class TimerRepository(private val context: Context) {
                 pranayamaConfig = restoredPranayama,
                 compoundConfig = restoredCompound,
                 breathCounterConfig = restoredBreath,
-                mantraConfig = restoredMantra
+                mantraConfig = restoredMantra,
+                holdTimerConfig = restoredHold
             )
         }
     }
@@ -577,6 +599,37 @@ class TimerRepository(private val context: Context) {
             list.map { profile ->
                 if (profile.id == profileId) {
                     profile.copy(mantraConfig = config)
+                } else {
+                    profile
+                }
+            }
+        }
+    }
+
+    /**
+     * Persists and updates custom hold timer configuration for a targeted profile.
+     *
+     * @param profileId Unique string ID of the profile (e.g. "yoga-physio-hold-timer").
+     * @param config Updated [com.habitbell.app.data.model.HoldTimerConfig] model containing hold duration, rest, rounds, and safety limits.
+     */
+    fun updateHoldTimerConfig(
+        profileId: String,
+        config: com.habitbell.app.data.model.HoldTimerConfig
+    ) {
+        prefs.edit()
+            .putInt("profile_hold_sec_$profileId", config.holdDurationSec)
+            .putInt("profile_rest_sec_$profileId", config.restDurationSec)
+            .putInt("profile_hold_repeats_$profileId", config.repeatCount)
+            .putInt("profile_max_hold_$profileId", config.maxHoldSec)
+            .putFloat("profile_hold_speed_$profileId", config.ttsSpeed)
+            .putBoolean("profile_hold_count_aloud_$profileId", config.isCountAloudEnabled)
+            .putBoolean("profile_hold_haptic_$profileId", config.isHapticTickEnabled)
+            .apply()
+
+        _profiles.update { list ->
+            list.map { profile ->
+                if (profile.id == profileId) {
+                    profile.copy(holdTimerConfig = config)
                 } else {
                     profile
                 }

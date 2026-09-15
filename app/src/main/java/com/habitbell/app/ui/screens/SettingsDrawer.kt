@@ -167,6 +167,7 @@ fun SettingsDrawer(
     onUpdatePranayama: (purak: Int, antar: Int, rechak: Int, bahya: Int, rounds: Int, intervalBellEnabled: Boolean, intervalCadence: Int, voiceEnabled: Boolean, voiceStyle: VoiceCueStyle, tribandhaVoiceEnabled: Boolean, voiceVolume: Float) -> Unit = { _, _, _, _, _, _, _, _, _, _, _ -> },
     onUpdateBreathCounterConfig: (profileId: String, config: BreathCounterConfig) -> Unit = { _, _ -> },
     onUpdateMantraCounterConfig: (profileId: String, config: MantraCounterConfig) -> Unit = { _, _ -> },
+    onUpdateHoldTimerConfig: (profileId: String, config: HoldTimerConfig) -> Unit = { _, _ -> },
     onTestVoiceCue: (VoiceCueStyle, Boolean, Float) -> Unit = { _, _, _ -> },
     onTestPranayamaIntervalBell: () -> Unit = {},
     hasActivityPermission: Boolean = true,
@@ -318,7 +319,8 @@ fun SettingsDrawer(
                             onOpenSuryaEditor = onOpenSuryaEditor,
                             onUpdateSurya = onUpdateSurya,
                             onUpdateBreathCounterConfig = onUpdateBreathCounterConfig,
-                            onUpdateMantraCounterConfig = onUpdateMantraCounterConfig
+                            onUpdateMantraCounterConfig = onUpdateMantraCounterConfig,
+                            onUpdateHoldTimerConfig = onUpdateHoldTimerConfig
                         )
                     }
                 } else {
@@ -386,7 +388,8 @@ private fun TimerSettingsContent(
     onOpenSuryaEditor: () -> Unit = {},
     onUpdateSurya: (poses: List<CompoundPose>, targetRounds: Int, speedPreset: String, customPaceSeconds: Int, voiceCueMode: VoiceCueMode) -> Unit = { _, _, _, _, _ -> },
     onUpdateBreathCounterConfig: (profileId: String, config: com.habitbell.app.data.model.BreathCounterConfig) -> Unit = { _, _ -> },
-    onUpdateMantraCounterConfig: (profileId: String, config: com.habitbell.app.data.model.MantraCounterConfig) -> Unit = { _, _ -> }
+    onUpdateMantraCounterConfig: (profileId: String, config: com.habitbell.app.data.model.MantraCounterConfig) -> Unit = { _, _ -> },
+    onUpdateHoldTimerConfig: (profileId: String, config: HoldTimerConfig) -> Unit = { _, _ -> }
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
         // -------------------------------------------------------------
@@ -488,6 +491,26 @@ private fun TimerSettingsContent(
                     }
                 }
             }
+        } else if (profile.holdTimerConfig != null) {
+            // Dedicated Voice-Driven Yoga / Physiotherapy Hold Timer Configuration
+            HoldTimerSettingsSheet(
+                profile = profile,
+                onUpdateConfig = { config ->
+                    onUpdateHoldTimerConfig(profile.id, config)
+                },
+                isBgMusicEnabled = isBgMusicEnabled,
+                bgMusicType = bgMusicType,
+                bgMusicCustomName = bgMusicCustomName,
+                bgMusicYouTubeUrl = bgMusicYouTubeUrl,
+                bgMusicVolume = bgMusicVolume,
+                onBgMusicToggle = onBgMusicToggle,
+                onBgMusicTypeSelected = onBgMusicTypeSelected,
+                onPickCustomAudio = onPickCustomAudio,
+                onBgMusicYouTubeUrlChange = onBgMusicYouTubeUrlChange,
+                onBgMusicVolumeChange = onBgMusicVolumeChange,
+                onPreviewBgMusic = onPreviewBgMusic
+            )
+            return
         } else if (profile.mantraConfig != null) {
             // Dedicated Unified Acoustic Mantra, Japa & Sacred Verse Counter Configuration
             MantraCounterSettingsSheet(
@@ -2319,6 +2342,520 @@ private fun PranayamaSettingsSheet(
                             }
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * # HoldTimerSettingsSheet
+ *
+ * Dedicated modal configuration sheet for the hands-free Voice-Driven Yoga & Physiotherapy
+ * Hold Timer subsystem.
+ *
+ * Provides granular interactive controls for:
+ * 1. **Hold & Rest Timing**: Customizable hold countdown seconds (10s..180s) and inter-round recovery rest (0s..90s).
+ * 2. **Rounds & Safety**: Target repetition cycles and clinician-defined maximum hold threshold alert.
+ * 3. **Speech & Acoustic Feedback**: Voice speed cadence (0.6x..1.8x), count out loud toggle, and tactile haptic pulse toggle.
+ * 4. **Ambient Background Soundscape**: Continuous meditative drone or YouTube audio with smooth ducking.
+ *
+ * @param profile Active hold timer [TimerProfile].
+ * @param onUpdateConfig Callback propagating updated [HoldTimerConfig] upstream.
+ * @param isBgMusicEnabled Master toggle for ambient soundscapes.
+ * @param bgMusicType Selected ambient sound strategy ([BackgroundSoundType]).
+ * @param bgMusicCustomName Human-readable filename of selected local audio track.
+ * @param bgMusicYouTubeUrl YouTube link for ambient background audio streaming.
+ * @param bgMusicVolume Ambient background music gain level (0.0f..1.0f).
+ * @param onBgMusicToggle Callback to toggle ambient music.
+ * @param onBgMusicTypeSelected Callback to select sound strategy.
+ * @param onPickCustomAudio Callback to launch system file picker for audio files.
+ * @param onBgMusicYouTubeUrlChange Callback when YouTube URL input changes.
+ * @param onBgMusicVolumeChange Callback when ambient music volume slider is adjusted.
+ * @param onPreviewBgMusic Callback to audition or stop background ambient stream preview.
+ */
+@Composable
+private fun HoldTimerSettingsSheet(
+    profile: TimerProfile,
+    onUpdateConfig: (HoldTimerConfig) -> Unit,
+    isBgMusicEnabled: Boolean,
+    bgMusicType: BackgroundSoundType,
+    bgMusicCustomName: String?,
+    bgMusicYouTubeUrl: String,
+    bgMusicVolume: Float,
+    onBgMusicToggle: (Boolean) -> Unit,
+    onBgMusicTypeSelected: (BackgroundSoundType) -> Unit,
+    onPickCustomAudio: () -> Unit,
+    onBgMusicYouTubeUrlChange: (String) -> Unit,
+    onBgMusicVolumeChange: (Float) -> Unit,
+    onPreviewBgMusic: (Boolean) -> Unit
+) {
+    val initialConfig = profile.holdTimerConfig ?: HoldTimerConfig.DEFAULT_YOGA_PHYSIO
+    var currentConfig by remember(profile.id, initialConfig) { mutableStateOf(initialConfig) }
+
+    fun dispatchConfig(newConfig: HoldTimerConfig) {
+        currentConfig = newConfig
+        onUpdateConfig(newConfig)
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        // -------------------------------------------------------------
+        // Card 1: Hold Duration & Recovery Rest Pacing
+        // -------------------------------------------------------------
+        Card(
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = "Hold & Rest Duration",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Configure posture hold duration and inter-round recovery pause:",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Hold Duration Stepper
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Posture Hold Duration",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = "${currentConfig.holdDurationSec}s per round",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        SmallAdjustButton("-5s") {
+                            val newHold = (currentConfig.holdDurationSec - 5).coerceAtLeast(5)
+                            dispatchConfig(currentConfig.copy(holdDurationSec = newHold))
+                        }
+                        SmallAdjustButton("+5s") {
+                            val newHold = (currentConfig.holdDurationSec + 5).coerceAtMost(300)
+                            dispatchConfig(currentConfig.copy(holdDurationSec = newHold))
+                        }
+                    }
+                }
+
+                // Preset Hold Chips
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    listOf(15, 30, 45, 60).forEach { s ->
+                        val isSel = currentConfig.holdDurationSec == s
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (isSel) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surface,
+                            border = BorderStroke(1.dp, if (isSel) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable { dispatchConfig(currentConfig.copy(holdDurationSec = s)) }
+                        ) {
+                            Text(
+                                text = "${s}s",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = if (isSel) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isSel) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(vertical = 6.dp)
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Rest Duration Stepper
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Inter-Round Rest Duration",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = if (currentConfig.restDurationSec == 0) "Immediate (0s)" else "${currentConfig.restDurationSec}s recovery rest",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        SmallAdjustButton("-5s") {
+                            val newRest = (currentConfig.restDurationSec - 5).coerceAtLeast(0)
+                            dispatchConfig(currentConfig.copy(restDurationSec = newRest))
+                        }
+                        SmallAdjustButton("+5s") {
+                            val newRest = (currentConfig.restDurationSec + 5).coerceAtMost(120)
+                            dispatchConfig(currentConfig.copy(restDurationSec = newRest))
+                        }
+                    }
+                }
+
+                // Preset Rest Chips
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    listOf(0, 10, 15, 30).forEach { r ->
+                        val isSel = currentConfig.restDurationSec == r
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (isSel) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surface,
+                            border = BorderStroke(1.dp, if (isSel) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable { dispatchConfig(currentConfig.copy(restDurationSec = r)) }
+                        ) {
+                            Text(
+                                text = if (r == 0) "0s (None)" else "${r}s",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = if (isSel) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isSel) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(vertical = 6.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // -------------------------------------------------------------
+        // Card 2: Repetition Rounds & Clinician Safety
+        // -------------------------------------------------------------
+        Card(
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = "Rounds & Clinician Safety",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Set repetition cycles and strain prevention guardrails:",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Rounds Stepper
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Total Rounds",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = "${currentConfig.repeatCount} rounds scheduled",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        SmallAdjustButton("-1") {
+                            if (currentConfig.repeatCount > 1) {
+                                dispatchConfig(currentConfig.copy(repeatCount = currentConfig.repeatCount - 1))
+                            }
+                        }
+                        SmallAdjustButton("+1") {
+                            if (currentConfig.repeatCount < 20) {
+                                dispatchConfig(currentConfig.copy(repeatCount = currentConfig.repeatCount + 1))
+                            }
+                        }
+                    }
+                }
+
+                // Preset Round Chips
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    listOf(2, 3, 4, 5, 8).forEach { r ->
+                        val isSel = currentConfig.repeatCount == r
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (isSel) MaterialTheme.colorScheme.primary.copy(alpha = 0.2f) else MaterialTheme.colorScheme.surface,
+                            border = BorderStroke(1.dp, if (isSel) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable { dispatchConfig(currentConfig.copy(repeatCount = r)) }
+                        ) {
+                            Text(
+                                text = "$r",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = if (isSel) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isSel) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onBackground,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(vertical = 6.dp)
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Clinician Max Hold Threshold
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Safety Limit (Max Hold)",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = "Alert spoken if hold exceeds ${currentConfig.maxHoldSec}s",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (!currentConfig.isHoldDurationSafe()) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                        )
+                    }
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        SmallAdjustButton("-10s") {
+                            val newMax = (currentConfig.maxHoldSec - 10).coerceAtLeast(15)
+                            dispatchConfig(currentConfig.copy(maxHoldSec = newMax))
+                        }
+                        SmallAdjustButton("+10s") {
+                            val newMax = (currentConfig.maxHoldSec + 10).coerceAtMost(300)
+                            dispatchConfig(currentConfig.copy(maxHoldSec = newMax))
+                        }
+                    }
+                }
+            }
+        }
+
+        // -------------------------------------------------------------
+        // Card 3: Voice Guidance & Speech Cadence
+        // -------------------------------------------------------------
+        Card(
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(
+                    text = "Voice Guidance & Pacing",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Acoustic speech rate and counting cues (Swara / Lata meditative profile):",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Voice Speed Slider
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Speech Cadence (${String.format(java.util.Locale.US, "%.2f", currentConfig.ttsSpeed)}x)",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        text = when {
+                            currentConfig.ttsSpeed < 0.80f -> "Calm / Unhurried"
+                            currentConfig.ttsSpeed < 1.05f -> "Meditative"
+                            else -> "Brisk"
+                        },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+                Slider(
+                    value = currentConfig.ttsSpeed,
+                    onValueChange = { dispatchConfig(currentConfig.copy(ttsSpeed = (it * 20).toInt() / 20f)) },
+                    valueRange = 0.60f..1.50f,
+                    colors = SliderDefaults.colors(
+                        thumbColor = MaterialTheme.colorScheme.primary,
+                        activeTrackColor = MaterialTheme.colorScheme.primary
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                SettingsToggleRow(
+                    title = "Count Aloud Each Second",
+                    subtitle = "Spoken numbers ('One', 'Two', 'Three'...) announced during countdown",
+                    checked = currentConfig.isCountAloudEnabled,
+                    onCheckedChange = { dispatchConfig(currentConfig.copy(isCountAloudEnabled = it)) }
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                Spacer(modifier = Modifier.height(8.dp))
+
+                SettingsToggleRow(
+                    title = "Tactile Haptic Pulse",
+                    subtitle = "Gentle sensory vibration on each elapsed second",
+                    checked = currentConfig.isHapticTickEnabled,
+                    onCheckedChange = { dispatchConfig(currentConfig.copy(isHapticTickEnabled = it)) }
+                )
+            }
+        }
+
+        // -------------------------------------------------------------
+        // Card 4: Ambient Background Soundscape
+        // -------------------------------------------------------------
+        Card(
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                SettingsToggleRow(
+                    title = "Background Ambient Sound",
+                    subtitle = "Continuous meditation drone automatically ducked during voice cues",
+                    checked = isBgMusicEnabled,
+                    onCheckedChange = onBgMusicToggle
+                )
+
+                if (isBgMusicEnabled) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "SOUND SOURCE",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        val isAumSelected = bgMusicType == BackgroundSoundType.DEFAULT_AUM
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (isAumSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+                            border = BorderStroke(1.dp, if (isAumSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable { onBgMusicTypeSelected(BackgroundSoundType.DEFAULT_AUM) }
+                        ) {
+                            Text(
+                                text = "ॐ Aum",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = if (isAumSelected) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isAumSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onBackground,
+                                modifier = Modifier.padding(vertical = 10.dp).wrapContentWidth(Alignment.CenterHorizontally)
+                            )
+                        }
+
+                        val isYtSelected = bgMusicType == BackgroundSoundType.YOUTUBE_LINK
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (isYtSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+                            border = BorderStroke(1.dp, if (isYtSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                            modifier = Modifier
+                                .weight(1.2f)
+                                .clickable { onBgMusicTypeSelected(BackgroundSoundType.YOUTUBE_LINK) }
+                        ) {
+                            Text(
+                                text = "YouTube Audio",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = if (isYtSelected) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isYtSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onBackground,
+                                modifier = Modifier.padding(vertical = 10.dp).wrapContentWidth(Alignment.CenterHorizontally)
+                            )
+                        }
+
+                        val isCustomSelected = bgMusicType == BackgroundSoundType.CUSTOM_FILE
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (isCustomSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
+                            border = BorderStroke(1.dp, if (isCustomSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable { onBgMusicTypeSelected(BackgroundSoundType.CUSTOM_FILE) }
+                        ) {
+                            Text(
+                                text = "Custom File",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = if (isCustomSelected) FontWeight.Bold else FontWeight.Normal,
+                                color = if (isCustomSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onBackground,
+                                modifier = Modifier.padding(vertical = 10.dp).wrapContentWidth(Alignment.CenterHorizontally)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Ambient Volume (${(bgMusicVolume * 100).toInt()}%)",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                    Slider(
+                        value = bgMusicVolume,
+                        onValueChange = onBgMusicVolumeChange,
+                        valueRange = 0.05f..1.0f,
+                        colors = SliderDefaults.colors(
+                            thumbColor = MaterialTheme.colorScheme.primary,
+                            activeTrackColor = MaterialTheme.colorScheme.primary
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
             }
         }

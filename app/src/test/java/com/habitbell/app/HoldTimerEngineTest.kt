@@ -177,6 +177,37 @@ class HoldTimerEngineTest {
     }
 
     @Test
+    fun testUpdateRestDurationAndVoiceSpeedAndReset() = runTest {
+        val engine = HoldTimerEngine(speaker = mockSpeaker, coroutineScope = this)
+        val initialConfig = HoldTimerConfig(holdDurationSec = 30, restDurationSec = 15, repeatCount = 3, ttsSpeed = 0.85f)
+        engine.loadConfig(initialConfig)
+
+        // Verify getActiveConfig
+        assertEquals(15, engine.getActiveConfig().restDurationSec)
+        assertEquals(0.85f, engine.getActiveConfig().ttsSpeed, 0.01f)
+
+        // Update Rest duration
+        engine.updateRestDuration(25)
+        assertEquals(25, engine.getActiveConfig().restDurationSec)
+        assertTrue(mockSpeaker.spokenPhrases.any { it.contains("Rest set to 25 seconds") })
+
+        // Update Voice Speed
+        engine.updateVoiceSpeed(1.15f)
+        assertEquals(1.15f, engine.getActiveConfig().ttsSpeed, 0.01f)
+        assertEquals(1.15f, engine.sessionState.value.ttsSpeed, 0.01f)
+
+        // Start session, advance time, then reset
+        engine.startSession()
+        testScheduler.advanceTimeBy(2000)
+        assertNotEquals(HoldTimerPhase.PREPARATION, engine.sessionState.value.phase)
+
+        engine.reset()
+        assertEquals(HoldTimerPhase.PREPARATION, engine.sessionState.value.phase)
+        assertEquals(1, engine.sessionState.value.currentRound)
+        assertFalse(engine.sessionState.value.isPaused)
+    }
+
+    @Test
     fun testTimerEngineLoadHoldTimerProfile() {
         val timerEngine = com.habitbell.app.engine.TimerEngine()
         val holdProfile = com.habitbell.app.data.default.DefaultProfiles.YOGA_PHYSIO_HOLD_TIMER

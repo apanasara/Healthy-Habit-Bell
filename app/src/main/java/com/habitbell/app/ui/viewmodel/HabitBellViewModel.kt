@@ -1030,6 +1030,24 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     /**
+     * Persists and live-updates active hold timer configuration.
+     *
+     * @param profileId Unique string identifier of the target profile.
+     * @param config Updated [com.habitbell.app.data.model.HoldTimerConfig] model.
+     */
+    fun updateHoldTimerConfig(
+        profileId: String,
+        config: com.habitbell.app.data.model.HoldTimerConfig
+    ) {
+        repository.updateHoldTimerConfig(profileId, config)
+        holdTimerManager.initializeSession(config, enableVoiceListener = true)
+        if (sessionState.value.profile.id == profileId) {
+            val updated = sessionState.value.profile.copy(holdTimerConfig = config)
+            engine.loadProfile(updated)
+        }
+    }
+
+    /**
      * Persists and live-updates active Surya Namaskar timer sequence parameters, including
      * 12 posture durations, target repetition rounds, speed preset, custom pace, and global voice guidance.
      *

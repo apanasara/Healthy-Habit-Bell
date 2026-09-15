@@ -29,8 +29,9 @@ import kotlinx.coroutines.flow.StateFlow
  */
 class HoldTimerManager(
     private val context: Context? = null,
+    val bgMusicManager: com.habitbell.app.engine.BackgroundMusicManager? = null,
     val engine: HoldTimerEngine = HoldTimerEngine(
-        speaker = context?.let { AndroidDualCueSpeaker(it) }
+        speaker = context?.let { AndroidDualCueSpeaker(it, bgMusicManager) }
     ),
     val voiceSource: VoiceCommandSource = context?.let { AndroidSpeechCommandSource(it) } ?: SimulatedVoiceCommandSource(),
     private val hapticManager: HapticManager? = context?.let { HapticManager(it) },
@@ -100,6 +101,34 @@ class HoldTimerManager(
         voiceSource.stopListening()
         engine.stop()
     }
+
+    /** Resets session state back to preparation. */
+    fun reset() {
+        engine.reset()
+    }
+
+    /** Updates active hold duration in seconds. */
+    fun updateHoldDuration(seconds: Int) {
+        engine.updateHoldDuration(seconds)
+    }
+
+    /** Updates active rest duration in seconds. */
+    fun updateRestDuration(seconds: Int) {
+        engine.updateRestDuration(seconds)
+    }
+
+    /** Updates target repeat rounds. */
+    fun updateRepeatCount(repeats: Int) {
+        engine.updateRepeatCount(repeats)
+    }
+
+    /** Updates voice speech rate multiplier. */
+    fun updateVoiceSpeed(speed: Float) {
+        engine.updateVoiceSpeed(speed)
+    }
+
+    /** Returns current active hold timer configuration. */
+    fun getActiveConfig(): HoldTimerConfig = engine.getActiveConfig()
 
     /** Releases all native resources. */
     fun release() {
