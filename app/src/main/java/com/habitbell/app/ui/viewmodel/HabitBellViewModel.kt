@@ -962,6 +962,9 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
     /** Central mantra and sacred verse recitation orchestrator from process singleton. */
     val mantraCountManager: com.habitbell.app.mantra.MantraCountManager = sessionHandler.mantraCountManager
 
+    /** Central voice-driven yoga & physiotherapy hold timer orchestrator from process singleton. */
+    val holdTimerManager: com.habitbell.app.holdtimer.HoldTimerManager = sessionHandler.holdTimerManager
+
     /** Active mantra input source type stream (Mic vs Tap). */
     val selectedMantraInputSource: StateFlow<com.habitbell.app.mantra.MantraInputSourceType> =
         mantraCountManager.selectedInputSource

@@ -81,26 +81,48 @@ data class MantraCounterConfig(
             }
         }
 
-        /** Default Gayatri Mantra configuration: 108 beads, 4.0s minimum verse duration, 1.2s pause. */
+        /**
+         * Default Gayatri Mantra configuration: 108 beads, 2.5s minimum cumulative vocal
+         * energy duration, 1.8s inter-verse concluding pause.
+         *
+         * NOTE: [minVerseDurationSec] measures ONLY high-energy vowel formant frames (where
+         * bandpassRms > dynamicThreshold). Consonants, micro-pauses, and breath transitions
+         * are excluded. A 12-second Gayatri recitation typically produces ~2.5–3.5s of
+         * qualifying high-energy vowel frames. Previous value of 4.0s was unreachable.
+         *
+         * NOTE: [interVersePauseThresholdSec] was 1.2s but natural breathing between verse
+         * lines takes 1.3–2.0s. Architecture doc §2 specifies 1.6s; we use 1.8s to safely
+         * accommodate deep diaphragmatic breaths without prematurely splitting the verse.
+         */
         val DEFAULT_GAYATRI = MantraCounterConfig(
             technique = MantraTechnique.GAYATRI_MANTRA,
             targetBeads = 108,
             targetMalas = 1,
-            minVerseDurationSec = 4.0f,
-            interVersePauseThresholdSec = 1.2f,
+            minVerseDurationSec = 2.5f,
+            interVersePauseThresholdSec = 1.8f,
             defaultInputMode = MantraInputSourceType.ACOUSTIC_MIC,
             isBeadHapticEnabled = true,
             isMilestoneChimeEnabled = true,
             micSensitivity = 1.0f
         )
 
-        /** Default Maha Mrityunjaya configuration: 108 beads, 4.0s minimum verse duration, 1.2s pause. */
+        /**
+         * Default Maha Mrityunjaya configuration: 108 beads, 2.8s minimum cumulative vocal
+         * energy duration, 1.8s inter-verse concluding pause.
+         *
+         * NOTE: Maha Mrityunjaya is slightly longer than Gayatri (4 padas with more
+         * syllables), producing ~2.8–4.0s of qualifying high-energy vowel frames.
+         * Previous value of 4.0s was at the upper boundary, causing intermittent failures.
+         *
+         * NOTE: [interVersePauseThresholdSec] increased from 1.2s to 1.8s to safely bridge
+         * natural breathing pauses between verse lines (architecture doc §2 specifies 1.7s).
+         */
         val DEFAULT_MAHA_MRITYUNJAYA = MantraCounterConfig(
             technique = MantraTechnique.MAHA_MRITYUNJAYA,
             targetBeads = 108,
             targetMalas = 1,
-            minVerseDurationSec = 4.0f,
-            interVersePauseThresholdSec = 1.2f,
+            minVerseDurationSec = 2.8f,
+            interVersePauseThresholdSec = 1.8f,
             defaultInputMode = MantraInputSourceType.ACOUSTIC_MIC,
             isBeadHapticEnabled = true,
             isMilestoneChimeEnabled = true,
@@ -120,12 +142,21 @@ data class MantraCounterConfig(
             micSensitivity = 1.0f
         )
 
-        /** Default Ram Naam Japa configuration: 108 beads, 0.35s minimum duration, 0.45s pause. */
+        /**
+         * Default Ram Naam Japa configuration: 108 beads, 0.12s minimum burst duration,
+         * 0.45s inter-chant pause.
+         *
+         * NOTE: [minVerseDurationSec] reduced from 0.35s to 0.12s. The monosyllabic chant
+         * "Ram" peaks and decays within ~150–200ms of vocal energy. The hysteresis evaluator
+         * requires burst duration to exceed this minimum BEFORE peak decay (72% of peak),
+         * which at 350ms was impossible for a 150ms syllable. Architecture doc §3 specifies
+         * SHORT_JAPA envelope as "120ms to 800ms per chant".
+         */
         val DEFAULT_RAM_JAPA = MantraCounterConfig(
             technique = MantraTechnique.RAM_JAPA,
             targetBeads = 108,
             targetMalas = 1,
-            minVerseDurationSec = 0.35f,
+            minVerseDurationSec = 0.12f,
             interVersePauseThresholdSec = 0.45f,
             defaultInputMode = MantraInputSourceType.ACOUSTIC_MIC,
             isBeadHapticEnabled = true,
@@ -133,12 +164,19 @@ data class MantraCounterConfig(
             micSensitivity = 1.0f
         )
 
-        /** Default Islamic Tasbih configuration: 100 beads (33/33/34), 0.40s duration, 0.50s pause. */
+        /**
+         * Default Islamic Tasbih configuration: 100 beads (33/33/34), 0.18s burst duration,
+         * 0.50s pause.
+         *
+         * NOTE: [minVerseDurationSec] reduced from 0.40s to 0.18s. Short dhikr phrases
+         * (SubhanAllah, Alhamdulillah) are rapid multi-syllabic bursts that complete
+         * their vocal energy cycle in ~180–300ms when spoken at devotional pace.
+         */
         val DEFAULT_TASBIH = MantraCounterConfig(
             technique = MantraTechnique.TASBIH_DHIKR,
             targetBeads = 100,
             targetMalas = 1,
-            minVerseDurationSec = 0.40f,
+            minVerseDurationSec = 0.18f,
             interVersePauseThresholdSec = 0.50f,
             defaultInputMode = MantraInputSourceType.ACOUSTIC_MIC,
             isBeadHapticEnabled = true,
@@ -159,13 +197,22 @@ data class MantraCounterConfig(
             micSensitivity = 1.0f
         )
 
-        /** Default Universal Scripture configuration: 108 beads, 3.5s duration, 1.2s pause. */
+        /**
+         * Default Universal Scripture configuration: 108 beads, 2.2s cumulative vocal
+         * energy duration, 1.6s inter-verse concluding pause.
+         *
+         * NOTE: [minVerseDurationSec] reduced from 3.5s to 2.2s to account for the
+         * vowel-only energy measurement. Architecture doc §2 specifies 5.0s for total
+         * recitation, but cumulative high-energy frames are ~40-50% of that.
+         *
+         * NOTE: [interVersePauseThresholdSec] increased from 1.2s to 1.6s per arch doc §2.
+         */
         val DEFAULT_UNIVERSAL = MantraCounterConfig(
             technique = MantraTechnique.UNIVERSAL_VERSE,
             targetBeads = 108,
             targetMalas = 1,
-            minVerseDurationSec = 3.5f,
-            interVersePauseThresholdSec = 1.2f,
+            minVerseDurationSec = 2.2f,
+            interVersePauseThresholdSec = 1.6f,
             defaultInputMode = MantraInputSourceType.ACOUSTIC_MIC,
             isBeadHapticEnabled = true,
             isMilestoneChimeEnabled = true,

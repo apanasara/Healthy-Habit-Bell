@@ -292,6 +292,26 @@ object DefaultProfiles {
     )
 
     /**
+     * Voice-Driven Yoga / Physiotherapy Hold Timer:
+     * Hands-free isometric posture hold and rest cadence timer.
+     * Initialized with 4 rounds of 30-second holds, 15-second rest, and 60-second clinician safety limit.
+     * Controlled entirely via offline voice commands ("Hey Yoga, hold 45 seconds", "Too fast", "Pause").
+     */
+    val YOGA_PHYSIO_HOLD_TIMER = TimerProfile(
+        id = "yoga-physio-hold-timer",
+        name = "Hold Timer",
+        type = TimerType.MULTI_INTERVAL,
+        category = "Physical Therapy",
+        iconName = "timer",
+        theme = ThemeMode.AMOLED,
+        bellPattern = BellPattern.SINGLE,
+        displayMode = true,
+        pocketMode = false,
+        isFavorite = true,
+        holdTimerConfig = HoldTimerConfig.DEFAULT_YOGA_PHYSIO
+    )
+
+    /**
      * Complete list of all curated default preset wellness profiles.
      * De-duplicated and consolidated around canonical mindfulness habits.
      */
@@ -299,6 +319,7 @@ object DefaultProfiles {
         PRANAYAMA_HATHA,
         BREATH_COUNTER,
         MANTRA_COUNTER,
+        YOGA_PHYSIO_HOLD_TIMER,
         EATING,
         REIKI,
         SURYA_NAMASKAR,
