@@ -12,6 +12,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import java.util.Locale
 
+import com.habitbell.app.engine.BackgroundMusicManager
+
 /**
  * # DualCueSpeaker
  *
@@ -24,7 +26,7 @@ interface DualCueSpeaker {
      * @param text Spoken word or phrase.
      * @param speedMultiplier Cadence/rate multiplier (1.0f = normal).
      */
-    fun speak(text: String, speedMultiplier: Float = 1.0f)
+    fun speak(text: String, speedMultiplier: Float = 0.85f)
 
     /** Halts any currently speaking or queued utterance. */
     fun stop()
@@ -36,33 +38,143 @@ interface DualCueSpeaker {
 /**
  * # AndroidDualCueSpeaker
  *
- * Native Android [TextToSpeech] implementation of [DualCueSpeaker].
+ * Native Android [TextToSpeech] implementation of [DualCueSpeaker] matching the acoustic profile
+ * of Pranayama voice guidance (Lata Mangeshkar / Swara style female timbre, elevated sweet pitch +52Hz/1.18f,
+ * calm unhurried cadence, and dynamic audio ducking via [BackgroundMusicManager]).
  *
  * @param context Android context for TTS engine initialization.
+ * @param bgMusicManager Optional ambient music coordinator for smooth raised-cosine ducking.
  */
-class AndroidDualCueSpeaker(context: Context) : DualCueSpeaker, TextToSpeech.OnInitListener {
+class AndroidDualCueSpeaker(
+    context: Context,
+    private val bgMusicManager: BackgroundMusicManager? = null
+) : DualCueSpeaker, TextToSpeech.OnInitListener {
 
-    private var tts: TextToSpeech? = TextToSpeech(context.applicationContext, this)
+    private val TAG = "AndroidDualCueSpeaker"
+    private var tts: TextToSpeech? = null
     private var isInitialized = false
 
-    override fun onInit(status: Int) {
-        if (status == TextToSpeech.SUCCESS) {
-            tts?.language = Locale.US
-            tts?.setPitch(1.05f) // High-clarity pleasant vocal pitch
-            isInitialized = true
-        } else {
-            Log.e("AndroidDualCueSpeaker", "Failed to initialize Android TextToSpeech (status $status)")
+    init {
+        try {
+            tts = TextToSpeech(context.applicationContext, this)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to instantiate Android TextToSpeech engine", e)
         }
     }
 
+    override fun onInit(status: Int) {
+        if (status == TextToSpeech.SUCCESS) {
+            tts?.let { engine ->
+                configureGentleVoice(engine)
+                setupUtteranceListener(engine)
+                isInitialized = true
+                Log.d(TAG, "AndroidDualCueSpeaker TextToSpeech initialized successfully with Pranayama profile")
+            }
+        } else {
+            Log.e(TAG, "Failed to initialize Android TextToSpeech (status $status)")
+            isInitialized = false
+        }
+    }
+
+    /**
+     * Prioritizes high-comfort Indian English (en_IN) or Hindi (hi_IN) female voices matching
+     * the sweet, melodious Swara / Lata-style acoustic profile used in Pranayama.
+     *
+     * @param engine Target [TextToSpeech] instance.
+     */
+    private fun configureGentleVoice(engine: TextToSpeech) {
+        try {
+            val preferredLocales = listOf(
+                Locale("hi", "IN"),
+                Locale("en", "IN"),
+                Locale.US,
+                Locale.getDefault()
+            )
+
+            var selectedLocale = Locale.US
+            for (loc in preferredLocales) {
+                val availability = engine.isLanguageAvailable(loc)
+                if (availability >= TextToSpeech.LANG_AVAILABLE) {
+                    engine.language = loc
+                    selectedLocale = loc
+                    break
+                }
+            }
+
+            val voices = engine.voices
+            if (!voices.isNullOrEmpty()) {
+                val femaleVoice = voices.firstOrNull { voice ->
+                    val nameLower = voice.name.lowercase()
+                    (voice.locale.language == selectedLocale.language) &&
+                            (nameLower.contains("female") || nameLower.contains("swara") || nameLower.contains("fem") || nameLower.contains("#female"))
+                } ?: voices.firstOrNull { voice ->
+                    val nameLower = voice.name.lowercase()
+                    nameLower.contains("female") || nameLower.contains("fem")
+                }
+
+                if (femaleVoice != null) {
+                    engine.voice = femaleVoice
+                    Log.d(TAG, "Selected gentle female TTS voice: ${femaleVoice.name}")
+                }
+            }
+
+            // High sweet pitch (1.18f) matching Lata / Pranayama profile and unhurried default cadence (0.85f)
+            engine.setPitch(1.18f)
+            engine.setSpeechRate(0.85f)
+        } catch (e: Exception) {
+            Log.w(TAG, "Error configuring female TTS voice parameters", e)
+        }
+    }
+
+    /**
+     * Configures utterance completion listeners to restore background music volume smoothly.
+     *
+     * @param engine Active [TextToSpeech] instance.
+     */
+    private fun setupUtteranceListener(engine: TextToSpeech) {
+        engine.setOnUtteranceProgressListener(object : android.speech.tts.UtteranceProgressListener() {
+            override fun onStart(utteranceId: String?) {}
+
+            override fun onDone(utteranceId: String?) {
+                bgMusicManager?.restoreVolume(durationMs = 500L)
+            }
+
+            @Deprecated("Deprecated in Java")
+            override fun onError(utteranceId: String?) {
+                bgMusicManager?.restoreVolume(durationMs = 500L)
+            }
+
+            override fun onError(utteranceId: String?, errorCode: Int) {
+                bgMusicManager?.restoreVolume(durationMs = 500L)
+                Log.w(TAG, "TTS utterance error: $errorCode for id: $utteranceId")
+            }
+        })
+    }
+
     override fun speak(text: String, speedMultiplier: Float) {
-        if (!isInitialized) return
-        tts?.setSpeechRate(speedMultiplier.coerceIn(0.5f, 2.0f))
-        tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, "hold_cue_${System.currentTimeMillis()}")
+        if (!isInitialized || tts == null) return
+        try {
+            // Apply unhurried multiplier anchored to calm baseline
+            val safeSpeed = speedMultiplier.coerceIn(0.5f, 2.0f)
+            tts?.setSpeechRate(safeSpeed)
+            tts?.setPitch(1.18f)
+
+            // Smooth audio ducking before voice articulation
+            bgMusicManager?.duckVolume(0.20f, 350L)
+
+            val params = android.os.Bundle().apply {
+                putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, 0.65f)
+            }
+            tts?.speak(text, TextToSpeech.QUEUE_FLUSH, params, "hold_cue_${System.currentTimeMillis()}")
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to articulate hold cue: $text", e)
+            bgMusicManager?.restoreVolume()
+        }
     }
 
     override fun stop() {
         tts?.stop()
+        bgMusicManager?.restoreVolume()
     }
 
     override fun release() {
@@ -70,6 +182,7 @@ class AndroidDualCueSpeaker(context: Context) : DualCueSpeaker, TextToSpeech.OnI
         tts?.shutdown()
         tts = null
         isInitialized = false
+        bgMusicManager?.restoreVolume()
     }
 }
 
@@ -197,6 +310,15 @@ class HoldTimerEngine(
     }
 
     /**
+     * Resets the active session back to the initial PREPARATION state with current configuration.
+     */
+    fun reset() {
+        sessionJob?.cancel()
+        speaker?.stop()
+        loadConfig(activeConfig)
+    }
+
+    /**
      * Updates hold duration on-the-fly during an ongoing session.
      *
      * @param seconds New hold duration in seconds.
@@ -262,6 +384,44 @@ class HoldTimerEngine(
             )
         }
     }
+
+    /**
+     * Updates inter-round rest duration in seconds.
+     *
+     * @param seconds New rest duration in seconds (>= 0).
+     */
+    fun updateRestDuration(seconds: Int) {
+        val safeSeconds = seconds.coerceAtLeast(0)
+        activeConfig = activeConfig.copy(restDurationSec = safeSeconds)
+        speaker?.speak("Rest set to $safeSeconds seconds", activeConfig.ttsSpeed)
+        _sessionState.update {
+            it.copy(
+                totalSecondsInPhase = if (it.phase == HoldTimerPhase.REST) safeSeconds else it.totalSecondsInPhase,
+                feedbackMessage = "Rest duration set to ${safeSeconds}s"
+            )
+        }
+    }
+
+    /**
+     * Updates TextToSpeech speed directly to a specific multiplier.
+     *
+     * @param speed Target speed multiplier (0.5f to 2.0f).
+     */
+    fun updateVoiceSpeed(speed: Float) {
+        val safeSpeed = speed.coerceIn(0.5f, 2.0f)
+        activeConfig = activeConfig.copy(ttsSpeed = safeSpeed)
+        _sessionState.update {
+            it.copy(
+                ttsSpeed = safeSpeed,
+                feedbackMessage = "Voice speed set to ${String.format(Locale.US, "%.2f", safeSpeed)}x"
+            )
+        }
+    }
+
+    /**
+     * Returns the currently active hold timer configuration snapshot.
+     */
+    fun getActiveConfig(): HoldTimerConfig = activeConfig
 
     /**
      * Executes an incoming [VoiceHoldCommand].

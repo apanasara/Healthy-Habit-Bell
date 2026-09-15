@@ -125,9 +125,46 @@ To prevent musculoskeletal strain or over-exertion during rehabilitation or adva
 
 ---
 
-## 7. Concurrency & Threading Invariants
+---
 
-- **Engine Execution**: Runs on `Dispatchers.Default` + `SupervisorJob`.
-- **Telemetry Dispatches**: Emitted through Kotlin `StateFlow<HoldTimerSessionState>` and collected on the Main looper via Compose `collectAsState()`.
-- **SpeechRecognizer Lifecycle**: Initialized on the Main looper per Android platform requirements.
-- **Zero-Internet Invariant**: Operates entirely offline without requiring external network connectivity or cloud APIs.
+## 8. Pranayama Acoustic Timbre & Background Ducking Matching
+
+To preserve deep meditational continuity across Habit Bell:
+- **Acoustic Voice Profile**: Matches `PranayamaVoiceGuide` with high-frequency Lata Mangeshkar-style Indian female timbre:
+  - Language: Prioritizes Indian English (`en-IN`) and Hindi (`hi-IN`) female neural voices (`hi-IN-SwaraNeural`).
+  - Elevated Pitch: Sets pitch to `1.18f` for sweet, bright clarity.
+  - Serene Cadence: Default speech rate multiplier configured to `0.85f` (unhurried yogic pacing).
+- **Smooth Dynamic Audio Ducking**:
+  - Interacts directly with `BackgroundMusicManager` via monotonic raised-cosine volume ducking.
+  - Before voice cue commences: ducks background soundscape smoothly to `0.20f` volume over a 350ms curve.
+  - Upon cue completion or cancellation: restores background audio to full volume over 500ms.
+
+---
+
+## 9. Pre-Session Interactive Setup & Unified Drawer Configuration
+
+- **Pre-Session Setup Chips**:
+  - When in `HoldTimerPhase.PREPARATION`, the screen displays 4 interactive chip rows allowing tactile pre-tuning before countdown commences:
+    - **Hold Duration**: Quick options for `15s`, `30s`, `45s`, `60s`.
+    - **Rest Duration**: Quick options for `0s` (None), `10s`, `15s`, `30s`.
+    - **Repetition Rounds**: Quick options for `2`, `3`, `4`, `5`, `8` cycles.
+    - **Voice Cadence**: Quick options for `0.75x` (Calm), `0.85x` (Yogic), `1.0x` (Normal), `1.15x` (Brisk).
+  - Tapping chips dynamically triggers `manager.updateHoldDuration()`, `manager.updateRestDuration()`, `manager.updateRepeatCount()`, and `manager.updateVoiceSpeed()` while maintaining reactive state.
+- **Dedicated HoldTimerSettingsSheet in SettingsDrawer**:
+  - Accessible via the top bar tune icon (`R.drawable.ic_ph_tune`) on `HoldTimerScreen`.
+  - Persists configuration to `SharedPreferences` via `TimerRepository.updateHoldTimerConfig()` and hydrates on app startup.
+  - Card 1: Hold Duration & Recovery Rest Steppers with quick chips.
+  - Card 2: Repetition Cycles & Clinician Safety limit stepper with alert status.
+  - Card 3: Speech Cadence slider (`0.60x`..`1.50x`), Count Aloud toggle, and Tactile Haptic toggle.
+  - Card 4: Background Ambient Soundscape (ॐ Aum drone, YouTube audio, custom file, volume slider).
+
+---
+
+## 10. Circadian Theming & Design System Alignment
+
+- **Design System Cohesion**: Strictly adopts the visual architecture of `SessionScreen.kt` and `PranayamaScreen`:
+  - **Punch-Hole Immune Top Bar**: Utilizes `statusBarsPadding()`, `displayCutoutPadding()`, and circular pill action buttons (`buttonPillBg`, `buttonBorder`).
+  - **Phosphor Line Icons**: Employs `R.drawable.ic_ph_back`, `R.drawable.ic_ph_sun`/`ic_ph_moon`, `R.drawable.ic_ph_tune`, `R.drawable.ic_ph_reset`, `R.drawable.ic_ph_play`/`ic_ph_pause`.
+  - **Circular Countdown Display**: Centered `CircularProgressRing` (230.dp, 5.dp stroke) with phase-aware animated colors (Green for Preparation, Cyan for Hold, Amber for Rest, Slate for Paused, Purple for Completed), ExtraLight minimalist numerals, and round ordinal indicators.
+  - **Circadian Theme Awareness**: Fully respects `ThemeMode.AMOLED`, `ThemeMode.LIGHT`, and `ThemeMode.EYE_COMFORT` with dynamic contrast luminance detection (`MaterialTheme.colorScheme.onBackground`, `onSurfaceVariant`, `errorContainer`).
+

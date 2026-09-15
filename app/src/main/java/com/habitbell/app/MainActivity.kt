@@ -227,6 +227,7 @@ class MainActivity : FragmentActivity() {
                                 onSelectProfile = { profile ->
                                     if (profile.isHoldTimerEnabled) {
                                         val config = profile.holdTimerConfig ?: com.habitbell.app.data.model.HoldTimerConfig.DEFAULT_YOGA_PHYSIO
+                                        viewModel.sessionHandler.loadProfile(profile)
                                         viewModel.holdTimerManager.initializeSession(config, enableVoiceListener = true)
                                         viewModel.navigateTo(AppScreen.HOLD_TIMER)
                                     } else {
@@ -363,6 +364,22 @@ class MainActivity : FragmentActivity() {
                                 onNavigateBack = {
                                     viewModel.holdTimerManager.stop()
                                     viewModel.navigateTo(AppScreen.HOME)
+                                },
+                                onToggleTheme = {
+                                    val nextTheme = when (uiState.selectedTheme) {
+                                        com.habitbell.app.data.model.ThemeMode.LIGHT -> com.habitbell.app.data.model.ThemeMode.AMOLED
+                                        else -> com.habitbell.app.data.model.ThemeMode.LIGHT
+                                    }
+                                    viewModel.setTheme(nextTheme)
+                                },
+                                onOpenSettings = {
+                                    viewModel.openSettingsDrawer(true, com.habitbell.app.ui.viewmodel.SettingsDrawerTab.TIMER)
+                                },
+                                onOpenVolumeSettings = {
+                                    viewModel.openVolumeSheet(true)
+                                },
+                                onOpenCastSettings = {
+                                    viewModel.openCastSheet(true)
                                 }
                             )
                         }
@@ -402,6 +419,10 @@ class MainActivity : FragmentActivity() {
                             },
                             onUpdateMantraCounterConfig = { profileId, config ->
                                 viewModel.updateMantraCounterConfig(profileId, config)
+                            },
+                            onUpdateHoldTimerConfig = { profileId, config ->
+                                viewModel.updateHoldTimerConfig(profileId, config)
+                                viewModel.holdTimerManager.engine.loadConfig(config)
                             },
                             onTestVoiceCue = { style, isTriBandha, volume -> viewModel.testPranayamaVoiceCue(style, isTriBandha, volume) },
                             onTestPranayamaIntervalBell = { viewModel.testPranayamaIntervalBell() },
