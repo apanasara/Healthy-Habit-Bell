@@ -68,8 +68,8 @@ class BreathCounterEngineTest {
         val bhramari = DefaultProfiles.BHRAMARI_COUNTER
         assertEquals(BreathTechnique.BHRAMARI, bhramari.breathCounterConfig?.technique)
 
-        // 4. Catalog size verification: 10 core profiles (including Mantra Counter)
-        assertEquals(10, DefaultProfiles.ALL_PRESETS.size)
+        // 4. Catalog size verification: 11 core profiles (including Mantra and Hold Timers)
+        assertEquals(11, DefaultProfiles.ALL_PRESETS.size)
     }
 
     /**

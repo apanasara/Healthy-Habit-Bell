@@ -46,16 +46,16 @@ class MantraCounterEngineTest {
         assertEquals(108, mConfig.targetBeads)
         assertEquals(1, mConfig.targetMalas)
         assertEquals(108, mConfig.totalTargetChants)
-        assertEquals(4.0f, mConfig.minVerseDurationSec, 0.01f)
-        assertEquals(1.2f, mConfig.interVersePauseThresholdSec, 0.01f)
+        assertEquals(2.5f, mConfig.minVerseDurationSec, 0.01f)
+        assertEquals(1.8f, mConfig.interVersePauseThresholdSec, 0.01f)
         assertEquals(MantraMode.EXTENDED_VERSE, mConfig.technique.defaultMode)
 
         // 2. Canonical technique parameter resolution via withTechnique()
         val mrityunjaya = mConfig.withTechnique(MantraTechnique.MAHA_MRITYUNJAYA)
         assertEquals(MantraTechnique.MAHA_MRITYUNJAYA, mrityunjaya.technique)
         assertEquals(108, mrityunjaya.targetBeads)
-        assertEquals(4.0f, mrityunjaya.minVerseDurationSec, 0.01f)
-        assertEquals(1.2f, mrityunjaya.interVersePauseThresholdSec, 0.01f)
+        assertEquals(2.8f, mrityunjaya.minVerseDurationSec, 0.01f)
+        assertEquals(1.8f, mrityunjaya.interVersePauseThresholdSec, 0.01f)
         assertEquals(MantraMode.EXTENDED_VERSE, mrityunjaya.technique.defaultMode)
 
         val aumkar = mConfig.withTechnique(MantraTechnique.AUMKAR)
@@ -68,14 +68,14 @@ class MantraCounterEngineTest {
         val ramJapa = mConfig.withTechnique(MantraTechnique.RAM_JAPA)
         assertEquals(MantraTechnique.RAM_JAPA, ramJapa.technique)
         assertEquals(108, ramJapa.targetBeads)
-        assertEquals(0.35f, ramJapa.minVerseDurationSec, 0.01f)
+        assertEquals(0.12f, ramJapa.minVerseDurationSec, 0.01f)
         assertEquals(0.45f, ramJapa.interVersePauseThresholdSec, 0.01f)
         assertEquals(MantraMode.SHORT_JAPA, ramJapa.technique.defaultMode)
 
         val tasbih = mConfig.withTechnique(MantraTechnique.TASBIH_DHIKR)
         assertEquals(MantraTechnique.TASBIH_DHIKR, tasbih.technique)
         assertEquals(100, tasbih.targetBeads)
-        assertEquals(0.40f, tasbih.minVerseDurationSec, 0.01f)
+        assertEquals(0.18f, tasbih.minVerseDurationSec, 0.01f)
         assertEquals(0.50f, tasbih.interVersePauseThresholdSec, 0.01f)
         assertEquals(MantraMode.SHORT_JAPA, tasbih.technique.defaultMode)
 
@@ -89,8 +89,8 @@ class MantraCounterEngineTest {
         val universal = mConfig.withTechnique(MantraTechnique.UNIVERSAL_VERSE)
         assertEquals(MantraTechnique.UNIVERSAL_VERSE, universal.technique)
         assertEquals(108, universal.targetBeads)
-        assertEquals(3.5f, universal.minVerseDurationSec, 0.01f)
-        assertEquals(1.2f, universal.interVersePauseThresholdSec, 0.01f)
+        assertEquals(2.2f, universal.minVerseDurationSec, 0.01f)
+        assertEquals(1.6f, universal.interVersePauseThresholdSec, 0.01f)
 
         // 3. User hardware preferences preservation across technique changes
         val customConfig = mConfig.copy(
@@ -105,8 +105,8 @@ class MantraCounterEngineTest {
         assertFalse(switched.isBeadHapticEnabled)
         assertFalse(switched.isMilestoneChimeEnabled)
 
-        // 4. Catalog size verification: 10 core presets in ALL_PRESETS
-        assertEquals(10, DefaultProfiles.ALL_PRESETS.size)
+        // 4. Catalog size verification: 11 core presets in ALL_PRESETS
+        assertEquals(11, DefaultProfiles.ALL_PRESETS.size)
     }
 
     /**

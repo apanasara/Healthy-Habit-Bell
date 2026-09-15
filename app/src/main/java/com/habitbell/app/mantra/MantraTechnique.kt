@@ -44,8 +44,8 @@ enum class MantraTechnique(
         scriptText = "ॐ भूर्भुवः स्वः तत्सवितुर्वरेण्यं भर्गो देवस्य धीमहि धियो यो नः प्रचोदयात्",
         defaultMode = MantraMode.EXTENDED_VERSE,
         defaultBeads = 108,
-        defaultMinDurationSec = 4.0f,
-        defaultInterPauseSec = 1.2f,
+        defaultMinDurationSec = 2.5f,
+        defaultInterPauseSec = 1.8f,
         description = "Sacred Vedic hymn of spiritual illumination and wisdom across 108 Mala beads."
     ),
 
@@ -60,8 +60,8 @@ enum class MantraTechnique(
         scriptText = "ॐ त्र्यम्बकं यजामहे सुगन्धिं पुष्टिवर्धनम् उर्वारुकमिव बन्धनान् मृत्योर्मुक्षीय मामृतात्",
         defaultMode = MantraMode.EXTENDED_VERSE,
         defaultBeads = 108,
-        defaultMinDurationSec = 4.0f,
-        defaultInterPauseSec = 1.2f,
+        defaultMinDurationSec = 2.8f,
+        defaultInterPauseSec = 1.8f,
         description = "The Great Death-Conquering Mantra for health, longevity, and liberation."
     ),
 
@@ -92,7 +92,7 @@ enum class MantraTechnique(
         scriptText = "श्री राम जय राम जय जय राम",
         defaultMode = MantraMode.SHORT_JAPA,
         defaultBeads = 108,
-        defaultMinDurationSec = 0.35f,
+        defaultMinDurationSec = 0.12f,
         defaultInterPauseSec = 0.45f,
         description = "Rhythmic continuous Taraka mantra japa across traditional 108-bead Mala."
     ),
@@ -108,7 +108,7 @@ enum class MantraTechnique(
         scriptText = "سُبْحَانَ ٱللَّٰهِ • ٱلْحَمْدُ لِلَّٰهِ • ٱللَّٰهُ أَكْبَرُ",
         defaultMode = MantraMode.SHORT_JAPA,
         defaultBeads = 100,
-        defaultMinDurationSec = 0.40f,
+        defaultMinDurationSec = 0.18f,
         defaultInterPauseSec = 0.50f,
         description = "Islamic prayer beads remembrance (33 SubhanAllah, 33 Alhamdulillah, 34 Allahu Akbar)."
     ),
@@ -140,8 +140,8 @@ enum class MantraTechnique(
         scriptText = "Sacred Verse & Scripture",
         defaultMode = MantraMode.EXTENDED_VERSE,
         defaultBeads = 108,
-        defaultMinDurationSec = 3.5f,
-        defaultInterPauseSec = 1.2f,
+        defaultMinDurationSec = 2.2f,
+        defaultInterPauseSec = 1.6f,
         description = "Customizable verse and scripture recitation counter supporting any spiritual tradition."
     )
 }

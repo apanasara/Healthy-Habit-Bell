@@ -37,8 +37,9 @@ import kotlin.math.sqrt
  *      while rejecting floor rumbles, fans, and high-frequency friction hiss.
  *   2. **Extended Verse Engine with Intra-Verse Pause Bridging**: Accumulates cumulative vocal
  *      duration across multi-line slokas (Gayatri, Maha Mrityunjaya, Surahs, Bible verses),
- *      bridging natural breathing pauses (< 1.2s) without resetting, and confirming exactly 1
- *      count when cumulative duration >= minimum threshold followed by a concluding pause (>= 1.5s).
+ *      bridging natural breathing pauses (< 1.8s) without resetting, and confirming exactly 1
+ *      count when cumulative duration >= minimum threshold followed by a concluding pause (>= 1.8s).
+ *      Uses dual-threshold hysteresis (trigger 1.0x, release 0.75x) to prevent chatter.
  *   3. **Short Japa Hysteresis Detector**: 3-stage state machine tracking vocal burst attack,
  *      peak decay, and valley drop-off with refractory lockout (>= 220ms) for rapid "Ram" or Tasbih chants.
  *   4. **Autocorrelation Pitch Tracker**: Identifies sustained periodic vocal resonance across
@@ -153,6 +154,23 @@ class AcousticMantraSensorProvider(
     /** Flag indicating whether the initial ambient acoustic calibration has completed. */
     var isCalibrated: Boolean = false
         private set
+
+    // --- RMS Smoothing Ring Buffer (Industry Best Practice: 3-Frame Moving Average) ---
+    /**
+     * Ring buffer holding the last [RMS_SMOOTHING_WINDOW] bandpass RMS values.
+     * A short moving average prevents single-frame noise spikes from triggering false
+     * threshold crossings — a standard technique in professional audio event detection.
+     */
+    private val rmsRingBuffer = FloatArray(3)
+
+    /** Current write index into [rmsRingBuffer] (circular). */
+    private var rmsRingIndex = 0
+
+    /** Number of frames written to [rmsRingBuffer] (capped at buffer size). */
+    private var rmsRingCount = 0
+
+    /** Size of the RMS smoothing window in frames (3 frames = ~96ms at 32ms per frame). */
+    private val RMS_SMOOTHING_WINDOW = 3
 
     // --- Extended Verse Engine State ---
     private var isVerseRecitationActive: Boolean = false
@@ -293,6 +311,9 @@ class AcousticMantraSensorProvider(
         aumkarStartTimeMillis = 0L
         isCurrentlyDroning = false
         bandpassFilter.reset()
+        rmsRingBuffer.fill(0f)
+        rmsRingIndex = 0
+        rmsRingCount = 0
         _inputFlow.value = MantraInputEvent()
     }
 
@@ -394,7 +415,18 @@ class AcousticMantraSensorProvider(
                     filteredSumSquares += (filtered * filtered)
                 }
                 val rawRms = sqrt(rawSumSquares / samplesRead).toFloat()
-                val bandpassRms = sqrt(filteredSumSquares / samplesRead).toFloat()
+                val rawBandpassRms = sqrt(filteredSumSquares / samplesRead).toFloat()
+
+                // 1b. Apply 3-frame moving average smoothing to bandpass RMS (Industry Best Practice)
+                // Prevents single-frame noise spikes from triggering false threshold crossings.
+                rmsRingBuffer[rmsRingIndex] = rawBandpassRms
+                rmsRingIndex = (rmsRingIndex + 1) % RMS_SMOOTHING_WINDOW
+                rmsRingCount = minOf(rmsRingCount + 1, RMS_SMOOTHING_WINDOW)
+                val bandpassRms = if (rmsRingCount >= RMS_SMOOTHING_WINDOW) {
+                    rmsRingBuffer.sum() / RMS_SMOOTHING_WINDOW
+                } else {
+                    rawBandpassRms // Not enough frames yet; use raw value during warm-up
+                }
 
                 // 2. Ambient Noise Calibration Window (Silent profiling pause: ~2.88s / 90 frames)
                 if (calibrationFramesRemaining > 0) {
@@ -483,9 +515,12 @@ class AcousticMantraSensorProvider(
     /**
      * Evaluates audio chunks for multi-line extended sacred verses (Gayatri Mantra, Maha Mrityunjaya, Surahs).
      *
-     * Key Innovation: **Intra-Verse Pause Bridging**:
+     * Key Innovation: **Intra-Verse Pause Bridging with Dual-Threshold Hysteresis**:
      * - Accumulates cumulative vocal energy duration while speech is active.
-     * - Line breath pauses (< 1.2s) are bridged without resetting the verse.
+     * - Uses dual-threshold hysteresis: trigger at 1.0× dynamicThreshold, release at 0.75×.
+     *   This prevents "chatter" (rapid on/off) when audio hovers near threshold, and allows
+     *   consonants and micro-pauses (which are lower energy) to be bridged without resetting.
+     * - Line breath pauses (< 1.8s) are bridged without resetting the verse.
      * - Confirms exactly 1 bead count when cumulative vocal duration >= [config.minVerseDurationSec]
      *   AND a concluding inter-verse silence >= [config.interVersePauseThresholdSec] is observed.
      *
@@ -509,12 +544,30 @@ class AcousticMantraSensorProvider(
         val floorLimit = max(0.008f, calibratedNoiseFloorRms * 0.70f)
         val dynamicThreshold = (dynamicNoiseFloorRms * (1.45f / sensitivity) + musicMargin + (0.008f / sensitivity)).coerceIn(0.015f + musicMargin, 0.12f)
 
+        // Dual-Threshold Hysteresis (Industry Best Practice):
+        // - Trigger threshold (1.0x): Sound must reach THIS level to START a detection
+        // - Release threshold (0.75x): Sound must fall below THIS level to END a detection
+        // This prevents "chatter" — rapid on/off toggling when audio hovers near the threshold.
+        val releaseThreshold = dynamicThreshold * 0.75f
+
         // Continuous ambient noise floor tracking (only when not actively reciting)
+        // Bug #4 Fix: Added slow upward adaptation path (α=0.005) when bandpassRms is
+        // between 70% and 100% of dynamicThreshold. Previously, if ambient noise settled
+        // at 71-99% of threshold, the noise floor would never adapt upward, leaving the
+        // system permanently miscalibrated. The upward path uses a very slow α to prevent
+        // legitimate speech from contaminating the noise floor estimate.
         if (!isVerseRecitationActive) {
             if (bandpassRms < dynamicNoiseFloorRms) {
+                // Fast downward adaptation (room getting quieter)
                 dynamicNoiseFloorRms = (dynamicNoiseFloorRms * 0.96f) + (bandpassRms * 0.04f)
             } else if (bandpassRms < dynamicThreshold * 0.70f) {
+                // Medium adaptation (ambient noise in safe zone below threshold)
                 dynamicNoiseFloorRms = (dynamicNoiseFloorRms * 0.98f) + (bandpassRms * 0.02f)
+            } else if (bandpassRms < dynamicThreshold) {
+                // Slow upward adaptation (ambient noise rising toward threshold - Bug #4 fix)
+                // Uses very slow α=0.005 to prevent legitimate speech onset from contaminating
+                // the noise floor estimate while still allowing gradual upward tracking.
+                dynamicNoiseFloorRms = (dynamicNoiseFloorRms * 0.995f) + (bandpassRms * 0.005f)
             }
             dynamicNoiseFloorRms = dynamicNoiseFloorRms.coerceIn(floorLimit, 0.08f)
         }
@@ -522,7 +575,15 @@ class AcousticMantraSensorProvider(
         val normalizedAmplitude = (rawRms * 3.5f).coerceIn(0f, 1f)
         val normalizedThreshold = (dynamicThreshold * 3.5f).coerceIn(0.05f, 0.95f)
 
-        val isSpeechDetected = bandpassRms > dynamicThreshold
+        // Dual-threshold hysteresis speech detection:
+        // - When NOT reciting: must exceed full dynamicThreshold to START (prevents noise triggering)
+        // - When ALREADY reciting: only need to stay above releaseThreshold (0.75x) to CONTINUE
+        //   (prevents premature verse termination during consonants and micro-pauses)
+        val isSpeechDetected = if (isVerseRecitationActive) {
+            bandpassRms > releaseThreshold
+        } else {
+            bandpassRms > dynamicThreshold
+        }
         val minVocalRequiredMs = (config.minVerseDurationSec * 1000L).toLong()
         val interPauseRequiredMs = (config.interVersePauseThresholdSec * 1000L).toLong()
 
@@ -626,11 +687,15 @@ class AcousticMantraSensorProvider(
         val dynamicThreshold = (dynamicNoiseFloorRms * (1.45f / sensitivity) + musicMargin + (0.008f / sensitivity)).coerceIn(0.015f + musicMargin, 0.12f)
 
         // Continuous ambient noise floor tracking
+        // Bug #4 Fix: Added slow upward adaptation (same as evaluateExtendedVerse)
         if (japaState == JapaState.IDLE_LISTENING) {
             if (bandpassRms < dynamicNoiseFloorRms) {
                 dynamicNoiseFloorRms = (dynamicNoiseFloorRms * 0.96f) + (bandpassRms * 0.04f)
             } else if (bandpassRms < dynamicThreshold * 0.70f) {
                 dynamicNoiseFloorRms = (dynamicNoiseFloorRms * 0.98f) + (bandpassRms * 0.02f)
+            } else if (bandpassRms < dynamicThreshold) {
+                // Slow upward adaptation (ambient noise rising toward threshold)
+                dynamicNoiseFloorRms = (dynamicNoiseFloorRms * 0.995f) + (bandpassRms * 0.005f)
             }
             dynamicNoiseFloorRms = dynamicNoiseFloorRms.coerceIn(floorLimit, 0.08f)
         }
