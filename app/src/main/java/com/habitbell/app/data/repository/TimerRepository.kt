@@ -273,6 +273,9 @@ class TimerRepository(private val context: Context) {
             "mantra", "mantra-counter", "mantra-japa", "japa" -> {
                 _profiles.value.find { it.id == "mantra-japa-counter" } ?: DefaultProfiles.MANTRA_COUNTER
             }
+            "yoga-physio-hold-timer", "hold-timer", "hold", "physio" -> {
+                _profiles.value.find { it.id == "yoga-physio-hold-timer" } ?: DefaultProfiles.YOGA_PHYSIO_HOLD_TIMER
+            }
             else -> null
         }
     }

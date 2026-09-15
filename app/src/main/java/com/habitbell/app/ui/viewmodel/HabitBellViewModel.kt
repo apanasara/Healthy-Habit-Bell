@@ -32,7 +32,10 @@ enum class AppScreen {
     CREATE_TIMER,
 
     /** Surya Namaskar sequence editor and companion synchronization screen. */
-    SURYA_TIMER
+    SURYA_TIMER,
+
+    /** Hands-free voice-driven Yoga & Physiotherapy hold timer screen. */
+    HOLD_TIMER
 }
 
 /**

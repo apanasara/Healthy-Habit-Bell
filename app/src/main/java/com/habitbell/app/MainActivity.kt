@@ -225,7 +225,13 @@ class MainActivity : FragmentActivity() {
                                 reminders = reminders,
                                 isZenMode = uiState.isZenMode,
                                 onSelectProfile = { profile ->
-                                    viewModel.selectProfileSession(profile)
+                                    if (profile.isHoldTimerEnabled) {
+                                        val config = profile.holdTimerConfig ?: com.habitbell.app.data.model.HoldTimerConfig.DEFAULT_YOGA_PHYSIO
+                                        viewModel.holdTimerManager.initializeSession(config, enableVoiceListener = true)
+                                        viewModel.navigateTo(AppScreen.HOLD_TIMER)
+                                    } else {
+                                        viewModel.selectProfileSession(profile)
+                                    }
                                 },
                                 onToggleZenMode = {
                                     viewModel.setZenMode(!uiState.isZenMode)
@@ -348,6 +354,16 @@ class MainActivity : FragmentActivity() {
                             com.habitbell.app.ui.SuryaTimerScreen(
                                 viewModel = suryaViewModel,
                                 onBack = { viewModel.navigateTo(AppScreen.HOME) }
+                            )
+                        }
+
+                        AppScreen.HOLD_TIMER -> {
+                            com.habitbell.app.ui.screens.HoldTimerScreen(
+                                manager = viewModel.holdTimerManager,
+                                onNavigateBack = {
+                                    viewModel.holdTimerManager.stop()
+                                    viewModel.navigateTo(AppScreen.HOME)
+                                }
                             )
                         }
                     }

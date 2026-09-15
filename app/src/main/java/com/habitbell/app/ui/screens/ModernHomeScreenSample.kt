@@ -263,6 +263,7 @@ fun ModernHomeScreenSample(
  */
 private fun resolvePhosphorIcon(profile: TimerProfile): Int {
     return when {
+        profile.isHoldTimerEnabled || profile.category.contains("Physio", ignoreCase = true) -> R.drawable.ic_ph_waves
         profile.isMantraCountingEnabled || profile.category.contains("Recitation", ignoreCase = true) -> R.drawable.ic_ph_sparkle
         profile.category.contains("Eating", ignoreCase = true) -> R.drawable.ic_ph_bowl
         profile.category.contains("Healing", ignoreCase = true) || profile.category.contains("Reiki", ignoreCase = true) -> R.drawable.ic_ph_sparkle
@@ -468,6 +469,7 @@ private fun ModernProfileRow(
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     val subtitle = when {
+                        profile.isHoldTimerEnabled -> "VOICE HOLD TIMER"
                         profile.isMantraCountingEnabled -> "SACRED JAPA"
                         profile.isBreathCountingEnabled -> "KRIYA BREATH"
                         profile.type == TimerType.LINEAR -> {
@@ -493,6 +495,7 @@ private fun ModernProfileRow(
 
             // Compact duration badge
             val badgeText = when {
+                profile.isHoldTimerEnabled -> "${profile.holdTimerConfig?.repeatCount ?: 4}r"
                 profile.isMantraCountingEnabled -> "${profile.mantraConfig?.targetBeads ?: 108}b"
                 profile.isBreathCountingEnabled -> "${profile.breathCounterConfig?.targetRounds ?: 3}r"
                 profile.type == TimerType.LINEAR -> "${profile.totalDurationSeconds / 60}m"
