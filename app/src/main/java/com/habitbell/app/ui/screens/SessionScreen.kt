@@ -353,6 +353,24 @@ private fun LandscapeSessionLayout(
                             onSelectTechnique = onSelectBreathTechnique,
                             onManualStrokeTap = onManualBreathStrokeTap
                         )
+                    } else if (sessionState.profile.isHoldTimerEnabled) {
+                        CircularProgressRing(
+                            progress = sessionState.progressFraction,
+                            size = 260.dp,
+                            strokeWidth = 6.dp
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier.clickable { onOpenSettings() }
+                            ) {
+                                Text(
+                                    text = sessionState.formattedRemainingTime,
+                                    fontSize = 58.sp,
+                                    fontWeight = FontWeight.ExtraLight,
+                                    color = MaterialTheme.colorScheme.onBackground
+                                )
+                            }
+                        }
                     } else {
                         val phase = sessionState.currentPranayamaPhase
                         if (phase != null) {
@@ -1087,6 +1105,46 @@ private fun PortraitSessionLayout(
                             onSelectTechnique = onSelectBreathTechnique,
                             onManualStrokeTap = onManualBreathStrokeTap
                         )
+                    } else if (sessionState.profile.isHoldTimerEnabled) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            CircularProgressRing(
+                                progress = sessionState.progressFraction,
+                                size = 280.dp,
+                                strokeWidth = 6.dp
+                            ) {
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    modifier = Modifier.clickable { onOpenSettings() }
+                                ) {
+                                    Text(
+                                        text = sessionState.formattedRemainingTime,
+                                        fontSize = 66.sp,
+                                        fontWeight = FontWeight.ExtraLight,
+                                        letterSpacing = (-1).sp,
+                                        color = MaterialTheme.colorScheme.onBackground
+                                    )
+                                    Spacer(modifier = Modifier.height(10.dp))
+                                    Surface(
+                                        shape = RoundedCornerShape(16.dp),
+                                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                                        modifier = Modifier.border(
+                                            1.dp,
+                                            MaterialTheme.colorScheme.primary.copy(alpha = 0.25f),
+                                            RoundedCornerShape(16.dp)
+                                        )
+                                    ) {
+                                        Text(
+                                            text = "HOLD TIMER • ROUND ${sessionState.currentRound}/${sessionState.totalRounds}",
+                                            fontSize = 11.sp,
+                                            letterSpacing = 1.2.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     } else {
                         PranayamaPortraitContent(
                             sessionState = sessionState,

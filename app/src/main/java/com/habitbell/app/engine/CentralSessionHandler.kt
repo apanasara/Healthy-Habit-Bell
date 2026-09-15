@@ -829,6 +829,7 @@ class CentralSessionHandler(private val application: Application) {
             "breathing" -> repository.getProfileById("pranayama-hatha-classical") ?: DefaultProfiles.PRANAYAMA_HATHA
             "breath-counter", "kriya", "kapalabhati", "bhastrika", "bhramari" -> repository.getProfileById("kriya-breath-counter") ?: DefaultProfiles.BREATH_COUNTER
             "mantra", "japa", "gayatri", "aumkar", "tasbih", "mantra-counter" -> repository.getProfileById("mantra-japa-counter") ?: DefaultProfiles.MANTRA_COUNTER
+            "hold", "hold-timer", "yoga-physio-hold-timer", "physio" -> repository.getProfileById("yoga-physio-hold-timer") ?: DefaultProfiles.YOGA_PHYSIO_HOLD_TIMER
             else -> repository.getProfileById(mediaId) ?: repository.profiles.value.firstOrNull() ?: DefaultProfiles.EATING
         }
         loadProfile(targetProfile)
@@ -858,6 +859,7 @@ class CentralSessionHandler(private val application: Application) {
             "breathing" -> repository.getProfileById("pranayama-hatha-classical") ?: DefaultProfiles.PRANAYAMA_HATHA
             "breath-counter", "kriya", "kapalabhati", "bhastrika", "bhramari" -> repository.getProfileById("kriya-breath-counter") ?: DefaultProfiles.BREATH_COUNTER
             "mantra", "japa", "gayatri", "aumkar", "tasbih", "mantra-counter" -> repository.getProfileById("mantra-japa-counter") ?: DefaultProfiles.MANTRA_COUNTER
+            "hold", "hold-timer", "yoga-physio-hold-timer", "physio" -> repository.getProfileById("yoga-physio-hold-timer") ?: DefaultProfiles.YOGA_PHYSIO_HOLD_TIMER
             else -> repository.getProfileById(mediaId) ?: repository.profiles.value.firstOrNull() ?: DefaultProfiles.EATING
         }
         startProfile(targetProfile)

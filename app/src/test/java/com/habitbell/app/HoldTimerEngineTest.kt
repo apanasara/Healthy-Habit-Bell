@@ -175,4 +175,19 @@ class HoldTimerEngineTest {
         // Advances to round 2
         assertEquals(2, engine.sessionState.value.currentRound)
     }
+
+    @Test
+    fun testTimerEngineLoadHoldTimerProfile() {
+        val timerEngine = com.habitbell.app.engine.TimerEngine()
+        val holdProfile = com.habitbell.app.data.default.DefaultProfiles.YOGA_PHYSIO_HOLD_TIMER
+
+        timerEngine.loadProfile(holdProfile)
+        val state = timerEngine.state.value
+
+        assertEquals("yoga-physio-hold-timer", state.profile.id)
+        assertEquals("Hold Timer", state.profile.name)
+        assertTrue(state.profile.isHoldTimerEnabled)
+        assertFalse("Hold timer must not be mistaken for mindful eating", state.profile.id.contains("eating"))
+        assertEquals(4, state.totalRounds)
+    }
 }

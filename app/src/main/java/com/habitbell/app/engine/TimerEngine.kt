@@ -298,6 +298,20 @@ class TimerEngine(
             return
         }
 
+        if (profile.isHoldTimerEnabled) {
+            val hConfig = profile.holdTimerConfig ?: return
+            val total = hConfig.totalEstimatedDurationSec
+            _state.value = TimerSessionState(
+                status = SessionStatus.IDLE,
+                profile = profile,
+                remainingSeconds = total,
+                totalSeconds = total,
+                currentRound = 1,
+                totalRounds = hConfig.repeatCount
+            )
+            return
+        }
+
         when (profile.type) {
             TimerType.LINEAR -> {
                 // Initialize linear countdown parameters
