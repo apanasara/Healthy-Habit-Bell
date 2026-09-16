@@ -904,6 +904,7 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
      * @param config Target [com.habitbell.app.data.model.HoldTimerConfig] containing voice cue style, volume, and speed.
      */
     fun testHoldVoiceCue(config: com.habitbell.app.data.model.HoldTimerConfig) {
+        android.util.Log.d("HabitBellViewModel", "testHoldVoiceCue: style=${config.voiceCueStyle}, volume=${config.voiceVolume}")
         sessionHandler.voiceEngine.auditionHoldCue(
             style = config.voiceCueStyle,
             volume = config.voiceVolume,

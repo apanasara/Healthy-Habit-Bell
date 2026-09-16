@@ -374,6 +374,16 @@ class HoldTimerEngine(
                     feedbackMessage = "$roundName Round • Begin Hold"
                 )
             }
+            // Delay lead-in to allow studio cue to articulate before countdown ticks commence
+            val cueLeadSec = if (voiceEngine != null) {
+                when (activeConfig.voiceCueStyle) {
+                    com.habitbell.app.data.model.VoiceCueStyle.BILINGUAL -> 3
+                    com.habitbell.app.data.model.VoiceCueStyle.SANSKRIT -> 2
+                    com.habitbell.app.data.model.VoiceCueStyle.ENGLISH -> 1
+                }
+            } else {
+                0
+            }
             delay(1200)
 
             // 2. Active Hold Phase Countdown Loop
@@ -386,8 +396,8 @@ class HoldTimerEngine(
                 actualHoldSec = sec
                 _sessionState.update { it.copy(currentSecond = sec) }
 
-                // Count out loud: "One", "Two", "Three" ...
-                if (activeConfig.isCountAloudEnabled) {
+                // Count out loud: only articulate numbers after lead-in cue has completed
+                if (activeConfig.isCountAloudEnabled && sec > cueLeadSec) {
                     speaker?.speak(numberWord(sec), activeConfig.ttsSpeed)
                 }
                 if (activeConfig.isHapticTickEnabled) {
@@ -422,6 +432,15 @@ class HoldTimerEngine(
                         feedbackMessage = "Rest • Recover"
                     )
                 }
+                val restLeadSec = if (voiceEngine != null) {
+                    when (activeConfig.voiceCueStyle) {
+                        com.habitbell.app.data.model.VoiceCueStyle.BILINGUAL -> 3
+                        com.habitbell.app.data.model.VoiceCueStyle.SANSKRIT -> 2
+                        com.habitbell.app.data.model.VoiceCueStyle.ENGLISH -> 1
+                    }
+                } else {
+                    0
+                }
                 delay(1000)
 
                 for (rSec in 1..restSec) {
@@ -431,7 +450,7 @@ class HoldTimerEngine(
                     val tickStart = SystemClock.elapsedRealtime()
                     _sessionState.update { it.copy(currentSecond = rSec) }
 
-                    if (activeConfig.isCountAloudEnabled) {
+                    if (activeConfig.isCountAloudEnabled && rSec > restLeadSec) {
                         speaker?.speak(numberWord(rSec), activeConfig.ttsSpeed)
                     }
                     if (activeConfig.isHapticTickEnabled) {
@@ -457,7 +476,14 @@ class HoldTimerEngine(
 
         // Conclude Session
         onMilestoneBell?.invoke()
-        speaker?.speak("Session complete", activeConfig.ttsSpeed)
+        if (voiceEngine != null) {
+            voiceEngine?.speakSessionCompleteCue(
+                volume = activeConfig.voiceVolume,
+                speedMultiplier = activeConfig.ttsSpeed
+            )
+        } else {
+            speaker?.speak("Session complete", activeConfig.ttsSpeed)
+        }
         _sessionState.update {
             it.copy(
                 phase = HoldTimerPhase.COMPLETED,
