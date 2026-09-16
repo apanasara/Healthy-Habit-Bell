@@ -154,24 +154,43 @@ class UnifiedVoiceEngine(
             }
 
             val voices = engine.voices
+            Log.d(TAG, "Configuring TTS voice profile. Selected locale: $selectedLocale, total voices: ${voices?.size ?: 0}")
             if (!voices.isNullOrEmpty()) {
+                // Prioritize female voices across Google TTS, Samsung, and Android AOSP engines.
+                // Google TTS uses identifiers like hi-in-x-hie-local (female), en-in-x-end-local (female), etc.
                 val femaleVoice = voices.firstOrNull { voice ->
                     val nameLower = voice.name.lowercase()
-                    (voice.locale.language == selectedLocale.language) &&
-                            (nameLower.contains("female") || nameLower.contains("swara") || nameLower.contains("fem") || nameLower.contains("#female"))
+                    val matchesLanguage = voice.locale.language == selectedLocale.language || voice.locale.country == "IN"
+                    matchesLanguage && (
+                        nameLower.contains("-hie-") || nameLower.contains("-end-") ||
+                        nameLower.contains("-enc-") || nameLower.contains("-ena-") ||
+                        nameLower.contains("-ene-") || nameLower.contains("female") ||
+                        nameLower.contains("swara") || nameLower.contains("#female") ||
+                        nameLower.contains("-sfg-") || nameLower.contains("-tpd-")
+                    )
                 } ?: voices.firstOrNull { voice ->
                     val nameLower = voice.name.lowercase()
-                    nameLower.contains("female") || nameLower.contains("fem")
+                    nameLower.contains("-hie-") || nameLower.contains("-end-") ||
+                    nameLower.contains("-enc-") || nameLower.contains("-ena-") ||
+                    nameLower.contains("-ene-") || nameLower.contains("female") ||
+                    nameLower.contains("swara")
+                } ?: voices.firstOrNull { voice ->
+                    val nameLower = voice.name.lowercase()
+                    (voice.locale.language == "hi" || (voice.locale.language == "en" && voice.locale.country == "IN")) &&
+                        !nameLower.contains("-hid-") && !nameLower.contains("-hic-") && !nameLower.contains("-enb-")
                 }
 
                 if (femaleVoice != null) {
                     engine.voice = femaleVoice
-                    Log.d(TAG, "Selected female TTS voice: ${femaleVoice.name}")
+                    engine.language = femaleVoice.locale
+                    Log.d(TAG, "Selected female TTS voice: ${femaleVoice.name} (locale: ${femaleVoice.locale})")
+                } else {
+                    Log.d(TAG, "No female voice matched. Active default voice: ${engine.voice?.name}")
                 }
             }
 
-            // Elevated sweet pitch (+52Hz equivalent 1.16f) and serene unhurried cadence
-            engine.setPitch(1.16f)
+            // Elevated sweet pitch (+52Hz equivalent 1.20f) and serene unhurried cadence
+            engine.setPitch(1.20f)
             engine.setSpeechRate(defaultSpeechRate)
         } catch (e: Exception) {
             Log.w(TAG, "Error configuring female TTS voice parameters", e)
@@ -490,19 +509,9 @@ class UnifiedVoiceEngine(
         val rawRes = when (style) {
             VoiceCueStyle.SANSKRIT -> R.raw.pranayama_kumbhak_sanskrit
             VoiceCueStyle.BILINGUAL -> R.raw.pranayama_kumbhak_bilingual
-            VoiceCueStyle.ENGLISH -> null
+            VoiceCueStyle.ENGLISH -> R.raw.hold_cue_english
         }
-
-        if (rawRes != null) {
-            playMasteredAudio(rawRes, safeVol)
-        } else {
-            val announcement = when (style) {
-                VoiceCueStyle.SANSKRIT -> "$roundOrdinal... कुम्भक"
-                VoiceCueStyle.BILINGUAL -> "$roundOrdinal Round... कुम्भक Hold"
-                VoiceCueStyle.ENGLISH -> "$roundOrdinal Round... Hold"
-            }
-            speakWithDucking(announcement, speedMultiplier, safeVol)
-        }
+        playMasteredAudio(rawRes, safeVol)
     }
 
     /**
@@ -523,19 +532,24 @@ class UnifiedVoiceEngine(
         val rawRes = when (style) {
             VoiceCueStyle.SANSKRIT -> R.raw.pranayama_rechak_sanskrit
             VoiceCueStyle.BILINGUAL -> R.raw.pranayama_rechak_bilingual
-            VoiceCueStyle.ENGLISH -> null
+            VoiceCueStyle.ENGLISH -> R.raw.rest_cue_english
         }
+        playMasteredAudio(rawRes, safeVol)
+    }
 
-        if (rawRes != null) {
-            playMasteredAudio(rawRes, safeVol)
-        } else {
-            val announcement = when (style) {
-                VoiceCueStyle.SANSKRIT -> "रेचक... विश्राम"
-                VoiceCueStyle.BILINGUAL -> "रेचक... Rest"
-                VoiceCueStyle.ENGLISH -> "Rest"
-            }
-            speakWithDucking(announcement, speedMultiplier, safeVol)
-        }
+    /**
+     * Articulates session completion with studio-mastered Lata voice asset or unified TTS fallback.
+     *
+     * @param volume Spoken gain factor.
+     * @param speedMultiplier Cadence multiplier.
+     */
+    fun speakSessionCompleteCue(
+        volume: Float = masterVoiceVolume,
+        speedMultiplier: Float = defaultSpeechRate
+    ) {
+        if (!isVoiceEnabled) return
+        val safeVol = volume.coerceIn(0.15f, 1.0f)
+        playMasteredAudio(R.raw.hold_session_complete, safeVol)
     }
 
     /**
@@ -550,6 +564,7 @@ class UnifiedVoiceEngine(
         volume: Float = masterVoiceVolume,
         speedMultiplier: Float = defaultSpeechRate
     ) {
+        Log.d(TAG, "auditionHoldCue triggered: style=$style, volume=$volume, speed=$speedMultiplier")
         speakHoldStartCue(
             roundOrdinal = "First",
             style = style,
@@ -570,6 +585,7 @@ class UnifiedVoiceEngine(
      * @param volume Floating-point volume gain (0.15f..1.0f).
      */
     fun playMasteredAudio(@RawRes resId: Int, volume: Float) {
+        Log.d(TAG, "playMasteredAudio called for resId=$resId, volume=$volume")
         activePlaybackJob?.cancel()
         activePlaybackJob = scope.launch {
             stopActiveMediaPlayer()
@@ -586,8 +602,7 @@ class UnifiedVoiceEngine(
                     .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
                     .build()
 
-                activeMediaPlayer = MediaPlayer.create(context, resId)?.apply {
-                    setAudioAttributes(attributes)
+                activeMediaPlayer = MediaPlayer.create(context, resId, attributes, 0)?.apply {
                     val safeVol = volume.coerceIn(0.15f, 1.0f)
                     setVolume(safeVol, safeVol)
 
@@ -626,8 +641,6 @@ class UnifiedVoiceEngine(
     fun speakWithDucking(text: String, speedMultiplier: Float = 0.85f, volume: Float = masterVoiceVolume) {
         activePlaybackJob?.cancel()
         activePlaybackJob = scope.launch {
-            stopActiveMediaPlayer()
-
             bgMusicManager?.duckVolume(duckedRatio = 0.20f, durationMs = 350L)
             delay(120L)
 

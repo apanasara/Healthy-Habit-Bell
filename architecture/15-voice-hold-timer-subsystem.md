@@ -141,7 +141,8 @@ To preserve deep meditational continuity across Habit Bell, the Hold Timer deleg
   - Before voice cue commences: ducks background soundscape smoothly to `0.20f` volume over a 350ms curve with a 120ms anti-startle delay.
   - Upon cue completion or cancellation: restores background audio to full volume over 500ms.
 - **Voice Cue Styles & In-Drawer Auditioning**:
-  - Supports Sanskrit (`Kumbhaka` / `Rechaka`), Bilingual (`Hold Kumbhaka` / `Exhale Rechaka`), and English (`Hold Breath` / `Release`).
+  - Supports Sanskrit (`Kumbhaka` / `Rechaka`), Bilingual (`Hold Kumbhaka` / `Exhale Rechaka`), and English (`Hold Breath` / `Release`), all backed by studio-mastered Lata voice assets (`hold_cue_english.mp3`, `rest_cue_english.mp3`, `hold_session_complete.mp3`).
+  - **Lead-in Separation**: Implements a dedicated lead-in delay (`cueLeadSec` / `restLeadSec`: 3s for Bilingual, 2s for Sanskrit, 1s for English) ensuring studio vocal cues finish cleanly before numeric count-aloud speech loops begin, preventing voice overlap.
   - Auditionable directly in `HoldTimerSettingsSheet` inside `SettingsDrawer` with dedicated volume and cadence controls.
 
 ---

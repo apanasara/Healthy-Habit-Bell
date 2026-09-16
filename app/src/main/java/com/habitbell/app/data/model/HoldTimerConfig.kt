@@ -37,7 +37,7 @@ data class HoldTimerConfig(
     val repeatCount: Int = 4,
     val roundNames: List<String> = DEFAULT_ROUND_NAMES,
     val maxHoldSec: Int = 60,
-    val ttsVoice: String = "en-US",
+    val ttsVoice: String = "hi-IN-SwaraNeural",
     val ttsSpeed: Float = 0.85f,
     val isCountAloudEnabled: Boolean = true,
     val isHapticTickEnabled: Boolean = true,
