@@ -1,18 +1,10 @@
 package com.habitbell.app.engine
 
 import android.content.Context
-import android.media.MediaPlayer
-import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.speech.tts.TextToSpeech
-import android.speech.tts.UtteranceProgressListener
-import android.speech.tts.Voice
-import android.util.Log
-import com.habitbell.app.R
+import com.habitbell.app.audio.UnifiedVoiceEngine
 import com.habitbell.app.data.model.PranayamaPhase
 import com.habitbell.app.data.model.VoiceCueStyle
-import java.util.*
 
 /**
  * # PranayamaVoiceGuide
@@ -21,10 +13,10 @@ import java.util.*
  *
  * ## Architectural Role & Subsystem Relationships
  * - **Audio Subsystem**: Operates within the Central Engine Layer alongside [AudioBellManager] and [BackgroundMusicManager].
+ * - **Unified Delegation**: Delegates all voice synthesis and studio asset playback to the process-level
+ *   [UnifiedVoiceEngine] ensuring a single TextToSpeech hardware handle and consistent Lata Mangeshkar profile.
  * - **Mastered Melodious Cues**: Delivers studio-mastered authentic Indian female voice cues in a sweet,
  *   high-frequency swara (reminiscent of classical Bollywood vocalists such as Lata Mangeshkar) with unhurried cadence.
- * - **TextToSpeech Hardware Handle**: Coordinates Android's native offline [TextToSpeech] engine as an
- *   adaptive fallback, configuring a gentle, serene female voice profile with mindful cadence and pitch.
  * - **Dynamic Audio Ducking**: Interfaces directly with [BackgroundMusicManager] to smoothly attenuate ambient
  *   background meditation drones during voice cues using raised-cosine crossfades.
  *
@@ -34,185 +26,30 @@ import java.util.*
  *
  * @param context Component or application context.
  * @param bgMusicManager Reference to ambient music coordinator for volume ducking.
+ * @param unifiedVoiceEngine Single authoritative voice engine instance (defaults to newly created or injected).
  */
 class PranayamaVoiceGuide(
     private val context: Context,
-    private val bgMusicManager: BackgroundMusicManager? = null
+    private val bgMusicManager: BackgroundMusicManager? = null,
+    val unifiedVoiceEngine: UnifiedVoiceEngine = UnifiedVoiceEngine(context, bgMusicManager)
 ) : TextToSpeech.OnInitListener {
 
-    private val TAG = "PranayamaVoiceGuide"
-
-    /** Main thread handler for scheduling audio ducking delays and resource cleanup. */
-    private val mainHandler = Handler(Looper.getMainLooper())
-
-    /** Native Android TextToSpeech engine handle. */
-    private var tts: TextToSpeech? = null
-
-    /** Active media player instance for studio-mastered audio cues. */
-    private var mediaPlayer: MediaPlayer? = null
-
     /** Flag indicating whether the TTS engine is successfully initialized and ready. */
-    @Volatile
-    var isInitialized: Boolean = false
-        private set
+    val isInitialized: Boolean
+        get() = unifiedVoiceEngine.isTtsReady
 
     /** Master toggle governing whether voice guidance cues are spoken. */
-    var isVoiceEnabled: Boolean = true
+    var isVoiceEnabled: Boolean
+        get() = unifiedVoiceEngine.isVoiceEnabled
+        set(value) { unifiedVoiceEngine.isVoiceEnabled = value }
 
     /** Active linguistic cue presentation style. Defaults to classical Sanskrit. */
-    var cueStyle: VoiceCueStyle = VoiceCueStyle.SANSKRIT
+    var cueStyle: VoiceCueStyle
+        get() = unifiedVoiceEngine.defaultCueStyle
+        set(value) { unifiedVoiceEngine.defaultCueStyle = value }
 
-    init {
-        try {
-            tts = TextToSpeech(context.applicationContext, this)
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to instantiate TextToSpeech engine", e)
-        }
-    }
-
-    /**
-     * TextToSpeech engine initialization callback.
-     * Selects a high-quality, gentle female voice and configures meditative pitch and speech rate.
-     *
-     * @param status [TextToSpeech.SUCCESS] or [TextToSpeech.ERROR].
-     */
     override fun onInit(status: Int) {
-        if (status == TextToSpeech.SUCCESS) {
-            tts?.let { engine ->
-                configureGentleVoice(engine)
-                setupUtteranceListener(engine)
-                isInitialized = true
-                Log.d(TAG, "PranayamaVoiceGuide TextToSpeech initialized successfully")
-            }
-        } else {
-            Log.w(TAG, "TextToSpeech initialization failed with status: $status")
-            isInitialized = false
-        }
-    }
-
-    /**
-     * Inspects available TTS system voices to prioritize a natural, sweet, melodious female timbre.
-     * Prioritizes high-comfort Indian English (en_IN) or Hindi (hi_IN) female voices.
-     *
-     * @param engine Target [TextToSpeech] instance.
-     */
-    private fun configureGentleVoice(engine: TextToSpeech) {
-        try {
-            val preferredLocales = listOf(
-                Locale("hi", "IN"),
-                Locale("en", "IN"),
-                Locale.US,
-                Locale.getDefault()
-            )
-
-            var selectedLocale = Locale.US
-            for (loc in preferredLocales) {
-                val availability = engine.isLanguageAvailable(loc)
-                if (availability >= TextToSpeech.LANG_AVAILABLE) {
-                    engine.language = loc
-                    selectedLocale = loc
-                    break
-                }
-            }
-
-            val voices = engine.voices
-            if (!voices.isNullOrEmpty()) {
-                val femaleVoice = voices.firstOrNull { voice ->
-                    val nameLower = voice.name.lowercase()
-                    (voice.locale.language == selectedLocale.language) &&
-                            (nameLower.contains("female") || nameLower.contains("swara") || nameLower.contains("fem") || nameLower.contains("#female"))
-                } ?: voices.firstOrNull { voice ->
-                    val nameLower = voice.name.lowercase()
-                    nameLower.contains("female") || nameLower.contains("fem")
-                }
-
-                if (femaleVoice != null) {
-                    engine.voice = femaleVoice
-                    Log.d(TAG, "Selected female TTS voice: ${femaleVoice.name}")
-                }
-            }
-
-            // Serene, slow meditative rate (0.55x) and sweet, melodious high pitch (1.14f)
-            engine.setSpeechRate(0.55f)
-            engine.setPitch(1.14f)
-        } catch (e: Exception) {
-            Log.w(TAG, "Error configuring female TTS voice parameters", e)
-        }
-    }
-
-    /**
-     * Configures utterance completion listeners to coordinate dynamic audio ducking
-     * with [BackgroundMusicManager].
-     *
-     * @param engine Active [TextToSpeech] instance.
-     */
-    private fun setupUtteranceListener(engine: TextToSpeech) {
-        engine.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
-            override fun onStart(utteranceId: String?) {}
-
-            override fun onDone(utteranceId: String?) {
-                bgMusicManager?.restoreVolume()
-            }
-
-            @Deprecated("Deprecated in Java")
-            override fun onError(utteranceId: String?) {
-                bgMusicManager?.restoreVolume()
-            }
-
-            override fun onError(utteranceId: String?, errorCode: Int) {
-                bgMusicManager?.restoreVolume()
-                Log.w(TAG, "TTS utterance error: $errorCode for id: $utteranceId")
-            }
-        })
-    }
-
-    /**
-     * Resolves the high-definition studio-mastered audio resource corresponding to [phase] and [style].
-     *
-     * ## Step Timing vs. Voice Timing Law:
-     * High-fidelity, melodious bilingual cues ("Purak... Inhale", "Kumbhak... Hold") require ~5.6s–5.9s
-     * to articulate fully in an unhurried, sweet, meditative Lata-style swara without feeling rushed.
-     * If [style] is [VoiceCueStyle.BILINGUAL] but [stepDurationSeconds] is less than 6 seconds (e.g., a 4s
-     * or 2s/3s Purak step), the engine automatically falls back to the clean single-language Sanskrit cue
-     * ("Purak", 2.2s). This strictly prevents mid-word audio clipping (e.g. "Purak... In-") while
-     * preserving genuine soothing pacing for steps that can accommodate it (e.g., 8s or 16s Kumbhak).
-     *
-     * @param phase Active breathwork phase ([PranayamaPhase]).
-     * @param style Linguistic delivery style ([VoiceCueStyle]).
-     * @param stepDurationSeconds Duration allocated for this breath phase in seconds (optional).
-     * @return Raw resource ID, or null if TTS fallback should be utilized.
-     */
-    private fun resolveAudioResource(
-        phase: PranayamaPhase,
-        style: VoiceCueStyle,
-        stepDurationSeconds: Int? = null
-    ): Int? {
-        // Enforce Step Timing vs. Voice Timing Law:
-        // Bilingual audio requires ~5.6s-5.9s. When a step is under 6 seconds, fall back to
-        // the concise 2.2s Sanskrit cue so "Inhale" or "Exhale" is never cut off mid-word.
-        val effectiveStyle = if (style == VoiceCueStyle.BILINGUAL && stepDurationSeconds != null && stepDurationSeconds < 6) {
-            VoiceCueStyle.SANSKRIT
-        } else {
-            style
-        }
-
-        return when (effectiveStyle) {
-            VoiceCueStyle.SANSKRIT -> when (phase) {
-                PranayamaPhase.INHALE -> R.raw.pranayama_purak_sanskrit
-                PranayamaPhase.HOLD_IN -> R.raw.pranayama_kumbhak_sanskrit
-                PranayamaPhase.EXHALE -> R.raw.pranayama_rechak_sanskrit
-                // In traditional 4-step Pranayama, both retention steps (internal and external) are Kumbhaka
-                PranayamaPhase.HOLD_OUT -> R.raw.pranayama_kumbhak_sanskrit
-            }
-            VoiceCueStyle.BILINGUAL -> when (phase) {
-                PranayamaPhase.INHALE -> R.raw.pranayama_purak_bilingual
-                PranayamaPhase.HOLD_IN -> R.raw.pranayama_kumbhak_bilingual
-                PranayamaPhase.EXHALE -> R.raw.pranayama_rechak_bilingual
-                // In traditional 4-step Pranayama, both retention steps (internal and external) are Kumbhaka
-                PranayamaPhase.HOLD_OUT -> R.raw.pranayama_kumbhak_bilingual
-            }
-            VoiceCueStyle.ENGLISH -> null
-        }
+        // Maintained for backward compatibility
     }
 
     /**
@@ -234,16 +71,13 @@ class PranayamaVoiceGuide(
         volume: Float = 0.52f,
         stepDurationSeconds: Int? = null
     ) {
-        if (!isVoiceEnabled) return
-
-        val safeVol = volume.coerceIn(0.15f, 1.0f)
-        val rawRes = resolveAudioResource(phase, style, stepDurationSeconds)
-
-        if (rawRes != null) {
-            playMasteredAudio(rawRes, safeVol)
-        } else {
-            speakWithTts(phase, style, isTriBandhaVoiceEnabled, safeVol, stepDurationSeconds)
-        }
+        unifiedVoiceEngine.speakPranayamaCue(
+            phase = phase,
+            style = style,
+            isTriBandhaVoiceEnabled = isTriBandhaVoiceEnabled,
+            volume = volume,
+            stepDurationSeconds = stepDurationSeconds
+        )
     }
 
     /**
@@ -258,143 +92,24 @@ class PranayamaVoiceGuide(
         isTriBandhaVoiceEnabled: Boolean = false,
         volume: Float = 0.52f
     ) {
-        val safeVol = volume.coerceIn(0.15f, 1.0f)
-        val samplePhase = if (isTriBandhaVoiceEnabled) PranayamaPhase.HOLD_IN else PranayamaPhase.INHALE
-        val rawRes = resolveAudioResource(samplePhase, style, stepDurationSeconds = 8)
-
-        if (rawRes != null) {
-            playMasteredAudio(rawRes, safeVol)
-        } else {
-            speakWithTts(samplePhase, style, isTriBandhaVoiceEnabled, safeVol, stepDurationSeconds = 8)
-        }
-    }
-
-    /**
-     * Plays a high-definition studio-mastered audio asset with smooth ducking and lifecycle management.
-     *
-     * @param resId Raw resource ID from [R.raw].
-     * @param volume Floating-point volume gain (0.0f..1.0f).
-     */
-    private fun playMasteredAudio(resId: Int, volume: Float) {
-        try {
-            stopMediaPlayer()
-            bgMusicManager?.duckVolume(0.20f, 350L)
-
-            // Lead delay allowing ambient background music to glide down smoothly before voice entry
-            mainHandler.postDelayed({
-                try {
-                    mediaPlayer = MediaPlayer.create(context, resId)?.apply {
-                        setVolume(volume, volume)
-                        setOnCompletionListener { mp ->
-                            bgMusicManager?.restoreVolume(500L)
-                            mp.release()
-                            mediaPlayer = null
-                        }
-                        start()
-                    }
-                } catch (e: Exception) {
-                    Log.e(TAG, "Error playing mastered Pranayama audio cue", e)
-                    bgMusicManager?.restoreVolume()
-                }
-            }, 120L)
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to initiate mastered audio cue", e)
-            bgMusicManager?.restoreVolume()
-        }
-    }
-
-    /**
-     * Synthesizes speech through native Android TTS engine when raw assets are unavailable.
-     */
-    private fun speakWithTts(
-        phase: PranayamaPhase,
-        style: VoiceCueStyle,
-        isTriBandhaVoiceEnabled: Boolean,
-        volume: Float,
-        stepDurationSeconds: Int? = null
-    ) {
-        if (!isInitialized || tts == null) return
-
-        val effectiveStyle = if (style == VoiceCueStyle.BILINGUAL && stepDurationSeconds != null && stepDurationSeconds < 6) {
-            VoiceCueStyle.SANSKRIT
-        } else {
-            style
-        }
-
-        val text = when (effectiveStyle) {
-            VoiceCueStyle.SANSKRIT -> when (phase) {
-                PranayamaPhase.INHALE -> "पूरक..."
-                PranayamaPhase.HOLD_IN -> if (isTriBandhaVoiceEnabled) "कुम्भक... त्रिबन्ध..." else "कुम्भक..."
-                PranayamaPhase.EXHALE -> "रेचक..."
-                PranayamaPhase.HOLD_OUT -> if (isTriBandhaVoiceEnabled) "कुम्भक... त्रिबन्ध..." else "कुम्भक..."
-            }
-            VoiceCueStyle.BILINGUAL -> when (phase) {
-                PranayamaPhase.INHALE -> "पूरक Inhale"
-                PranayamaPhase.HOLD_IN -> if (isTriBandhaVoiceEnabled) "कुम्भक Hold with Tri-Bandha" else "कुम्भक Hold"
-                PranayamaPhase.EXHALE -> "रेचक Exhale"
-                PranayamaPhase.HOLD_OUT -> if (isTriBandhaVoiceEnabled) "कुम्भक Hold with Tri-Bandha" else "कुम्भक Hold"
-            }
-            VoiceCueStyle.ENGLISH -> when (phase) {
-                PranayamaPhase.INHALE -> "Inhale"
-                PranayamaPhase.HOLD_IN -> if (isTriBandhaVoiceEnabled) "Hold... Tri-Bandha" else "Hold"
-                PranayamaPhase.EXHALE -> "Exhale"
-                PranayamaPhase.HOLD_OUT -> "Hold"
-            }
-        }
-
-        try {
-            bgMusicManager?.duckVolume(0.20f, 350L)
-            mainHandler.postDelayed({
-                val params = Bundle().apply {
-                    putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, volume)
-                }
-                val utteranceId = "pranayama_cue_${System.currentTimeMillis()}"
-                tts?.speak(text, TextToSpeech.QUEUE_FLUSH, params, utteranceId)
-            }, 120L)
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to speak Pranayama cue: $text", e)
-            bgMusicManager?.restoreVolume()
-        }
-    }
-
-    /**
-     * Safely stops and releases active [MediaPlayer] instances.
-     */
-    private fun stopMediaPlayer() {
-        try {
-            mediaPlayer?.let {
-                if (it.isPlaying) {
-                    it.stop()
-                }
-                it.release()
-            }
-        } catch (_: Exception) {}
-        mediaPlayer = null
+        unifiedVoiceEngine.auditionPranayamaCue(
+            style = style,
+            isTriBandhaVoiceEnabled = isTriBandhaVoiceEnabled,
+            volume = volume
+        )
     }
 
     /**
      * Halts ongoing speech synthesis or audio playback immediately and restores ambient volume.
      */
     fun stop() {
-        stopMediaPlayer()
-        try {
-            tts?.stop()
-        } catch (_: Exception) {}
-        bgMusicManager?.restoreVolume()
+        unifiedVoiceEngine.stop()
     }
 
     /**
      * Releases system TTS engine and frees audio handles.
      */
     fun shutdown() {
-        stopMediaPlayer()
-        try {
-            tts?.stop()
-            tts?.shutdown()
-            tts = null
-            isInitialized = false
-        } catch (e: Exception) {
-            Log.e(TAG, "Error releasing TextToSpeech", e)
-        }
+        unifiedVoiceEngine.shutdown()
     }
 }

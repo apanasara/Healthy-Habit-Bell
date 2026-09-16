@@ -30,8 +30,10 @@ import kotlinx.coroutines.flow.StateFlow
 class HoldTimerManager(
     private val context: Context? = null,
     val bgMusicManager: com.habitbell.app.engine.BackgroundMusicManager? = null,
+    val voiceEngine: com.habitbell.app.audio.UnifiedVoiceEngine? = context?.let { com.habitbell.app.audio.UnifiedVoiceEngine(it, bgMusicManager) },
     val engine: HoldTimerEngine = HoldTimerEngine(
-        speaker = context?.let { AndroidDualCueSpeaker(it, bgMusicManager) }
+        speaker = voiceEngine ?: context?.let { AndroidDualCueSpeaker(it, bgMusicManager) },
+        voiceEngine = voiceEngine
     ),
     val voiceSource: VoiceCommandSource = context?.let { AndroidSpeechCommandSource(it) } ?: SimulatedVoiceCommandSource(),
     private val hapticManager: HapticManager? = context?.let { HapticManager(it) },

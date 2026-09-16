@@ -38,151 +38,30 @@ interface DualCueSpeaker {
 /**
  * # AndroidDualCueSpeaker
  *
- * Native Android [TextToSpeech] implementation of [DualCueSpeaker] matching the acoustic profile
- * of Pranayama voice guidance (Lata Mangeshkar / Swara style female timbre, elevated sweet pitch +52Hz/1.18f,
- * calm unhurried cadence, and dynamic audio ducking via [BackgroundMusicManager]).
+ * Native [DualCueSpeaker] implementation delegating to the unified voice engine [UnifiedVoiceEngine]
+ * matching the acoustic profile of Pranayama voice guidance (Lata Mangeshkar timbre,
+ * elevated sweet pitch +52Hz/1.16f, unhurried cadence, and dynamic audio ducking via [BackgroundMusicManager]).
  *
  * @param context Android context for TTS engine initialization.
  * @param bgMusicManager Optional ambient music coordinator for smooth raised-cosine ducking.
+ * @param unifiedVoiceEngine Single authoritative voice engine instance.
  */
 class AndroidDualCueSpeaker(
     context: Context,
-    private val bgMusicManager: BackgroundMusicManager? = null
-) : DualCueSpeaker, TextToSpeech.OnInitListener {
-
-    private val TAG = "AndroidDualCueSpeaker"
-    private var tts: TextToSpeech? = null
-    private var isInitialized = false
-
-    init {
-        try {
-            tts = TextToSpeech(context.applicationContext, this)
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to instantiate Android TextToSpeech engine", e)
-        }
-    }
-
-    override fun onInit(status: Int) {
-        if (status == TextToSpeech.SUCCESS) {
-            tts?.let { engine ->
-                configureGentleVoice(engine)
-                setupUtteranceListener(engine)
-                isInitialized = true
-                Log.d(TAG, "AndroidDualCueSpeaker TextToSpeech initialized successfully with Pranayama profile")
-            }
-        } else {
-            Log.e(TAG, "Failed to initialize Android TextToSpeech (status $status)")
-            isInitialized = false
-        }
-    }
-
-    /**
-     * Prioritizes high-comfort Indian English (en_IN) or Hindi (hi_IN) female voices matching
-     * the sweet, melodious Swara / Lata-style acoustic profile used in Pranayama.
-     *
-     * @param engine Target [TextToSpeech] instance.
-     */
-    private fun configureGentleVoice(engine: TextToSpeech) {
-        try {
-            val preferredLocales = listOf(
-                Locale("hi", "IN"),
-                Locale("en", "IN"),
-                Locale.US,
-                Locale.getDefault()
-            )
-
-            var selectedLocale = Locale.US
-            for (loc in preferredLocales) {
-                val availability = engine.isLanguageAvailable(loc)
-                if (availability >= TextToSpeech.LANG_AVAILABLE) {
-                    engine.language = loc
-                    selectedLocale = loc
-                    break
-                }
-            }
-
-            val voices = engine.voices
-            if (!voices.isNullOrEmpty()) {
-                val femaleVoice = voices.firstOrNull { voice ->
-                    val nameLower = voice.name.lowercase()
-                    (voice.locale.language == selectedLocale.language) &&
-                            (nameLower.contains("female") || nameLower.contains("swara") || nameLower.contains("fem") || nameLower.contains("#female"))
-                } ?: voices.firstOrNull { voice ->
-                    val nameLower = voice.name.lowercase()
-                    nameLower.contains("female") || nameLower.contains("fem")
-                }
-
-                if (femaleVoice != null) {
-                    engine.voice = femaleVoice
-                    Log.d(TAG, "Selected gentle female TTS voice: ${femaleVoice.name}")
-                }
-            }
-
-            // High sweet pitch (1.18f) matching Lata / Pranayama profile and unhurried default cadence (0.85f)
-            engine.setPitch(1.18f)
-            engine.setSpeechRate(0.85f)
-        } catch (e: Exception) {
-            Log.w(TAG, "Error configuring female TTS voice parameters", e)
-        }
-    }
-
-    /**
-     * Configures utterance completion listeners to restore background music volume smoothly.
-     *
-     * @param engine Active [TextToSpeech] instance.
-     */
-    private fun setupUtteranceListener(engine: TextToSpeech) {
-        engine.setOnUtteranceProgressListener(object : android.speech.tts.UtteranceProgressListener() {
-            override fun onStart(utteranceId: String?) {}
-
-            override fun onDone(utteranceId: String?) {
-                bgMusicManager?.restoreVolume(durationMs = 500L)
-            }
-
-            @Deprecated("Deprecated in Java")
-            override fun onError(utteranceId: String?) {
-                bgMusicManager?.restoreVolume(durationMs = 500L)
-            }
-
-            override fun onError(utteranceId: String?, errorCode: Int) {
-                bgMusicManager?.restoreVolume(durationMs = 500L)
-                Log.w(TAG, "TTS utterance error: $errorCode for id: $utteranceId")
-            }
-        })
-    }
+    private val bgMusicManager: BackgroundMusicManager? = null,
+    val unifiedVoiceEngine: com.habitbell.app.audio.UnifiedVoiceEngine = com.habitbell.app.audio.UnifiedVoiceEngine(context, bgMusicManager)
+) : DualCueSpeaker {
 
     override fun speak(text: String, speedMultiplier: Float) {
-        if (!isInitialized || tts == null) return
-        try {
-            // Apply unhurried multiplier anchored to calm baseline
-            val safeSpeed = speedMultiplier.coerceIn(0.5f, 2.0f)
-            tts?.setSpeechRate(safeSpeed)
-            tts?.setPitch(1.18f)
-
-            // Smooth audio ducking before voice articulation
-            bgMusicManager?.duckVolume(0.20f, 350L)
-
-            val params = android.os.Bundle().apply {
-                putFloat(TextToSpeech.Engine.KEY_PARAM_VOLUME, 0.65f)
-            }
-            tts?.speak(text, TextToSpeech.QUEUE_FLUSH, params, "hold_cue_${System.currentTimeMillis()}")
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to articulate hold cue: $text", e)
-            bgMusicManager?.restoreVolume()
-        }
+        unifiedVoiceEngine.speak(text, speedMultiplier)
     }
 
     override fun stop() {
-        tts?.stop()
-        bgMusicManager?.restoreVolume()
+        unifiedVoiceEngine.stop()
     }
 
     override fun release() {
-        tts?.stop()
-        tts?.shutdown()
-        tts = null
-        isInitialized = false
-        bgMusicManager?.restoreVolume()
+        unifiedVoiceEngine.shutdown()
     }
 }
 
@@ -203,14 +82,22 @@ class AndroidDualCueSpeaker(
  * State machine runs on [Dispatchers.Default] with monotonic time tracking to prevent background drift.
  *
  * @param speaker Speech synthesis delegate.
+ * @param voiceEngine Authoritative unified voice engine delegate (optional).
  * @param logger Telemetry logging delegate.
  * @param coroutineScope External coroutine scope (defaults to Default dispatcher + SupervisorJob).
  */
 class HoldTimerEngine(
     var speaker: DualCueSpeaker? = null,
+    var voiceEngine: com.habitbell.app.audio.UnifiedVoiceEngine? = null,
     val logger: HoldTimerSessionLogger = HoldTimerSessionLogger(),
     private val coroutineScope: CoroutineScope = CoroutineScope(Dispatchers.Default + SupervisorJob())
 ) {
+
+    init {
+        if (speaker == null && voiceEngine != null) {
+            speaker = voiceEngine
+        }
+    }
 
     private val _sessionState = MutableStateFlow(HoldTimerSessionState())
     val sessionState: StateFlow<HoldTimerSessionState> = _sessionState.asStateFlow()
@@ -466,8 +353,17 @@ class HoldTimerEngine(
             val roundName = activeConfig.getRoundName(round)
             onMilestoneBell?.invoke()
 
-            // 1. Announce Round Level Cue ("First", "Second", ...)
-            speaker?.speak(roundName, activeConfig.ttsSpeed)
+            // 1. Announce Round Level Cue / Hold Cue
+            if (voiceEngine != null) {
+                voiceEngine?.speakHoldStartCue(
+                    roundOrdinal = roundName,
+                    style = activeConfig.voiceCueStyle,
+                    volume = activeConfig.voiceVolume,
+                    speedMultiplier = activeConfig.ttsSpeed
+                )
+            } else {
+                speaker?.speak(roundName, activeConfig.ttsSpeed)
+            }
             _sessionState.update {
                 it.copy(
                     phase = HoldTimerPhase.HOLD,
@@ -509,7 +405,15 @@ class HoldTimerEngine(
             val restSec = activeConfig.restDurationSec
             if (restSec > 0 && round < activeConfig.repeatCount && !skipRequested) {
                 onMilestoneBell?.invoke()
-                speaker?.speak("Rest", activeConfig.ttsSpeed)
+                if (voiceEngine != null) {
+                    voiceEngine?.speakRestCue(
+                        style = activeConfig.voiceCueStyle,
+                        volume = activeConfig.voiceVolume,
+                        speedMultiplier = activeConfig.ttsSpeed
+                    )
+                } else {
+                    speaker?.speak("Rest", activeConfig.ttsSpeed)
+                }
                 _sessionState.update {
                     it.copy(
                         phase = HoldTimerPhase.REST,

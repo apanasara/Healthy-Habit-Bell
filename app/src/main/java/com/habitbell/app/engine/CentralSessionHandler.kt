@@ -193,24 +193,29 @@ class CentralSessionHandler(private val application: Application) {
         }
     }
 
+    /** Authoritative single voice engine coordinator across all voice cues in the app. */
+    val voiceEngine: com.habitbell.app.audio.UnifiedVoiceEngine = com.habitbell.app.audio.UnifiedVoiceEngine(application, bgMusicManager)
+
     /** Voice-driven yoga and physiotherapy hold timer orchestrator. */
     val holdTimerManager: com.habitbell.app.holdtimer.HoldTimerManager = com.habitbell.app.holdtimer.HoldTimerManager(
         context = application,
         bgMusicManager = bgMusicManager,
+        voiceEngine = voiceEngine,
         bellManager = audioManager
     )
 
     /** Gentle lady voice guidance coordinator for Pranayama breathwork. */
-    val voiceGuide: PranayamaVoiceGuide = PranayamaVoiceGuide(application, bgMusicManager)
+    val voiceGuide: PranayamaVoiceGuide = PranayamaVoiceGuide(application, bgMusicManager, voiceEngine)
 
     /** Voice guidance player for Surya Namaskar Asana cues and Solar Mantras. */
-    val suryaVoicePlayer: com.habitbell.app.audio.SuryaVoicePlayer = com.habitbell.app.audio.SuryaVoicePlayer(application, bgMusicManager)
+    val suryaVoicePlayer: com.habitbell.app.audio.SuryaVoicePlayer = com.habitbell.app.audio.SuryaVoicePlayer(application, bgMusicManager, voiceEngine)
 
     /** Voice guidance player articulating 5-second countdown cues and strikes before session begins. */
     val preparationVoiceGuide: com.habitbell.app.audio.PreparationVoiceGuide = com.habitbell.app.audio.PreparationVoiceGuide(
         context = application,
         bgMusicManager = bgMusicManager,
-        audioBellManager = audioManager
+        audioBellManager = audioManager,
+        unifiedVoiceEngine = voiceEngine
     )
 
     /** Core 1Hz heartbeat finite state machine governing timer countdowns. */

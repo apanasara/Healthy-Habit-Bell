@@ -424,6 +424,7 @@ class MainActivity : FragmentActivity() {
                                 viewModel.updateHoldTimerConfig(profileId, config)
                                 viewModel.holdTimerManager.engine.loadConfig(config)
                             },
+                            onTestHoldVoiceCue = { config -> viewModel.testHoldVoiceCue(config) },
                             onTestVoiceCue = { style, isTriBandha, volume -> viewModel.testPranayamaVoiceCue(style, isTriBandha, volume) },
                             onTestPranayamaIntervalBell = { viewModel.testPranayamaIntervalBell() },
                             tvCastUrl = viewModel.getTvCastUrl(),

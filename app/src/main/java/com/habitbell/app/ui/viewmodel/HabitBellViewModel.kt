@@ -898,6 +898,19 @@ class HabitBellViewModel(application: Application) : AndroidViewModel(applicatio
         audioManager.playPranayamaIntervalPreview()
     }
 
+    /**
+     * Auditions a sample spoken cue for the Hold Timer settings drawer preview.
+     *
+     * @param config Target [com.habitbell.app.data.model.HoldTimerConfig] containing voice cue style, volume, and speed.
+     */
+    fun testHoldVoiceCue(config: com.habitbell.app.data.model.HoldTimerConfig) {
+        sessionHandler.voiceEngine.auditionHoldCue(
+            style = config.voiceCueStyle,
+            volume = config.voiceVolume,
+            speedMultiplier = config.ttsSpeed
+        )
+    }
+
     /** Central breath stroke counter orchestrator from process singleton. */
     val breathCountManager: com.habitbell.app.breath.BreathCountManager = sessionHandler.breathCountManager
 

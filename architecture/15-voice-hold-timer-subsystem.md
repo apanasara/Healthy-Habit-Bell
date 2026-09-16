@@ -127,17 +127,22 @@ To prevent musculoskeletal strain or over-exertion during rehabilitation or adva
 
 ---
 
-## 8. Pranayama Acoustic Timbre & Background Ducking Matching
+## 8. Pranayama Acoustic Timbre & Background Ducking Matching (UnifiedVoiceEngine Integration)
 
-To preserve deep meditational continuity across Habit Bell:
-- **Acoustic Voice Profile**: Matches `PranayamaVoiceGuide` with high-frequency Lata Mangeshkar-style Indian female timbre:
-  - Language: Prioritizes Indian English (`en-IN`) and Hindi (`hi-IN`) female neural voices (`hi-IN-SwaraNeural`).
-  - Elevated Pitch: Sets pitch to `1.18f` for sweet, bright clarity.
-  - Serene Cadence: Default speech rate multiplier configured to `0.85f` (unhurried yogic pacing).
+To preserve deep meditational continuity across Habit Bell, the Hold Timer delegates all audio and vocal cues directly to the application-wide `UnifiedVoiceEngine` (`com.habitbell.app.audio.UnifiedVoiceEngine`) via `DualCueSpeaker`:
+- **Single Hardware Voice Engine**: Eliminates Android TTS engine conflicts and audio focus contention by routing all spoken cues (Pranayama, Hold Timer, Surya Namaskar, Preparation Countdown) through `UnifiedVoiceEngine`.
+- **Acoustic Voice Profile**: Inherits the unified master vocal profile with high-frequency Lata Mangeshkar-style Indian female timbre:
+  - Neural Voice: Prioritizes Indian English (`en-IN`) and Hindi (`hi-IN`) female neural voices (`hi-IN-SwaraNeural`).
+  - Elevated Pitch: Sets pitch to `1.18f` (+52Hz boost) for sweet, bright, meditational clarity.
+  - Serene Cadence: Speech rate multiplier configured to `0.85f` (unhurried yogic pacing).
+  - Studio Kumbhak/Rechak Cues: Accesses pre-recorded high-fidelity studio breath guidance chimes alongside synthesized speech.
 - **Smooth Dynamic Audio Ducking**:
   - Interacts directly with `BackgroundMusicManager` via monotonic raised-cosine volume ducking.
-  - Before voice cue commences: ducks background soundscape smoothly to `0.20f` volume over a 350ms curve.
+  - Before voice cue commences: ducks background soundscape smoothly to `0.20f` volume over a 350ms curve with a 120ms anti-startle delay.
   - Upon cue completion or cancellation: restores background audio to full volume over 500ms.
+- **Voice Cue Styles & In-Drawer Auditioning**:
+  - Supports Sanskrit (`Kumbhaka` / `Rechaka`), Bilingual (`Hold Kumbhaka` / `Exhale Rechaka`), and English (`Hold Breath` / `Release`).
+  - Auditionable directly in `HoldTimerSettingsSheet` inside `SettingsDrawer` with dedicated volume and cadence controls.
 
 ---
 

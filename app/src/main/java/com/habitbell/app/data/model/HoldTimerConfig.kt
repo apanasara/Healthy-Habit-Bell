@@ -28,6 +28,8 @@ import org.json.JSONObject
  * @property ttsSpeed Speech rate and cadence multiplier (default 1.0f, safe range 0.5f to 2.0f).
  * @property isCountAloudEnabled Whether the dual-cue engine counts each second out loud during holds and rests.
  * @property isHapticTickEnabled Whether tactile vibration pulses fire synchronously on each second tick.
+ * @property voiceCueStyle Spoken voice guidance delivery style (Sanskrit, Bilingual, English).
+ * @property voiceVolume Spoken vocal gain factor (0.15f..1.0f). Default 0.52f.
  */
 data class HoldTimerConfig(
     val holdDurationSec: Int = 30,
@@ -38,7 +40,9 @@ data class HoldTimerConfig(
     val ttsVoice: String = "en-US",
     val ttsSpeed: Float = 0.85f,
     val isCountAloudEnabled: Boolean = true,
-    val isHapticTickEnabled: Boolean = true
+    val isHapticTickEnabled: Boolean = true,
+    val voiceCueStyle: VoiceCueStyle = VoiceCueStyle.BILINGUAL,
+    val voiceVolume: Float = 0.52f
 ) {
     init {
         require(holdDurationSec >= 1) { "holdDurationSec must be at least 1 second (got $holdDurationSec)" }
@@ -46,6 +50,7 @@ data class HoldTimerConfig(
         require(repeatCount >= 1) { "repeatCount must be at least 1 round (got $repeatCount)" }
         require(maxHoldSec >= 1) { "maxHoldSec safety limit must be at least 1 second (got $maxHoldSec)" }
         require(ttsSpeed in 0.4f..2.5f) { "ttsSpeed must be within 0.4f..2.5f (got $ttsSpeed)" }
+        require(voiceVolume in 0.15f..1.0f) { "voiceVolume must be within 0.15f..1.0f (got $voiceVolume)" }
     }
 
     /**
@@ -95,6 +100,8 @@ data class HoldTimerConfig(
         json.put("ttsSpeed", ttsSpeed.toDouble())
         json.put("isCountAloudEnabled", isCountAloudEnabled)
         json.put("isHapticTickEnabled", isHapticTickEnabled)
+        json.put("voiceCueStyle", voiceCueStyle.name)
+        json.put("voiceVolume", voiceVolume.toDouble())
         return json.toString(2)
     }
 
@@ -112,7 +119,9 @@ data class HoldTimerConfig(
             restDurationSec = 15,
             repeatCount = 4,
             maxHoldSec = 60,
-            ttsSpeed = 0.85f
+            ttsSpeed = 0.85f,
+            voiceCueStyle = VoiceCueStyle.BILINGUAL,
+            voiceVolume = 0.52f
         )
 
         /**
@@ -133,6 +142,9 @@ data class HoldTimerConfig(
             val speed = json.optDouble("ttsSpeed", 0.85).toFloat()
             val countAloud = json.optBoolean("isCountAloudEnabled", true)
             val haptic = json.optBoolean("isHapticTickEnabled", true)
+            val styleStr = json.optString("voiceCueStyle", "BILINGUAL")
+            val style = try { VoiceCueStyle.valueOf(styleStr) } catch (_: Exception) { VoiceCueStyle.BILINGUAL }
+            val volume = json.optDouble("voiceVolume", 0.52).toFloat()
 
             val namesList = mutableListOf<String>()
             val namesArray = json.optJSONArray("roundNames")
@@ -153,7 +165,9 @@ data class HoldTimerConfig(
                 ttsVoice = voice,
                 ttsSpeed = speed,
                 isCountAloudEnabled = countAloud,
-                isHapticTickEnabled = haptic
+                isHapticTickEnabled = haptic,
+                voiceCueStyle = style,
+                voiceVolume = volume
             )
         }
     }
