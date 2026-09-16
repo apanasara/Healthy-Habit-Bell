@@ -91,3 +91,17 @@ To eliminate cold-boot latency and white screen flashes on both modern and legac
   - Executes a subtle breathing scale (0.92f → 1.0f) and alpha fade-in (650ms) using `FastOutSlowInEasing`.
   - Automatically fades out smoothly (400ms) to reveal `ModernHomeScreenSample` on cold boot.
   - **Voice & Deep Link Bypass**: Automated intents (`ACTION_SET_TIMER`, `SURYA_TIMER`, `ACTION_VIEW`) immediately bypass the in-app splash animation (`showSplashOverlay = false`) to guarantee zero-latency execution for Google Assistant commands.
+
+### 4. Dynamic Logo Theming & Shadow-Free Vector Branding
+To ensure flawless visual coherence across daylight and nighttime environments:
+- **Zero-Shadow Flat Vector Geometry (`ic_habit_bell_logo.xml`)**:
+  - Engineered directly from the canonical Lotus & Bell branding asset (`branding/HabitBell.svg`), stripping all raster blur filters, Gaussian drops, and offset shadows.
+  - Base vector fill `#FFFFFFFF` allows loss-less hardware vector scaling without raster pixelation across all display densities (mdpi through xxxhdpi).
+- **Dynamic Button Theme Color Harmony**:
+  - Dynamically tinted in Compose via `ColorFilter.tint(MaterialTheme.colorScheme.primary)` across `ModernHomeScreenSample`, `HomeScreen`, and `SplashScreen`.
+  - **Dark & AMOLED Themes**: Dynamically harmonizes with UI button accents using `BellGold` (`#D4AF37`) or `EyeComfortAmber` (`#E29D47`).
+  - **Sun Day Light Theme**: Dynamically adapts in real time to the daytime button theme color `SunDayAmber` (`#D97706`).
+  - **Seamless Reactive Switching**: Instantly tracks theme cycling (AMOLED → Eye Comfort → Dark → Light) without activity restart or asset reloading.
+- **Shadow-Free Raster Fallback (`ic_splash_logo.png`)**:
+  - Synthesized via headless Chrome rendering with zero drop shadow (`scripts/generate_branding_assets.js`) for native system window splash and legacy external platforms.
+
