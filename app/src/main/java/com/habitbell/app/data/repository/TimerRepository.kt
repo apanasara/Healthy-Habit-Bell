@@ -212,6 +212,13 @@ class TimerRepository(private val context: Context) {
                 val speed = prefs.getFloat("profile_hold_speed_${defaultProfile.id}", baseConfig.ttsSpeed)
                 val countAloud = prefs.getBoolean("profile_hold_count_aloud_${defaultProfile.id}", baseConfig.isCountAloudEnabled)
                 val haptic = prefs.getBoolean("profile_hold_haptic_${defaultProfile.id}", baseConfig.isHapticTickEnabled)
+                val cueStyleStr = prefs.getString("profile_hold_cue_style_${defaultProfile.id}", baseConfig.voiceCueStyle.name)
+                val restoredStyle = try {
+                    com.habitbell.app.data.model.VoiceCueStyle.valueOf(cueStyleStr ?: baseConfig.voiceCueStyle.name)
+                } catch (_: Exception) {
+                    baseConfig.voiceCueStyle
+                }
+                val voiceVol = prefs.getFloat("profile_hold_voice_volume_${defaultProfile.id}", baseConfig.voiceVolume)
 
                 baseConfig.copy(
                     holdDurationSec = if (holdSec >= 1) holdSec else baseConfig.holdDurationSec,
@@ -220,7 +227,9 @@ class TimerRepository(private val context: Context) {
                     maxHoldSec = if (maxHold >= 1) maxHold else baseConfig.maxHoldSec,
                     ttsSpeed = if (speed in 0.4f..2.5f) speed else baseConfig.ttsSpeed,
                     isCountAloudEnabled = countAloud,
-                    isHapticTickEnabled = haptic
+                    isHapticTickEnabled = haptic,
+                    voiceCueStyle = restoredStyle,
+                    voiceVolume = if (voiceVol in 0.0f..1.0f) voiceVol else baseConfig.voiceVolume
                 )
             }
 
@@ -624,6 +633,8 @@ class TimerRepository(private val context: Context) {
             .putFloat("profile_hold_speed_$profileId", config.ttsSpeed)
             .putBoolean("profile_hold_count_aloud_$profileId", config.isCountAloudEnabled)
             .putBoolean("profile_hold_haptic_$profileId", config.isHapticTickEnabled)
+            .putString("profile_hold_cue_style_$profileId", config.voiceCueStyle.name)
+            .putFloat("profile_hold_voice_volume_$profileId", config.voiceVolume)
             .apply()
 
         _profiles.update { list ->

@@ -43,24 +43,93 @@ The audio architecture guarantees high-fidelity, boundary-free sound reproductio
 
 ---
 
-## 3. Melodious Anti-Startle Voice Guidance Subsystem (`PranayamaVoiceGuide.kt`)
+## 3. Unified Voice Engine & Anti-Startle Guidance Subsystem (`UnifiedVoiceEngine.kt`)
 
-- **Acoustic Design Rationale**:
-  - Sudden, loud vocal instructions during deep breath retention (*Kumbhaka*) or contemplation trigger an abrupt sympathetic nervous startle response, shattering meditative absorption (*dhyana*).
-  - Habit Bell eliminates jarring transitions through an unhurried, sweet, soft, high-frequency female voice profile matching the gentle, revered tonal swara of Bollywood singing legend **Lata Mangeshkar**.
-- **Voice Profile Standard & Mastered Assets**:
-  - **Acoustic Profile**: Natural high-frequency swara (`pitch: +52Hz`), meditative cadence (`rate: -45%` / `0.55x`), clean yogic pronunciation, and whisper-soft default gain (`0.52f`).
-  - **Option 1 (Only Sanskrit)**: Traditional Sanskrit sacred cues (`R.raw.pranayama_purak_sanskrit`, `R.raw.pranayama_kumbhak_sanskrit`, `R.raw.pranayama_rechak_sanskrit`). Both internal (*Antar*) and external (*Bahya*) retention phases share the melodious *Kumbhak* cue per authentic yogic practice.
-  - **Option 2 (Sanskrit + English)**: Bilingual cues (`R.raw.pranayama_purak_bilingual`, `R.raw.pranayama_kumbhak_bilingual`, `R.raw.pranayama_rechak_bilingual`). Spoken with unhurried, deeply soothing, sweet Lata-style cadence (~5.6s–5.9s duration).
-  - **Step Timing vs. Voice Timing Law (< 6s Accommodation Guard)**: In `PranayamaVoiceGuide.kt`, when a phase's configured duration cannot fully accommodate the unhurried bilingual cue (< 6 seconds, e.g. a 4s or 2s/3s Purak step), Option 2 automatically and seamlessly falls back to the clean, melodious single-language Sanskrit cue (`R.raw.pranayama_purak_sanskrit`, ~2.2s). Steps with duration $\ge 6$s (e.g. 8s or 16s Kumbhak/Rechak) enjoy the full unhurried bilingual guidance, guaranteeing that no cue is ever rushed or clipped mid-word.
-  - **Anti-Startle Lead Delay**: Inserts a 120ms gentle delay after ducking begins before audio playback, letting ambient music settle before the voice begins.
-  - **Cross-Subsystem Reuse Guarantee & Surya Namaskar Tooling**:
-    - This voice profile specification (`hi-IN-SwaraNeural`, `+52Hz`, gentle soothing swara) is established as the project-wide architectural standard.
-    - **Reusable Generator Tool (`scripts/generate_surya_namaskar_voice.py`)**: A dedicated automated Python studio script is bundled in the repository:
-      ```bash
-      python3 scripts/generate_surya_namaskar_voice.py
-      ```
-      This will autonomously synthesize all 24 Surya Namaskar audio assets (12 Asanas with sacred solar mantras `ॐ मित्राय नमः...` + 12 bilingual flow cues) directly into `app/src/main/res/raw/` matching the exact tonal swara and acoustic characteristics of the Pranayama voice cues.
+### 3.1 Architectural Rationale & Single Engine Architecture
+In earlier iterations of Habit Bell, vocal guidance was fragmented across 4 separate components (`PranayamaVoiceGuide`, `PreparationVoiceGuide`, `SuryaVoicePlayer`, and `AndroidDualCueSpeaker` in `HoldTimerEngine`). Each component maintained or requested separate `TextToSpeech` instances, causing:
+1. **Audio Server Contention**: Multiple `TextToSpeech` hardware handles competing for OS media resources.
+2. **Acoustic Inconsistency**: Differing voice locales, speech speeds, and pitch offsets between timers.
+3. **Redundant Ducking Orchestration**: Duplicated ducking logic and media listener lifecycles.
+
+To solve this, **`UnifiedVoiceEngine.kt`** (`com.habitbell.app.audio`) was established as the single, authoritative voice engine across all voice cues in Habit Bell. It implements `OnInitListener` and `DualCueSpeaker`, acting as a thread-safe process singleton accessible via `CentralSessionHandler.voiceEngine` and injected into `HoldTimerManager`, `PranayamaVoiceGuide`, `PreparationVoiceGuide`, and `SuryaVoicePlayer`.
+
+```
+                                  +-----------------------------+
+                                  |     CentralSessionHandler   |
+                                  +--------------+--------------+
+                                                 | process singleton
+                                                 v
++------------------------------------------------------------------------------------------------+
+|                                    UnifiedVoiceEngine                                          |
+|  - Single android.speech.tts.TextToSpeech hardware handle (hi-IN-SwaraNeural, +52Hz, 0.85f)    |
+|  - Shared android.media.MediaPlayer pipeline with 120ms anti-startle delay & 350ms ducking     |
+|  - Implements DualCueSpeaker (speak, stop, release) for HoldTimerEngine FSM                    |
++---------+----------------------------+-----------------------------+---------------------------+
+          |                            |                             |                           |
+          v                            v                             v                           v
+  [1. Pranayama]             [2. Prep Countdown]           [3. Surya Namaskar]          [4. Hold Timer]
+  - Purak / Kumbhak /        - T-5s "Take position"        - 12 Solar Mantras           - Round ordinal cues
+    Rechak / Bahya           - T-3s, 2s, 1s numbers        - Asana flow cues            - Kumbhak / Hold
+  - Tri-Bandha cues          - Option C strikes sync       - Asana durations            - Rechak / Rest
+  - <6s auto-fallback        - Silence guard (mic)         - Dual speech modes          - Second ticks aloud
+```
+
+### 3.2 Master Vocal Profile Standard
+- **Acoustic Profile**: Natural high-frequency female swara (`pitch: +52Hz` / ~1.16f multiplier), unhurried meditative cadence (`0.75x–0.85x`), and whisper-soft default gain (`0.52f`).
+- **Tonal Identity**: Modelled after Bollywood singing legend **Lata Mangeshkar** (`hi-IN-SwaraNeural` voice locale with graceful, soothing cadence).
+- **Anti-Startle Lead Delay**: Every spoken vocal instruction or studio audio asset enforces a **120ms lead delay** after ambient music ducking commences, allowing ambient drones to soften before voice entry.
+- **Dynamic Raised-Cosine S-Curve Ducking**: Automatically attenuates background music to $0.20\text{f}$ over 350ms via `BackgroundMusicManager.duckVolume()`, restoring it to unity over 500ms via `restoreVolume()` upon phrase completion.
+
+### 3.3 Four Functional Vocal Domains Supported by the Unified Engine
+
+#### Domain 1: Classical Hatha Yoga Pranayama
+- **Option 1 (Only Sanskrit)**: Traditional Sanskrit sacred cues (`R.raw.pranayama_purak_sanskrit`, `R.raw.pranayama_kumbhak_sanskrit`, `R.raw.pranayama_rechak_sanskrit`). Both internal (*Antar*) and external (*Bahya*) retention phases share the melodious *Kumbhak* cue.
+- **Option 2 (Sanskrit + English)**: Bilingual guidance (`R.raw.pranayama_purak_bilingual`, `R.raw.pranayama_kumbhak_bilingual`, `R.raw.pranayama_rechak_bilingual`).
+- **Step Timing vs. Voice Timing Law (< 6s Accommodation Guard)**: When a phase duration cannot fully accommodate the unhurried bilingual cue (< 6 seconds, e.g. 4s Purak step), Option 2 automatically falls back to the clean, single-language Sanskrit cue (`R.raw.pranayama_purak_sanskrit`, ~2.2s). Steps with duration $\ge 6$s enjoy full bilingual guidance.
+- **Tri-Bandha Guidance**: Whispers *"Kumbhak... Tri-Bandha"* during internal breath retention when enabled in settings.
+
+#### Domain 2: Pre-Session Preparation Countdown
+- **T = 5s**: Articulates *"Take your position"* (`R.raw.prep_take_position`).
+- **T = 3s, 2s, 1s**: Pronounces *"Three"* (`R.raw.prep_three`), *"Two"* (`R.raw.prep_two`), and *"One"* (`R.raw.prep_one`), paired with Option C tingsha strikes.
+- **Strict Acoustic Silence Guard**: When `isAcousticCalibrationActive` is true (Breathwork / Mantra Counter in acoustic mic mode), all voice numbers and chimes are strictly suppressed to guarantee clean environmental noise profiling.
+
+#### Domain 3: Sūrya Namaskār Subsystem
+- Synthesizes 12 sacred solar mantras (`ॐ मित्राय नमः...`, `ॐ रवये नमः...`) and posture guidance matching the identical Swara acoustic profile.
+- Standalone generator script: `python3 scripts/generate_surya_namaskar_voice.py`.
+
+#### Domain 4: Voice-Driven Yoga / Physiotherapy Hold Timer
+- **Phase Transition Cues**:
+  - **Hold Commencement**: Announces spoken round ordinal ("First", "Second", "Third"...) followed by phase cue.
+    - Sanskrit: *"First... कुम्भक"* (or `R.raw.pranayama_kumbhak_sanskrit` asset).
+    - Bilingual: *"First Round... कुम्भक Hold"* (or `R.raw.pranayama_kumbhak_bilingual` asset).
+    - English: *"First Round... Hold"*.
+  - **Rest Commencement**: Announces recovery rest.
+    - Sanskrit: *"रेचक... विश्राम"* (or `R.raw.pranayama_rechak_sanskrit`).
+    - Bilingual: *"रेचक... Rest"* (or `R.raw.pranayama_rechak_bilingual`).
+    - English: *"Rest"*.
+- **Count Aloud Each Second**: When enabled (`isCountAloudEnabled`), articulates countdown numbers ("one", "two", "three"...) on each second tick.
+- **Auditioning from Settings Drawer**: `UnifiedVoiceEngine.auditionHoldCue(style, volume, speed)` allows practitioners to audition cues directly inside `HoldTimerSettingsSheet`.
+
+### 3.4 Future Developer & AI Agent Usage Guide
+To reuse the voice engine in any new timer, mindfulness practice, or subsystem:
+```kotlin
+// 1. Obtain engine instance from CentralSessionHandler
+val voiceEngine = sessionHandler.voiceEngine
+
+// 2. Play a high-definition studio-mastered audio asset with 120ms anti-startle delay and ducking:
+voiceEngine.playMasteredAudio(R.raw.pranayama_purak_sanskrit, volume = 0.52f)
+
+// 3. Synthesize natural speech with the master Lata Swara profile and ducking:
+voiceEngine.speakWithDucking(
+    text = "Exhale slowly through the nose",
+    speedMultiplier = 0.85f,
+    volume = 0.52f
+)
+
+// 4. Inject as DualCueSpeaker into any countdown or state machine:
+val speaker: DualCueSpeaker = voiceEngine
+speaker.speak("Hold posture steady", 0.85f)
+```
 
 ---
 

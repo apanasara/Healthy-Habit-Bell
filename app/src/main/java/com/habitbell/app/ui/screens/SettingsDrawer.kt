@@ -168,6 +168,7 @@ fun SettingsDrawer(
     onUpdateBreathCounterConfig: (profileId: String, config: BreathCounterConfig) -> Unit = { _, _ -> },
     onUpdateMantraCounterConfig: (profileId: String, config: MantraCounterConfig) -> Unit = { _, _ -> },
     onUpdateHoldTimerConfig: (profileId: String, config: HoldTimerConfig) -> Unit = { _, _ -> },
+    onTestHoldVoiceCue: (HoldTimerConfig) -> Unit = {},
     onTestVoiceCue: (VoiceCueStyle, Boolean, Float) -> Unit = { _, _, _ -> },
     onTestPranayamaIntervalBell: () -> Unit = {},
     hasActivityPermission: Boolean = true,
@@ -320,7 +321,8 @@ fun SettingsDrawer(
                             onUpdateSurya = onUpdateSurya,
                             onUpdateBreathCounterConfig = onUpdateBreathCounterConfig,
                             onUpdateMantraCounterConfig = onUpdateMantraCounterConfig,
-                            onUpdateHoldTimerConfig = onUpdateHoldTimerConfig
+                            onUpdateHoldTimerConfig = onUpdateHoldTimerConfig,
+                            onTestHoldVoiceCue = onTestHoldVoiceCue
                         )
                     }
                 } else {
@@ -389,7 +391,8 @@ private fun TimerSettingsContent(
     onUpdateSurya: (poses: List<CompoundPose>, targetRounds: Int, speedPreset: String, customPaceSeconds: Int, voiceCueMode: VoiceCueMode) -> Unit = { _, _, _, _, _ -> },
     onUpdateBreathCounterConfig: (profileId: String, config: com.habitbell.app.data.model.BreathCounterConfig) -> Unit = { _, _ -> },
     onUpdateMantraCounterConfig: (profileId: String, config: com.habitbell.app.data.model.MantraCounterConfig) -> Unit = { _, _ -> },
-    onUpdateHoldTimerConfig: (profileId: String, config: HoldTimerConfig) -> Unit = { _, _ -> }
+    onUpdateHoldTimerConfig: (profileId: String, config: HoldTimerConfig) -> Unit = { _, _ -> },
+    onTestHoldVoiceCue: (HoldTimerConfig) -> Unit = {}
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
         // -------------------------------------------------------------
@@ -508,7 +511,8 @@ private fun TimerSettingsContent(
                 onPickCustomAudio = onPickCustomAudio,
                 onBgMusicYouTubeUrlChange = onBgMusicYouTubeUrlChange,
                 onBgMusicVolumeChange = onBgMusicVolumeChange,
-                onPreviewBgMusic = onPreviewBgMusic
+                onPreviewBgMusic = onPreviewBgMusic,
+                onTestVoiceCue = onTestHoldVoiceCue
             )
             return
         } else if (profile.mantraConfig != null) {
@@ -2388,7 +2392,8 @@ private fun HoldTimerSettingsSheet(
     onPickCustomAudio: () -> Unit,
     onBgMusicYouTubeUrlChange: (String) -> Unit,
     onBgMusicVolumeChange: (Float) -> Unit,
-    onPreviewBgMusic: (Boolean) -> Unit
+    onPreviewBgMusic: (Boolean) -> Unit,
+    onTestVoiceCue: ((HoldTimerConfig) -> Unit)? = null
 ) {
     val initialConfig = profile.holdTimerConfig ?: HoldTimerConfig.DEFAULT_YOGA_PHYSIO
     var currentConfig by remember(profile.id, initialConfig) { mutableStateOf(initialConfig) }
@@ -2727,7 +2732,104 @@ private fun HoldTimerSettingsSheet(
                     modifier = Modifier.fillMaxWidth()
                 )
 
+                Spacer(modifier = Modifier.height(14.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Spoken Cue Style
+                Text(
+                    text = "Spoken Cue Style",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    com.habitbell.app.data.model.VoiceCueStyle.entries.forEach { style ->
+                        val isSelected = currentConfig.voiceCueStyle == style
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surface,
+                            border = BorderStroke(1.dp, if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { dispatchConfig(currentConfig.copy(voiceCueStyle = style)) }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                RadioButton(
+                                    selected = isSelected,
+                                    onClick = { dispatchConfig(currentConfig.copy(voiceCueStyle = style)) },
+                                    colors = RadioButtonDefaults.colors(selectedColor = MaterialTheme.colorScheme.primary)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Column {
+                                    Text(
+                                        text = style.shortLabel,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Text(
+                                        text = when (style) {
+                                            com.habitbell.app.data.model.VoiceCueStyle.SANSKRIT -> "Authentic Swara cues (Kumbhak, Rechak)"
+                                            com.habitbell.app.data.model.VoiceCueStyle.BILINGUAL -> "Sanskrit + English (Kumbhak... Hold, Rechak... Rest)"
+                                            com.habitbell.app.data.model.VoiceCueStyle.ENGLISH -> "Mindfulness English cues (Hold, Rest)"
+                                        },
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Voice Guidance Volume Slider
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Voice Guidance Volume (${(currentConfig.voiceVolume * 100).toInt()}%)",
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+                Slider(
+                    value = currentConfig.voiceVolume,
+                    onValueChange = { dispatchConfig(currentConfig.copy(voiceVolume = (it * 20).toInt() / 20f)) },
+                    valueRange = 0.0f..1.0f,
+                    colors = SliderDefaults.colors(
+                        thumbColor = MaterialTheme.colorScheme.primary,
+                        activeTrackColor = MaterialTheme.colorScheme.primary
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
                 Spacer(modifier = Modifier.height(10.dp))
+
+                // Spoken Cue Audition Button
+                OutlinedButton(
+                    onClick = { onTestVoiceCue?.invoke(currentConfig) },
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    val auditionLabel = when (currentConfig.voiceCueStyle) {
+                        com.habitbell.app.data.model.VoiceCueStyle.SANSKRIT -> "▶ Test Spoken Voice Cue ('Kumbhak')"
+                        com.habitbell.app.data.model.VoiceCueStyle.BILINGUAL -> "▶ Test Spoken Voice Cue ('Kumbhak... Hold')"
+                        com.habitbell.app.data.model.VoiceCueStyle.ENGLISH -> "▶ Test Spoken Voice Cue ('Hold')"
+                    }
+                    Text(auditionLabel)
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                Spacer(modifier = Modifier.height(12.dp))
 
                 SettingsToggleRow(
                     title = "Count Aloud Each Second",

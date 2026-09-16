@@ -29,9 +29,10 @@ Habit Bell is an offline-first, distraction-free wellness operating system engin
 |  - CentralSessionHandler (Authoritative Hub)  |     |  - TimerRepository                  |
 |  - MediaSessionCompat ("HabitBellMediaSession)|     |  - SharedPreferences JSON Store    |
 |  - TimerEngine (1Hz FSM Countdown Core)       |     |  - Predefined Profiles & Reminders  |
-|  - BreathCountManager (Fast Breath Counter)   |     |  - Domain Models (TimerProfile,     |
-|  - AudioBellManager (SoundPool + Procedural)  |     |    PranayamaConfig, CompoundConfig) |
-|  - BackgroundMusicManager (Aum / SAF / YouTube|     +-------------------------------------+
+|  - UnifiedVoiceEngine (Single Voice Engine)   |     |  - Domain Models (TimerProfile,     |
+|  - BreathCountManager (Fast Breath Counter)   |     |    PranayamaConfig, CompoundConfig) |
+|  - AudioBellManager (SoundPool + Procedural)  |     +-------------------------------------+
+|  - BackgroundMusicManager (Aum / SAF / YouTube|
 |  - BatteryOptimizer & TimerService            |
 |  - HapticManager (Pocket-Mode Vibrations)     |
 |  - HealthStepManager (Multi-Platform Steps)   |
@@ -62,7 +63,7 @@ To ensure fast reading, low token consumption for autonomous AI agents, and effo
 | :--- | :--- | :--- |
 | [**01. System Overview & Topology**](architecture/01-system-overview-and-topology.md) | Architectural tiers, Clean Architecture, MVI/MVVM UDF, reactive `StateFlow` | Master Topology, System Layers |
 | [**02. Session & Timer Engines**](architecture/02-session-and-timer-engines.md) | Authoritative orchestrator, 5-state countdown FSM, monotonic sleep skew prevention | `CentralSessionHandler`, `TimerEngine` |
-| [**03. Audio & Soundscape Engine**](architecture/03-audio-and-soundscape-engine.md) | Dual-engine bells, constant ambient volume, Lata voice profile, YouTube streaming, volume sync | `AudioBellManager`, `BackgroundMusicManager`, `PranayamaVoiceGuide`, `SystemVolumeObserver` |
+| [**03. Audio & Soundscape Engine**](architecture/03-audio-and-soundscape-engine.md) | Unified voice engine across all cues (Pranayama, Hold Timer, Surya, Preparation), single TTS handle, dual-engine bells, constant ambient volume, Lata voice profile, YouTube streaming, volume sync | `UnifiedVoiceEngine`, `AudioBellManager`, `BackgroundMusicManager`, `PranayamaVoiceGuide`, `SystemVolumeObserver` |
 | [**04. TV & Living Room Subsystems**](architecture/04-tv-and-living-room-subsystems.md) | Google Cast CAF v3, Miracast 1% backlight decoupling, WebCast, Apple TV, Web Receiver | `HabitBellCastManager`, `ScreenMirroringManager`, `LocalCastWebServer`, `DialTvDiscoverer` |
 | [**05. Automotive & Voice Actions**](architecture/05-automotive-and-voice-actions.md) | Android Auto Car App Library v1.7.0, recents task removal (`onTaskRemoved`), Google Assistant | `HabitBellCarAppService`, `HabitBellCarSession`, `HabitBellCarScreen`, `HabitBellMediaService` |
 | [**06. Presentation UI & Theming**](architecture/06-presentation-ui-and-theming.md) | Jetpack Compose, punch-hole safe geometry, state restoration, Sun/Moon circadian theming, zero-shadow vector branding, dynamic button theme tinting | `SessionScreen`, `ModernHomeScreenSample`, `HabitBellTheme`, `CastButton` |
@@ -96,3 +97,5 @@ Whenever an autonomous AI agent or engineer modifies, refactors, or extends a su
 - **Living Room Audio Handover**: When streaming to a Google Cast display or Custom Web Receiver, mobile background music is paused to eliminate acoustic echo while the TV receiver streams the user's configured ambient YouTube soundscape directly; upon Cast disconnection, mobile audio seamlessly resumes.
 - **Zero-Internet Guarantee**: Offline operation is guaranteed across timer execution, acoustic procedural synthesis, and local screen mirroring.
 - **Strict Acoustic Silence Protocol & Pre-Timer Room Sound Scanning**: For acoustic microphone sessions (Breathwork and Mantra Counter), the 3-second ambient room noise calibration is unified into the pre-session preparation window ($T=3\text{s} \dots 1\text{s}$). Loudspeaker chime strikes (Option C strikes 3, 2, 1), numeric vocal countdown cues, opening interval bells, and background music are strictly suppressed during this window to eliminate self-acoustic feedback, ensuring pristine environmental noise floor profiling without false threshold inflation.
+- **Unified Voice Engine & Master Vocal Profile Standard**: A single shared process singleton `UnifiedVoiceEngine` (`com.habitbell.app.audio`) coordinates all vocal prompts across Pranayama, Hold Timer, Surya Namaskar, and Pre-Session Preparation. It consolidates hardware handles to a single underlying Android `TextToSpeech` engine and `MediaPlayer` pipeline, enforcing an unhurried, meditative Lata Mangeshkar acoustic profile (`hi-IN-SwaraNeural`, +52Hz pitch shift ~1.16f, cadence 0.75f–0.85f), 120ms anti-startle lead delay, and dynamic raised-cosine background music ducking (to 0.20f over 350ms, restoring over 500ms). Studio-mastered Kumbhak/Rechak assets are seamlessly auditioned and executed across both Pranayama and Hold Timer workflows.
+
