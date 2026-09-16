@@ -25,6 +25,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -565,9 +566,12 @@ private fun ModernZenTopBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
+            // Dynamic Vector Branding Logo: inherits button theme colour (primaryColor)
+            // with zero drop shadow and razor-sharp scalable rendering across dark and light modes.
             Image(
-                painter = painterResource(id = R.drawable.ic_splash_logo),
+                painter = painterResource(id = R.drawable.ic_habit_bell_logo),
                 contentDescription = "Habit Bell Logo",
+                colorFilter = ColorFilter.tint(primaryColor),
                 modifier = Modifier.size(30.dp)
             )
             Text(

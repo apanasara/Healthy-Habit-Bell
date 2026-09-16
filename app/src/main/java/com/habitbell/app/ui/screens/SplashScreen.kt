@@ -8,6 +8,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -15,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -68,7 +70,7 @@ fun SplashScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFF060709))
+            .background(MaterialTheme.colorScheme.background)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null
@@ -85,10 +87,12 @@ fun SplashScreen(
                 .scale(scale.value)
                 .alpha(alpha.value.coerceIn(0f, 1f))
         ) {
-            // Official Golden Lotus & Bell Branding Symbol
+            // Official Lotus & Bell Branding Symbol: dynamically themed matching button theme colour
+            // with zero drop shadow in dark and light modes.
             Image(
-                painter = painterResource(id = R.drawable.ic_splash_logo),
+                painter = painterResource(id = R.drawable.ic_habit_bell_logo),
                 contentDescription = "Habit Bell Official Logo",
+                colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.primary),
                 modifier = Modifier
                     .size(180.dp)
                     .padding(bottom = 24.dp)
@@ -100,7 +104,7 @@ fun SplashScreen(
                 fontSize = 28.sp,
                 fontWeight = FontWeight.Light,
                 letterSpacing = 4.sp,
-                color = Color(0xFFFFFFFF)
+                color = MaterialTheme.colorScheme.onBackground
             )
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -111,7 +115,7 @@ fun SplashScreen(
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Normal,
                 letterSpacing = 2.sp,
-                color = Color(0xFFE5A93C)
+                color = MaterialTheme.colorScheme.primary
             )
         }
     }

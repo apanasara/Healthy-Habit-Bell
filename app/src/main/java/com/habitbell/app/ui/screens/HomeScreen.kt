@@ -18,6 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -211,9 +212,12 @@ private fun HomeTopBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            // Dynamic Vector Branding Logo: dynamically matches button theme colour
+            // (MaterialTheme.colorScheme.primary) with zero drop shadow in dark and light modes.
             Image(
-                painter = painterResource(id = R.drawable.ic_splash_logo),
+                painter = painterResource(id = R.drawable.ic_habit_bell_logo),
                 contentDescription = "Habit Bell Logo",
+                colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.primary),
                 modifier = Modifier.size(36.dp)
             )
             Column {

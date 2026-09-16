@@ -207,8 +207,14 @@ function generateSplashAndBannerAssets() {
   const drawableDir = path.join(APP_RES_DIR, "drawable");
   fs.mkdirSync(drawableDir, { recursive: true });
 
-  // 1. High-resolution Splash Screen Logo (512x512 transparent PNG)
+  // 1. High-resolution Splash Screen Logo (512x512 transparent PNG, zero drop shadow)
   const splashTarget = path.join(drawableDir, "ic_splash_logo.png");
+  // Render clean vector SVG without raster drop shadows or filters
+  let cleanSvg = fs.readFileSync(path.join(BRANDING_DIR, "HabitBell.svg"), "utf8")
+    .replace(/<rect[\s\S]*?\/>/, "")
+    .replace('filter:url(#filter7)', "")
+    .replace(/fill:#dc9b39/, "fill:#D4AF37");
+
   const splashHtml = `<!DOCTYPE html>
 <html>
 <head>
@@ -224,20 +230,27 @@ function generateSplashAndBannerAssets() {
     align-items: center;
     overflow: hidden;
   }
-  img {
+  .logo-container {
     width: 380px;
-    height: auto;
-    display: block;
-    filter: drop-shadow(0 12px 28px rgba(0, 0, 0, 0.6));
+    height: 380px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+  svg {
+    width: 100%;
+    height: 100%;
   }
 </style>
 </head>
 <body>
-  <img src="file://${SRC_TRANSPARENT_PNG}" />
+  <div class="logo-container">
+    ${cleanSvg}
+  </div>
 </body>
 </html>`;
   renderHtmlToPng(splashHtml, 512, 512, splashTarget, true);
-  console.log(`  ✓ drawable/ic_splash_logo.png (512x512)`);
+  console.log(`  ✓ drawable/ic_splash_logo.png (512x512, zero shadow)`);
 
   // 2. Android TV / Google TV Leanback 16:9 Launcher Banner (320x180)
   const bannerTarget = path.join(drawableDir, "tv_banner.png");
