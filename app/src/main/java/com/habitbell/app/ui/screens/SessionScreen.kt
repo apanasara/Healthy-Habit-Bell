@@ -45,7 +45,6 @@ import com.habitbell.app.data.model.TimerType
 import com.habitbell.app.engine.SessionStatus
 import com.habitbell.app.engine.TimerSessionState
 import com.habitbell.app.ui.components.BreathIndicator
-import com.habitbell.app.ui.components.CastButton
 import com.habitbell.app.ui.components.CircularProgressRing
 import com.habitbell.app.ui.components.CompoundPoseCard
 
@@ -482,17 +481,6 @@ private fun LandscapeSessionLayout(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    if (sessionState.profile.isCastSupported) {
-                        Box(
-                            modifier = Modifier
-                                .size(38.dp)
-                                .background(buttonPillBg, CircleShape)
-                                .border(buttonBorder, CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            CastButton(modifier = Modifier.size(20.dp))
-                        }
-                    }
                     if (isScreenMirroringActive) {
                         IconButton(
                             onClick = onToggleOrientation,
@@ -509,7 +497,7 @@ private fun LandscapeSessionLayout(
                             )
                         }
                     }
-                    // TV Casting & Screen Mirroring Sheet (Requirement E8)
+                    // TV Casting & Screen Mirroring Sheet (Requirement E8 - includes Google Cast & device discovery)
                     IconButton(
                         onClick = onOpenCastSettings,
                         modifier = Modifier
@@ -520,7 +508,7 @@ private fun LandscapeSessionLayout(
                         Icon(
                             imageVector = Icons.Outlined.Tv,
                             contentDescription = "Living Room & TV Casting",
-                            tint = MaterialTheme.colorScheme.onSurface,
+                            tint = if (isScreenMirroringActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.size(18.dp)
                         )
                     }
@@ -549,20 +537,6 @@ private fun LandscapeSessionLayout(
                         Icon(
                             painter = painterResource(id = if (isDark) R.drawable.ic_ph_sun else R.drawable.ic_ph_moon),
                             contentDescription = if (isDark) "Switch to Light Mode" else "Switch to Dark Mode",
-                            tint = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
-                    IconButton(
-                        onClick = onOpenSettings,
-                        modifier = Modifier
-                            .size(38.dp)
-                            .background(buttonPillBg, CircleShape)
-                            .border(buttonBorder, CircleShape)
-                    ) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.ic_ph_tune),
-                            contentDescription = "Settings",
                             tint = MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.size(18.dp)
                         )
@@ -833,17 +807,6 @@ private fun PortraitSessionLayout(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    if (sessionState.profile.isCastSupported) {
-                        Box(
-                            modifier = Modifier
-                                .size(42.dp)
-                                .background(buttonPillBg, CircleShape)
-                                .border(buttonBorder, CircleShape),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            CastButton(modifier = Modifier.size(24.dp))
-                        }
-                    }
                     if (isScreenMirroringActive) {
                         IconButton(
                             onClick = onToggleOrientation,
@@ -860,7 +823,7 @@ private fun PortraitSessionLayout(
                             )
                         }
                     }
-                    // TV Casting & Screen Mirroring Sheet (Requirement E8)
+                    // TV Casting & Screen Mirroring Sheet (Requirement E8 - includes Google Cast & device discovery)
                     IconButton(
                         onClick = onOpenCastSettings,
                         modifier = Modifier
@@ -871,7 +834,7 @@ private fun PortraitSessionLayout(
                         Icon(
                             imageVector = Icons.Outlined.Tv,
                             contentDescription = "Living Room & TV Casting",
-                            tint = MaterialTheme.colorScheme.onSurface,
+                            tint = if (isScreenMirroringActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.size(20.dp)
                         )
                     }
@@ -901,20 +864,6 @@ private fun PortraitSessionLayout(
                         Icon(
                             painter = painterResource(id = if (isDark) R.drawable.ic_ph_sun else R.drawable.ic_ph_moon),
                             contentDescription = if (isDark) "Switch to Light Mode" else "Switch to Dark Mode",
-                            tint = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                    IconButton(
-                        onClick = onOpenSettings,
-                        modifier = Modifier
-                            .size(42.dp)
-                            .background(buttonPillBg, CircleShape)
-                            .border(buttonBorder, CircleShape)
-                    ) {
-                        Icon(
-                            painter = painterResource(id = R.drawable.ic_ph_tune),
-                            contentDescription = "Settings",
                             tint = MaterialTheme.colorScheme.onSurface,
                             modifier = Modifier.size(20.dp)
                         )

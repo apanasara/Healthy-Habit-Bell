@@ -415,7 +415,7 @@ fun HoldTimerScreen(
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.width(44.dp)
+                            modifier = Modifier.width(60.dp)
                         )
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -451,7 +451,7 @@ fun HoldTimerScreen(
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.width(44.dp)
+                            modifier = Modifier.width(60.dp)
                         )
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -487,7 +487,7 @@ fun HoldTimerScreen(
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.width(44.dp)
+                            modifier = Modifier.width(60.dp)
                         )
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -523,7 +523,7 @@ fun HoldTimerScreen(
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.width(44.dp)
+                            modifier = Modifier.width(60.dp)
                         )
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
